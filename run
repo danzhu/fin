@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./asm < "$1" > test && ./fin test
