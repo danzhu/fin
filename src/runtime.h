@@ -3,6 +3,7 @@
 
 #include <iosfwd>
 #include <vector>
+#include "method.h"
 #include "stack.h"
 
 namespace Fin
@@ -10,24 +11,41 @@ namespace Fin
     class Runtime
     {
         Stack opStack;
+        std::vector<Method> methods;
         std::vector<char> instrs;
-        size_t pc;
+        uint32_t pc;
+        uint32_t fp;
+
+        template<typename T> T readConst() noexcept
+        {
+            // TODO: change to cross-platform implementation
+            auto val = *reinterpret_cast<T*>(&instrs.at(pc));
+            pc += sizeof(T) / sizeof(char);
+            return val;
+        }
 
         template<typename T> void loadConst() noexcept
         {
-            opStack.push(*reinterpret_cast<T*>(&instrs[pc]));
-            pc += sizeof(T) / sizeof(char);
+            opStack.push(readConst<T>());
         }
 
         template<typename Op> void binaryOp() noexcept
         {
-            Op op;
-            typename Op::first_argument_type op1;
-            typename Op::second_argument_type op2;
+            auto op2 = opStack.pop<typename Op::second_argument_type>();
+            auto op1 = opStack.pop<typename Op::first_argument_type>();
+            opStack.push(Op{}(op1, op2));
+        }
 
-            opStack.pop(op2);
-            opStack.pop(op1);
-            opStack.push(op(op1, op2));
+        template<typename T> void load() noexcept
+        {
+            auto offset = readConst<int16_t>();
+            opStack.push(opStack.at<T>(fp + offset));
+        }
+
+        template<typename T> void store() noexcept
+        {
+            auto offset = readConst<int16_t>();
+            opStack.at<T>(fp + offset) = opStack.pop<T>();
         }
 
         void execute();

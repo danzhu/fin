@@ -2,29 +2,53 @@
 #define __STACK_H__
 
 #include <cstdint>
+#include <stdexcept>
 
 namespace Fin
 {
     class Stack
     {
-        char *content;
-        int capacity;
-        int size;
+        char *_content = nullptr;
+        uint32_t _cap;
+        uint32_t _size = 0;
     public:
-        Stack(std::size_t size = 256);
+        Stack(uint32_t cap = 256);
         Stack(const Stack &other) = delete;
         ~Stack();
 
+        Stack &operator=(const Stack &other) = delete;
+
+        uint32_t size() const noexcept { return _size; }
+        void resize(uint32_t size) noexcept { _size = size; }
+
+        template<typename T> T &at(uint32_t idx)
+        {
+            // note that we allow access to exactly _size
+            // so that things can be pushed
+            if (idx > _size)
+                throw std::length_error{"invalid stack access"};
+
+            return *reinterpret_cast<T*>(_content + idx);
+        }
+
+        template<typename T> T pop()
+        {
+            _size -= sizeof(T) / sizeof(char);
+            return at<T>(_size);
+        }
+
         template<typename T> void pop(T &val)
         {
-            size -= sizeof(T) / sizeof(char);
-            val = *reinterpret_cast<T*>(content + size);
+            val = pop<T>();
         }
 
         template<typename T> void push(T val)
         {
-            *reinterpret_cast<T*>(content + size) = val;
-            size += sizeof(T) / sizeof(char);
+            at<T>(_size) = val;
+            _size += sizeof(T) / sizeof(char);
+
+            if (_size > _cap)
+                throw std::overflow_error{"stack overflow"};
         }
     };
 }

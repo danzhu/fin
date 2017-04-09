@@ -1,11 +1,8 @@
 #include "stack.h"
 
-Fin::Stack::Stack(std::size_t size)
-{
-    content = new char[size];
-}
+Fin::Stack::Stack(uint32_t cap): _content{new char[cap]}, _cap{cap} {}
 
 Fin::Stack::~Stack()
 {
-    delete content;
+    delete[] _content;
 }

@@ -21,7 +21,7 @@ dist:
 	zip -r ${DIST} Makefile ${SRCDIR}
 
 clean:
-	${RM} ${EXEC} ${OBJECTS} ${DEPENDS}
+	${RM} ${EXEC} asm ${OBJECTS} ${DEPENDS}
 
 ${EXEC}: ${OBJECTS}
 	${CXX} ${CXXFLAGS} ${OBJECTS} -o $@ ${LDFLAGS}
