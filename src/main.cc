@@ -19,7 +19,16 @@ int main(int argc, const char *argv[])
     }
 
     Fin::Runtime runtime;
-    runtime.run(input);
+    try
+    {
+        runtime.run(input);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << std::endl
+            << "pc = " << runtime.programCounter() << std::endl;
+        return 1;
+    }
 
     return 0;
 }

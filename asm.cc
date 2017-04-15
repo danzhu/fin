@@ -19,15 +19,21 @@ std::map<std::string, char> readOpcodes(const std::string &filename)
 }
 
 template<typename T>
+void print(T val)
+{
+    auto size = sizeof(T) / sizeof(char);
+    for (unsigned int i = 0; i < size; ++i)
+        std::cout << static_cast<char>(val >> (i * 8));
+}
+
+template<typename T>
 void encode(const std::string &src)
 {
     std::istringstream ss{src};
     T val;
     ss >> val;
 
-    auto size = sizeof(T) / sizeof(char);
-    for (unsigned int i = 0; i < size; ++i)
-        std::cout << static_cast<char>(val >> (i * 8));
+    print(val);
 }
 
 int main()
@@ -37,10 +43,13 @@ int main()
     std::string op;
     while (std::cin >> op)
     {
-        auto it = opcodes.find(op);
-        if (it != opcodes.end())
+        if (op[0] == '@')
+            continue;
+
+        if (op[0] == '\'')
         {
-            std::cout << it->second;
+            print<uint16_t>(op.size() - 2);
+            std::cout << op.substr(1, op.size() - 2);
         }
         else if (std::isdigit(op[0]) || op[0] == '-')
         {
@@ -67,6 +76,10 @@ int main()
                     encode<int32_t>(op);
                     break;
             }
+        }
+        else if (opcodes.find(op) != opcodes.end())
+        {
+            std::cout << opcodes.at(op);
         }
         else
         {

@@ -4,57 +4,107 @@
 #include <iostream>
 #include "opcode.h"
 
+std::string Fin::Runtime::readStr()
+{
+    auto len = readConst<uint16_t>();
+    auto val = std::string{&instrs.at(pc), len};
+    pc += len;
+    return val;
+}
+
 void Fin::Runtime::execute()
 {
     pc = 0;
     fp = 0;
 
+    Module *declModule = nullptr;
+    Module *refModule = nullptr;
+    currentModule = nullptr;
+
     while (true)
     {
-        auto op = static_cast<Opcode>(instrs[pc]);
+        auto op = static_cast<Opcode>(instrs.at(pc));
         ++pc;
 
         switch (op)
         {
-            case Opcode::decl:
+            case Opcode::error:
+                throw std::runtime_error{"error"};
+
+            case Opcode::module:
                 {
-                    std::string name = "<not implemented>";
-                    auto argSize = readConst<uint16_t>();
-                    auto localSize = readConst<uint16_t>();
-                    auto len = readConst<uint32_t>();
-                    methods.emplace_back(name, pc, argSize, localSize);
-                    pc += len;
+                    ModuleID id;
+                    id.name = readStr();
+                    auto methodSize = readConst<uint16_t>();
+
+                    auto module = std::make_unique<Module>(modules.size(), methodSize);
+                    currentModule = refModule = declModule = module.get();
+                    modulesByID.emplace(id, module.get());
+                    modules.emplace_back(std::move(module));
+                }
+                continue;
+
+            case Opcode::method:
+                {
+                    auto idx = readConst<uint16_t>();
+                    auto argSize = readConst<decltype(Method::argSize)>();
+                    auto skip = readConst<uint32_t>();
+
+                    declModule->methods.at(idx) = Method{declModule, pc, argSize};
+                    pc += skip;
+                }
+                continue;
+
+            case Opcode::module_ref:
+                {
+                    ModuleID id;
+                    id.name = readStr();
+                    refModule = modulesByID.at(id);
+
+                    // TODO: load module if not available
+                }
+                continue;
+
+            case Opcode::method_ref:
+                {
+                    auto methodIdx = readConst<uint16_t>();
+
+                    auto method = &refModule->methods.at(methodIdx);
+                    declModule->methodRefs.emplace_back(method);
                 }
                 continue;
 
             case Opcode::call:
                 {
                     auto idx = readConst<uint16_t>();
-                    auto method = methods.at(idx);
+
+                    auto &method = *currentModule->methodRefs.at(idx);
+                    auto &module = *method.module;
 
                     // store current frame
-                    opStack.push(idx);
+                    opStack.push(module.id);
+                    opStack.push(method.argSize);
                     opStack.push(pc);
                     opStack.push(fp);
 
                     // update frame
                     fp = opStack.size();
                     pc = method.location;
-                    opStack.resize(opStack.size() + method.localSize);
                 }
                 continue;
 
             case Opcode::ret:
                 {
-                    auto idx = opStack.pop<uint16_t>();
-                    auto method = methods.at(idx);
-
                     // restore previous frame
                     opStack.resize(fp);
+
                     opStack.pop(fp);
                     opStack.pop(pc);
+                    auto argSize = opStack.pop<decltype(Method::argSize)>();
+                    auto id = opStack.pop<decltype(Module::id)>();
 
-                    opStack.resize(opStack.size() - method.argSize);
+                    opStack.resize(opStack.size() - argSize);
+                    currentModule = modules.at(id).get();
                 }
                 continue;
 
@@ -103,5 +153,11 @@ void Fin::Runtime::run(std::istream &src)
 {
     instrs.assign(std::istreambuf_iterator<char>(src),
             std::istreambuf_iterator<char>());
+    instrs.emplace_back(static_cast<char>(Opcode::term));
     execute();
+}
+
+uint32_t Fin::Runtime::programCounter() const noexcept
+{
+    return pc;
 }

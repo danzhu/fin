@@ -1,17 +1,20 @@
 #ifndef __METHOD_H__
 #define __METHOD_H__
 
-#include <string>
+#include <cstdint>
+#include <vector>
+
+struct Module;
 
 struct Method
 {
-    std::string name;
+    Module *module = nullptr;
     uint32_t location;
-    uint32_t argSize;
-    uint32_t localSize;
+    uint16_t argSize;
 
-    Method(const std::string &name, uint32_t loc, uint16_t as, uint16_t ls):
-        name{name}, location{loc}, argSize{as}, localSize{ls} {}
+    Method() {}
+    Method(Module *module, uint32_t loc, uint16_t argSize):
+        module{module}, location{loc}, argSize{argSize} {}
 };
 
 #endif
