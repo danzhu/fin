@@ -1,0 +1,27 @@
+error
+module name:s methodSize:u16
+method index:u16 argSize:u16 skip:u32
+module_ref name:s
+method_ref index:u16
+call index:u16
+ret
+term
+br offset:i16
+br_false offset:i16
+br_true offset:i16
+push amount:u16
+pop amount:u16
+const_i value:i32
+load_i offset:i16
+store_i offset:i16
+add_i
+sub_i
+mult_i
+div_i
+mod_i
+eq_i
+ne_i
+lt_i
+gt_i
+le_i
+ge_i

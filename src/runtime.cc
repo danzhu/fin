@@ -8,7 +8,7 @@ std::string Fin::Runtime::readStr()
 {
     auto len = readConst<uint16_t>();
     auto val = std::string{&instrs.at(pc), len};
-    pc += len;
+    jump(pc + len);
     return val;
 }
 
@@ -19,12 +19,11 @@ void Fin::Runtime::execute()
 
     Module *declModule = nullptr;
     Module *refModule = nullptr;
-    currentModule = nullptr;
+    execModule = nullptr;
 
     while (true)
     {
-        auto op = static_cast<Opcode>(instrs.at(pc));
-        ++pc;
+        auto op = readConst<Opcode>();
 
         switch (op)
         {
@@ -38,18 +37,21 @@ void Fin::Runtime::execute()
                     auto methodSize = readConst<uint16_t>();
 
                     auto module = &createModule(id, methodSize);
-                    currentModule = refModule = declModule = module;
+                    execModule = refModule = declModule = module;
                 }
                 continue;
 
             case Opcode::method:
                 {
+                    if (!declModule)
+                        throw std::runtime_error{"no declaring module"};
+
                     auto idx = readConst<uint16_t>();
                     auto argSize = readConst<decltype(Method::argSize)>();
                     auto skip = readConst<uint32_t>();
 
                     declModule->methods.at(idx) = Method{declModule, pc, argSize};
-                    pc += skip;
+                    jump(pc + skip);
                 }
                 continue;
 
@@ -65,6 +67,12 @@ void Fin::Runtime::execute()
 
             case Opcode::method_ref:
                 {
+                    if (!declModule)
+                        throw std::runtime_error{"no declaring module"};
+
+                    if (!refModule)
+                        throw std::runtime_error{"no referencing module"};
+
                     auto methodIdx = readConst<uint16_t>();
 
                     auto method = &refModule->methods.at(methodIdx);
@@ -74,9 +82,12 @@ void Fin::Runtime::execute()
 
             case Opcode::call:
                 {
+                    if (!execModule)
+                        throw std::runtime_error{"no executing module"};
+
                     auto idx = readConst<uint16_t>();
 
-                    auto &method = *currentModule->methodRefs.at(idx);
+                    auto &method = *execModule->methodRefs.at(idx);
 
                     if (method.nativeMethod)
                     {
@@ -94,7 +105,7 @@ void Fin::Runtime::execute()
 
                         // update frame
                         fp = opStack.size();
-                        pc = method.location;
+                        jump(method.location);
                     }
                 }
                 continue;
@@ -110,12 +121,49 @@ void Fin::Runtime::execute()
                     auto id = opStack.pop<decltype(Module::id)>();
 
                     opStack.resize(opStack.size() - argSize);
-                    currentModule = modules.at(id).get();
+                    execModule = modules.at(id).get();
                 }
                 continue;
 
             case Opcode::term:
                 return;
+
+            case Opcode::br:
+                {
+                    auto offset = readConst<int16_t>();
+                    jump(pc + offset);
+                }
+                continue;
+
+            case Opcode::br_false:
+                {
+                    auto offset = readConst<int16_t>();
+                    if (!opStack.pop<bool>())
+                        jump(pc + offset);
+                }
+                continue;
+
+            case Opcode::br_true:
+                {
+                    auto offset = readConst<int16_t>();
+                    if (opStack.pop<bool>())
+                        jump(pc + offset);
+                }
+                continue;
+
+            case Opcode::push:
+                {
+                    auto size = readConst<uint16_t>();
+                    opStack.resize(opStack.size() + size);
+                }
+                continue;
+
+            case Opcode::pop:
+                {
+                    auto size = readConst<uint16_t>();
+                    opStack.resize(opStack.size() - size);
+                }
+                continue;
 
             case Opcode::const_i:
                 loadConst<int32_t>();
@@ -143,6 +191,34 @@ void Fin::Runtime::execute()
 
             case Opcode::div_i:
                 binaryOp<std::divides<int32_t>>();
+                continue;
+
+            case Opcode::mod_i:
+                binaryOp<std::modulus<int32_t>>();
+                continue;
+
+            case Opcode::eq_i:
+                binaryOp<std::equal_to<int32_t>>();
+                continue;
+
+            case Opcode::ne_i:
+                binaryOp<std::not_equal_to<int32_t>>();
+                continue;
+
+            case Opcode::lt_i:
+                binaryOp<std::less<int32_t>>();
+                continue;
+
+            case Opcode::le_i:
+                binaryOp<std::less_equal<int32_t>>();
+                continue;
+
+            case Opcode::gt_i:
+                binaryOp<std::greater<int32_t>>();
+                continue;
+
+            case Opcode::ge_i:
+                binaryOp<std::greater_equal<int32_t>>();
                 continue;
         }
 

@@ -39,16 +39,7 @@ int main(int argc, const char *argv[])
     io.methods.at(0) = Fin::Method{write};
     io.methods.at(1) = Fin::Method{read};
 
-    try
-    {
-        runtime.run(input);
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << std::endl
-            << "pc = " << runtime.programCounter() << std::endl;
-        return 1;
-    }
+    runtime.run(input);
 
     return 0;
 }

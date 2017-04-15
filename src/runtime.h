@@ -17,15 +17,22 @@ namespace Fin
         std::vector<std::unique_ptr<Module>> modules;
         std::map<ModuleID, Module *> modulesByID;
         std::vector<char> instrs;
-        Module *currentModule;
+        Module *execModule;
         uint32_t pc;
         uint32_t fp;
+
+        void jump(int16_t target)
+        {
+            pc = target;
+            if (pc > instrs.size())
+                throw std::out_of_range{"pc out of range"};
+        }
 
         template<typename T> T readConst()
         {
             // TODO: change to cross-platform implementation
             auto val = *reinterpret_cast<T*>(&instrs.at(pc));
-            pc += sizeof(T) / sizeof(char);
+            jump(pc + sizeof(T) / sizeof(char));
             return val;
         }
         template<typename T> void readConst(T &val)

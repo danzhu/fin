@@ -1,1 +1,1 @@
-asm: asm.cc
+asm: asm.cc src/opcode.h
