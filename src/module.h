@@ -5,27 +5,30 @@
 #include <vector>
 #include "array.h"
 
-struct Method;
-
-struct ModuleID
+namespace Fin
 {
-    std::string name;
-    // TODO: version
+    struct Method;
 
-    bool operator<(const ModuleID &other) const noexcept
+    struct ModuleID
     {
-        return name < other.name;
-    }
-};
+        std::string name;
+        // TODO: version
 
-struct Module
-{
-    uint32_t id;
-    Array<Method> methods;
-    std::vector<Method *> methodRefs;
+        bool operator<(const ModuleID &other) const noexcept
+        {
+            return name < other.name;
+        }
+    };
 
-    explicit Module(uint32_t id, uint16_t methodSize):
-        id{id}, methods{methodSize} {}
-};
+    struct Module
+    {
+        uint32_t id;
+        Array<Method> methods;
+        std::vector<Method *> methodRefs;
+
+        explicit Module(uint16_t methodSize):
+            methods{methodSize} {}
+    };
+}
 
 #endif

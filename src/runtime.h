@@ -70,6 +70,7 @@ namespace Fin
         void execute();
     public:
         void run(std::istream &src);
+        Module &createModule(const ModuleID &id, uint16_t methodSize);
         uint32_t programCounter() const noexcept;
     };
 }

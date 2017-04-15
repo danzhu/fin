@@ -10,6 +10,8 @@ All instructions have 1-byte opcode, followed by a fixed or variable length of
 bytes for its arguments. This reference use the following notation for the types
 and format of the arguments:
 
+`i16`: 16-bit signed integer
+
 `i32`: 32-bit signed integer
 
 `u16`: 16-bit unsigned integer
@@ -164,10 +166,3 @@ Pop two values from stack and push the product.
 `div_i`
 
 Pop two values from stack and push the quotient.
-
-
-### `print_i`
-
-`print_i`
-
-Pop a value from stack and write to stdout.

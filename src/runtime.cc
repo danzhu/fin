@@ -37,10 +37,8 @@ void Fin::Runtime::execute()
                     id.name = readStr();
                     auto methodSize = readConst<uint16_t>();
 
-                    auto module = std::make_unique<Module>(modules.size(), methodSize);
-                    currentModule = refModule = declModule = module.get();
-                    modulesByID.emplace(id, module.get());
-                    modules.emplace_back(std::move(module));
+                    auto module = &createModule(id, methodSize);
+                    currentModule = refModule = declModule = module;
                 }
                 continue;
 
@@ -79,17 +77,25 @@ void Fin::Runtime::execute()
                     auto idx = readConst<uint16_t>();
 
                     auto &method = *currentModule->methodRefs.at(idx);
-                    auto &module = *method.module;
 
-                    // store current frame
-                    opStack.push(module.id);
-                    opStack.push(method.argSize);
-                    opStack.push(pc);
-                    opStack.push(fp);
+                    if (method.nativeMethod)
+                    {
+                        method.nativeMethod(*this, opStack);
+                    }
+                    else
+                    {
+                        auto &module = *method.module;
 
-                    // update frame
-                    fp = opStack.size();
-                    pc = method.location;
+                        // store current frame
+                        opStack.push(module.id);
+                        opStack.push(method.argSize);
+                        opStack.push(pc);
+                        opStack.push(fp);
+
+                        // update frame
+                        fp = opStack.size();
+                        pc = method.location;
+                    }
                 }
                 continue;
 
@@ -138,10 +144,6 @@ void Fin::Runtime::execute()
             case Opcode::div_i:
                 binaryOp<std::divides<int32_t>>();
                 continue;
-
-            case Opcode::print_i:
-                std::cout << opStack.pop<int32_t>() << std::endl;
-                continue;
         }
 
         throw std::runtime_error{"invalid opcode "
@@ -160,4 +162,15 @@ void Fin::Runtime::run(std::istream &src)
 uint32_t Fin::Runtime::programCounter() const noexcept
 {
     return pc;
+}
+
+Fin::Module &Fin::Runtime::createModule(const ModuleID &id, uint16_t methodSize)
+{
+    auto module = std::make_unique<Module>(methodSize);
+    module->id = modules.size();
+
+    auto p = module.get();
+    modules.emplace_back(std::move(module));
+    modulesByID.emplace(id, p);
+    return *p;
 }

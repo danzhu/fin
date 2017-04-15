@@ -4,17 +4,26 @@
 #include <cstdint>
 #include <vector>
 
-struct Module;
-
-struct Method
+namespace Fin
 {
-    Module *module = nullptr;
-    uint32_t location;
-    uint16_t argSize;
+    class Runtime;
+    class Stack;
+    struct Module;
 
-    Method() {}
-    Method(Module *module, uint32_t loc, uint16_t argSize):
-        module{module}, location{loc}, argSize{argSize} {}
-};
+    typedef void (NativeMethod)(Runtime &rt, Stack &st);
+
+    struct Method
+    {
+        Module *module = nullptr;
+        NativeMethod *nativeMethod = nullptr;
+        uint32_t location;
+        uint16_t argSize;
+
+        Method() {}
+        Method(NativeMethod *method): nativeMethod{method} {}
+        Method(Module *module, uint32_t loc, uint16_t argSize):
+            module{module}, location{loc}, argSize{argSize} {}
+    };
+}
 
 #endif
