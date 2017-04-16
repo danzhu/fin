@@ -1,6 +1,8 @@
 #ifndef __OPCODE_H__
 #define __OPCODE_H__
 
+#include <array>
+
 namespace Fin
 {
     enum class Opcode : char
@@ -21,6 +23,7 @@ namespace Fin
         const_i,
         load_i,
         store_i,
+        ret_i,
         add_i,
         sub_i,
         mult_i,
@@ -34,7 +37,7 @@ namespace Fin
         ge_i,
     };
 
-    const char *OpcodeNames[] =
+    std::array<const char *, 28> OpcodeNames =
     {
         "error",
         "module",
@@ -52,6 +55,7 @@ namespace Fin
         "const_i",
         "load_i",
         "store_i",
+        "ret_i",
         "add_i",
         "sub_i",
         "mult_i",

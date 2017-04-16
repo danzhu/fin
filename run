@@ -1,6 +1,0 @@
-#!/bin/bash
-
-tools/asm.py < "$1" > test.fin && ./fin test.fin
-if [[ $? -ne 0 ]]; then
-    xxd test
-fi

@@ -14,6 +14,7 @@ pop amount:u16
 const_i value:i32
 load_i offset:i16
 store_i offset:i16
+ret_i
 add_i
 sub_i
 mult_i

@@ -21,19 +21,19 @@ namespace Fin
         uint32_t pc;
         uint32_t fp;
 
-        void jump(int16_t target)
-        {
-            pc = target;
-            if (pc > instrs.size())
-                throw std::out_of_range{"pc out of range"};
-        }
+        std::string readStr();
+        void jump(int16_t target);
+        int16_t frameOffset();
+        void ret();
+        void execute();
 
         template<typename T> T readConst()
         {
-            // TODO: change to cross-platform implementation
-            auto val = *reinterpret_cast<T*>(&instrs.at(pc));
-            jump(pc + sizeof(T) / sizeof(char));
-            return val;
+            std::make_unsigned_t<T> val{};
+            for (uint16_t i = 0; i < sizeof(T); ++i)
+                val |= instrs.at(pc + i) << (i * 8);
+            jump(pc + sizeof(T));
+            return *reinterpret_cast<T*>(&val);
         }
         template<typename T> void readConst(T &val)
         {
@@ -52,17 +52,6 @@ namespace Fin
             opStack.push(Op{}(op1, op2));
         }
 
-        int16_t frameOffset()
-        {
-            auto offset = readConst<int16_t>();
-            if (offset < 0)
-            {
-                offset -= (sizeof(Module::id) + sizeof(Method::argSize)
-                        + sizeof(pc) + sizeof(fp));
-            }
-            return offset;
-        }
-
         template<typename T> void load()
         {
             opStack.push(opStack.at<T>(fp + frameOffset()));
@@ -73,8 +62,12 @@ namespace Fin
             opStack.pop(opStack.at<T>(fp + frameOffset()));
         }
 
-        std::string readStr();
-        void execute();
+        template<typename T> void ret()
+        {
+            auto val = opStack.pop<T>();
+            ret();
+            opStack.push(val);
+        }
     public:
         void run(std::istream &src);
         Module &createModule(const ModuleID &id, uint16_t methodSize);

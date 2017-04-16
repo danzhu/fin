@@ -5,6 +5,8 @@ import instr
 FORMAT = """#ifndef __OPCODE_H__
 #define __OPCODE_H__
 
+#include <array>
+
 namespace Fin
 {{
     enum class Opcode : char
@@ -12,7 +14,7 @@ namespace Fin
 {opcodes}
     }};
 
-    const char *OpcodeNames[] =
+    std::array<const char *, {size}> OpcodeNames =
     {{
 {names}
     }};
@@ -24,7 +26,7 @@ def main():
     instrs = instr.load()
     opcodes = '\n'.join(['        {},'.format(ins.opcode) for ins in instrs])
     names = '\n'.join(['        "{}",'.format(ins.opcode) for ins in instrs])
-    print(FORMAT.format(opcodes=opcodes, names=names))
+    print(FORMAT.format(opcodes=opcodes, names=names, size=len(instrs)))
 
 if __name__ == '__main__':
     main()

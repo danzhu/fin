@@ -4,12 +4,44 @@
 #include <iostream>
 #include "opcode.h"
 
+void Fin::Runtime::jump(int16_t target)
+{
+    pc = target;
+    if (pc > instrs.size())
+        throw std::out_of_range{"pc out of range"};
+}
+
+int16_t Fin::Runtime::frameOffset()
+{
+    auto offset = readConst<int16_t>();
+    if (offset < 0)
+    {
+        offset -= (sizeof(Module::id) + sizeof(Method::argSize)
+                + sizeof(pc) + sizeof(fp));
+    }
+    return offset;
+}
+
 std::string Fin::Runtime::readStr()
 {
     auto len = readConst<uint16_t>();
     auto val = std::string{&instrs.at(pc), len};
     jump(pc + len);
     return val;
+}
+
+void Fin::Runtime::ret()
+{
+    // restore previous frame
+    opStack.resize(fp);
+
+    opStack.pop(fp);
+    opStack.pop(pc);
+    auto argSize = opStack.pop<decltype(Method::argSize)>();
+    auto id = opStack.pop<decltype(Module::id)>();
+
+    opStack.resize(opStack.size() - argSize);
+    execModule = modules.at(id).get();
 }
 
 void Fin::Runtime::execute()
@@ -24,6 +56,10 @@ void Fin::Runtime::execute()
     while (true)
     {
         auto op = readConst<Opcode>();
+
+#ifdef DEBUG
+        std::cerr << OpcodeNames.at(static_cast<uint8_t>(op)) << std::endl;
+#endif
 
         switch (op)
         {
@@ -111,18 +147,7 @@ void Fin::Runtime::execute()
                 continue;
 
             case Opcode::ret:
-                {
-                    // restore previous frame
-                    opStack.resize(fp);
-
-                    opStack.pop(fp);
-                    opStack.pop(pc);
-                    auto argSize = opStack.pop<decltype(Method::argSize)>();
-                    auto id = opStack.pop<decltype(Module::id)>();
-
-                    opStack.resize(opStack.size() - argSize);
-                    execModule = modules.at(id).get();
-                }
+                ret();
                 continue;
 
             case Opcode::term:
@@ -175,6 +200,10 @@ void Fin::Runtime::execute()
 
             case Opcode::store_i:
                 store<int32_t>();
+                continue;
+
+            case Opcode::ret_i:
+                ret<int32_t>();
                 continue;
 
             case Opcode::add_i:

@@ -33,7 +33,10 @@ namespace Fin
 
         template<typename T> T pop()
         {
-            _size -= sizeof(T) / sizeof(char);
+            if (_size < sizeof(T))
+                throw std::overflow_error{"negative stack size"};
+
+            _size -= sizeof(T);
             return at<T>(_size);
         }
 
@@ -45,7 +48,7 @@ namespace Fin
         template<typename T> void push(T val)
         {
             at<T>(_size) = val;
-            _size += sizeof(T) / sizeof(char);
+            _size += sizeof(T);
 
             if (_size > _cap)
                 throw std::overflow_error{"stack overflow"};
