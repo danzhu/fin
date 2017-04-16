@@ -1,7 +1,9 @@
 # make output
-/asm
 /fin
 /obj/
 
 # test files
 /test*
+
+# python temp
+__pycache__

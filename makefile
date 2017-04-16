@@ -14,25 +14,25 @@ DEPENDS := $(patsubst ${SRCDIR}/%.cc,${OBJDIR}/%.d,${SOURCES})
 
 .PHONY: all dist clean
 
-all: ${EXEC} asm
+all: ${EXEC}
 
 dist:
 	${RM} ${DIST}
 	zip -r ${DIST} Makefile ${SRCDIR}
 
 clean:
-	${RM} ${EXEC} asm ${OBJECTS} ${DEPENDS}
+	${RM} ${EXEC} ${OBJECTS} ${DEPENDS}
 
 ${EXEC}: ${OBJECTS}
 	${CXX} ${CXXFLAGS} ${OBJECTS} -o $@ ${LDFLAGS}
-
-asm: asm.cc
-	${CXX} ${CXXFLAGS} asm.cc -o $@
 
 ${OBJDIR}/%.o: ${SRCDIR}/%.cc | ${OBJDIR}
 	${CXX} ${CXXFLAGS} -c $< -o $@
 
 ${OBJDIR}:
 	mkdir $@
+
+${SRCDIR}/opcode.h: tools/instrs
+	tools/generateOpcodes.py > $@
 
 -include ${DEPENDS}

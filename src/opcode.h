@@ -29,8 +29,8 @@ namespace Fin
         eq_i,
         ne_i,
         lt_i,
-        gt_i,
         le_i,
+        gt_i,
         ge_i,
     };
 
@@ -60,8 +60,8 @@ namespace Fin
         "eq_i",
         "ne_i",
         "lt_i",
-        "gt_i",
         "le_i",
+        "gt_i",
         "ge_i",
     };
 }
