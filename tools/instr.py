@@ -3,15 +3,6 @@
 import struct
 import heapq
 
-ENC = {
-        'i8':  'b',
-        'u8':  'B',
-        'i16': 'h',
-        'u16': 'H',
-        'i32': 'i',
-        'u32': 'I'
-        }
-
 class Instr:
     def __init__(self, line, alloc):
         segs = line.split(' ')
@@ -40,9 +31,9 @@ class Param:
         if self.type == 's':
             return Bytes(encode('H', len(src)) + src.encode())
         elif src[0].isalpha():
-            return Label(ENC[self.type], src)
+            return Label(self.type, src)
         else:
-            return Bytes(encode(ENC[self.type], int(src, 0)))
+            return Bytes(encode(self.type, int(src, 0)))
 
 
 class Bytes:

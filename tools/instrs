@@ -1,20 +1,20 @@
 error=0
 cookie=35
-module name:s methodSize:u16
-method index:u16 argSize:u16 skip:u32
+module name:s methodSize:H
+method index:H argSize:H skip:I
 module_ref name:s
-method_ref index:u16
-call index:u16
+method_ref index:H
+call index:H
 ret
 term
-br offset:i16
-br_false offset:i16
-br_true offset:i16
-push amount:u16
-pop amount:u16
-const_i value:i32
-load_i offset:i16
-store_i offset:i16
+br offset:h
+br_false offset:h
+br_true offset:h
+push amount:H
+pop amount:H
+const_i value:i
+load_i offset:h
+store_i offset:h
 ret_i
 add_i
 sub_i

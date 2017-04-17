@@ -3,8 +3,8 @@
 /fin.zip
 /obj/
 
-# test files
-/*.fin
+# compiled files
+*.fm
 
 # python temp
 __pycache__
