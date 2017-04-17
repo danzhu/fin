@@ -38,7 +38,7 @@ ${OBJDIR}/%.o: ${SRCDIR}/%.cc | ${OBJDIR}
 ${OBJDIR}:
 	mkdir $@
 
-%.fin: %.asm
+%.fin: %.asm tools/asm.py tools/instr.py
 	tools/asm.py < $< > $@
 
 ${SRCDIR}/opcode.h: tools/instrs tools/generateOpcodes.py tools/instr.py

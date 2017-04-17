@@ -14,7 +14,7 @@ namespace Fin
 {opcodes}
     }};
 
-    std::array<const char *, {size}> OpcodeNames =
+    std::array<const char *, 256> OpcodeNames =
     {{
 {names}
     }};
@@ -23,10 +23,20 @@ namespace Fin
 #endif"""
 
 def main():
-    instrs = instr.load()
-    opcodes = '\n'.join(['        {},'.format(ins.opcode) for ins in instrs])
-    names = '\n'.join(['        "{}",'.format(ins.opcode) for ins in instrs])
-    print(FORMAT.format(opcodes=opcodes, names=names, size=len(instrs)))
+    instrs = {ins.binary: ins for ins in instr.load()}
+
+    opcodes = []
+    names = []
+    for i in range(256):
+        ins = instrs.get(i)
+        if ins is not None:
+            opcodes.append('        {} = {},'.format(ins.opcode, hex(i)))
+        names.append('        "{}",'.format(ins.opcode if ins else hex(i)))
+
+    print(FORMAT.format(
+        opcodes='\n'.join(opcodes),
+        names='\n'.join(names),
+        size=len(instrs)))
 
 if __name__ == '__main__':
     main()

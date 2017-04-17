@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import struct
+import heapq
 
 ENC = {
         'i8':  'b',
@@ -12,13 +13,17 @@ ENC = {
         }
 
 class Instr:
-    def __init__(self, line, binary):
+    def __init__(self, line, alloc):
         segs = line.split(' ')
+        name = segs[0].split('=')
 
-        self.opcode = segs[0]
-        self.binary = binary
+        self.opcode = name[0]
+        if len(name) > 1:
+            self.binary = int(name[1])
+            alloc.remove(self.binary)
+        else:
+            self.binary = alloc.next()
         self.params = [Param(param) for param in segs[1:]]
-        # self.size   = sum([param.size for param in self.params])
 
     def encode(self):
         return Bytes(encode('B', self.binary))
@@ -30,7 +35,6 @@ class Param:
 
         self.name = segs[0]
         self.type = segs[1]
-        # self.size = SIZE[self.type]
 
     def encode(self, src):
         if self.type == 's':
@@ -67,15 +71,36 @@ class Label:
         out.buffer.write(encode(self.enc, value))
 
 
+class Allocator:
+    def __init__(self, size):
+        self.at = 0
+        self.removed = []
+
+    def next(self):
+        while len(self.removed) > 0 and self.at == self.removed[0]:
+            self.at += 1
+            heapq.heappop(self.removed)
+        val = self.at
+        self.at += 1
+        return val
+
+    def remove(self, val):
+        if val < self.at or val in self.removed:
+            raise ValueError('already used value')
+        heapq.heappush(self.removed, val)
+
+
 def encode(fmt, val):
     return struct.pack('<' + fmt, val)
 
 def load(fmt = 'tools/instrs'):
+    # available enum values
+    alloc = Allocator(256)
     instrs = []
 
     with open(fmt) as f:
         for line in f:
-            instr = Instr(line[:-1], len(instrs))
+            instr = Instr(line[:-1], alloc)
             instrs.append(instr)
 
     return instrs

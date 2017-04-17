@@ -66,6 +66,11 @@ void Fin::Runtime::execute()
             case Opcode::error:
                 throw std::runtime_error{"error"};
 
+            case Opcode::cookie:
+                // skip shebang
+                while (readConst<char>() != '\n');
+                continue;
+
             case Opcode::module:
                 {
                     ModuleID id;

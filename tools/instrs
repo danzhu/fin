@@ -1,4 +1,5 @@
-error
+error=0
+cookie=35
 module name:s methodSize:u16
 method index:u16 argSize:u16 skip:u32
 module_ref name:s

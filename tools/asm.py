@@ -10,6 +10,8 @@ def main():
     tokens = []
     table = {}
 
+    tokens.append(instr.Bytes(b'#!/usr/bin/env fin\n'))
+
     for line in sys.stdin:
         line = line[:-1]
         if len(line) == 0 or line[0] == '#':
