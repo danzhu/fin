@@ -2,6 +2,7 @@
 #define __MODULE_H__
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "array.h"
 
@@ -23,11 +24,14 @@ namespace Fin
     struct Module
     {
         uint32_t id;
-        Array<Method> methods;
-        std::vector<Method *> methodRefs;
+        std::unordered_map<std::string, Method> methods;
+        std::vector<Method *> refMethods;
 
-        explicit Module(uint16_t methodSize):
-            methods{methodSize} {}
+        void addMethod(const std::string &name, Method &&method)
+        {
+            method.name = name;
+            methods.emplace(name, std::move(method));
+        }
     };
 }
 

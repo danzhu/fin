@@ -26,6 +26,7 @@ namespace Fin
         int16_t frameOffset();
         void ret();
         void execute();
+        void call(const Method &method);
 
         template<typename T> T readConst()
         {
@@ -70,7 +71,8 @@ namespace Fin
         }
     public:
         void run(std::istream &src);
-        Module &createModule(const ModuleID &id, uint16_t methodSize);
+        Module &createModule(const std::string &name);
+        Module &getModule(const std::string &name);
         uint32_t programCounter() const noexcept;
     };
 }

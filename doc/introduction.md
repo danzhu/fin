@@ -31,10 +31,10 @@ the instruction set was specially designed to allow declaration and execution in
 the same instruction format. For example:
 
 ```asm
-module example 1
+module 'example'
 
-ref_module io
-ref_method 1
+ref_module 'io'
+ref_method 'write'
 
 const_i 123
 call 0
@@ -50,5 +50,5 @@ that all code and methods immediately after will belong to. The module `io` is a
 will need to access. Finally, during the execution of the bottom 2 lines, the
 **executing module** is also `example`. The executing module is the module that
 the executing method belongs to, and is used to resolve method references - in
-this case `call 0` calls method 1 of `io` because `example` references that
-method.
+this case `call 0` calls method `write` of `io` because `example` references
+that method at index 0.

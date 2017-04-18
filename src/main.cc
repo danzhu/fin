@@ -32,12 +32,9 @@ int main(int argc, const char *argv[])
 
     Fin::Runtime runtime;
 
-    Fin::ModuleID ioID;
-    ioID.name = "io";
-
-    auto &io = runtime.createModule(ioID, 2);
-    io.methods.at(0) = Fin::Method{write};
-    io.methods.at(1) = Fin::Method{read};
+    auto &io = runtime.createModule("io");
+    io.addMethod("write", Fin::Method{write});
+    io.addMethod("read", Fin::Method{read});
 
     runtime.run(input);
 

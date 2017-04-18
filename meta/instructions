@@ -6,18 +6,17 @@ cookie=35
     used for shebang at the start of the program. This also allows comments
     embedded in the binary.
 
-module name:s methodSize:H
+module name:s
     Declare new module, and set declaring module to this module.
 
-method index:H argSize:H skip:I
-    Implement method at `index` of declaring module.
+method name:s argSize:H skip:I
+    Declare method `name` of declaring module.
 
 ref_module name:s
-    Set referencing module.
+    Add module reference.
 
-ref_method index:H
-    Add method at `index` of referencing module to list of references of
-    declaring module.
+ref_method name:s
+    Add method `name` to list of references of declaring module.
 
 call index:H
     Call method at `index` of references in executing module.

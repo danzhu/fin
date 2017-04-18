@@ -2,6 +2,7 @@
 #define __METHOD_H__
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace Fin
@@ -14,6 +15,7 @@ namespace Fin
 
     struct Method
     {
+        std::string name;
         Module *module = nullptr;
         NativeMethod *nativeMethod = nullptr;
         uint32_t location;

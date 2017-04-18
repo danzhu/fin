@@ -36,6 +36,9 @@ class Param:
 
     def encode(self, src):
         if self.type == 's':
+            if src[0] != "'" or src[-1] != "'":
+                raise ValueError('missing quotes')
+            src = src[1:-1]
             return Bytes(encode('H', len(src)) + src.encode())
         elif src[0].isalpha():
             return Label(self.type, src)

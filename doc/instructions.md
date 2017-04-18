@@ -22,7 +22,7 @@ embedded in the binary.
 
 **Opcode**: 0x1
 
-**Format**: `module name:s methodSize:H`
+**Format**: `module name:s`
 
 Declare new module, and set declaring module to this module.
 
@@ -30,9 +30,9 @@ Declare new module, and set declaring module to this module.
 
 **Opcode**: 0x2
 
-**Format**: `method index:H argSize:H skip:I`
+**Format**: `method name:s argSize:H skip:I`
 
-Implement method at `index` of declaring module.
+Declare method `name` of declaring module.
 
 ## `ref_module`
 
@@ -40,16 +40,15 @@ Implement method at `index` of declaring module.
 
 **Format**: `ref_module name:s`
 
-Set referencing module.
+Add module reference.
 
 ## `ref_method`
 
 **Opcode**: 0x4
 
-**Format**: `ref_method index:H`
+**Format**: `ref_method name:s`
 
-Add method at `index` of referencing module to list of references of
-declaring module.
+Add method `name` to list of references of declaring module.
 
 ## `call`
 
