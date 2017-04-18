@@ -8,16 +8,23 @@ class Instr:
         segs = line.split(' ')
         name = segs[0].split('=')
 
-        self.opcode = name[0]
+        self.opname = name[0]
         if len(name) > 1:
-            self.binary = int(name[1])
-            alloc.remove(self.binary)
+            self.opcode = int(name[1])
+            alloc.remove(self.opcode)
         else:
-            self.binary = alloc.next()
+            self.opcode = alloc.next()
         self.params = [Param(param) for param in segs[1:]]
+        self.comment = ''
 
     def encode(self):
-        return Bytes(encode('B', self.binary))
+        return Bytes(encode('B', self.opcode))
+
+    def format(self):
+        val = self.opname
+        for p in self.params:
+            val += ' ' + p.format()
+        return val
 
 
 class Param:
@@ -34,6 +41,9 @@ class Param:
             return Label(self.type, src)
         else:
             return Bytes(encode(self.type, int(src, 0)))
+
+    def format(self):
+        return '{}:{}'.format(self.name, self.type)
 
 
 class Bytes:
@@ -84,13 +94,23 @@ class Allocator:
 def encode(fmt, val):
     return struct.pack('<' + fmt, val)
 
-def load(fmt = 'tools/instrs'):
+def load(source = 'meta/instructions'):
     # available enum values
     alloc = Allocator(256)
     instrs = []
 
-    with open(fmt) as f:
+    instr = None
+    with open(source) as f:
         for line in f:
+            # empty line
+            if line == '\n':
+                continue
+
+            # comment
+            if line[0] == ' ':
+                instr.comment += line.lstrip()
+                continue
+
             instr = Instr(line[:-1], alloc)
             instrs.append(instr)
 

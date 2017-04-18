@@ -1,0 +1,94 @@
+error=0
+    Crash the runtime environment.
+
+cookie=35
+    With opcode equal to `#`, this instruction will skip until past EOL, and is
+    used for shebang at the start of the program. This also allows comments
+    embedded in the binary.
+
+module name:s methodSize:H
+    Declare new module, and set declaring module to this module.
+
+method index:H argSize:H skip:I
+    Implement method at `index` of declaring module.
+
+ref_module name:s
+    Set referencing module.
+
+ref_method index:H
+    Add method at `index` of referencing module to list of references of
+    declaring module.
+
+call index:H
+    Call method at `index` of references in executing module.
+
+return
+    Return from the current method.
+
+term
+    Stop program execution. Automatically added to the end of every module.
+
+br offset:h
+    Unconditionally branch to `pc + offset`, where pc is at the end of the
+    instruction.
+
+br_false offset:h
+    Pop boolean from stack and branch if false.
+
+br_true offset:h
+    Pop boolean from stack and branch if true.
+
+push amount:H
+    Push `amount` bytes onto stack.
+
+pop amount:H
+    Pop `amount` bytes from stack.
+
+const_i value:i
+    Load constant `value` onto stack.
+
+load_i offset:h
+    Load value on frame at `offset` onto stack.
+
+store_i offset:h
+    Store value to frame at `offset` from stack.
+
+return_i
+    Return from method with a return value.
+
+add_i
+    Pop two values from stack and push the sum.
+
+sub_i
+    Pop two values from stack and push the difference.
+
+mult_i
+    Pop two values from stack and push the product.
+
+div_i
+    Pop two values from stack and push the quotient.
+
+mod_i
+    Pop two values from stack and push the modulo.
+
+eq_i
+    Pop two values from stack and push the boolean representing if they are
+    equal.
+
+ne_i
+    Pop two values from stack and push the boolean representing if they are
+    not equal.
+
+lt_i
+    Pop two values from stack and push the boolean representing if less than.
+
+le_i
+    Pop two values from stack and push the boolean representing if less than or
+    equal to.
+
+gt_i
+    Pop two values from stack and push the boolean representing if greater than.
+
+ge_i
+    Pop two values from stack and push the boolean representing if greater than
+    or equal to.

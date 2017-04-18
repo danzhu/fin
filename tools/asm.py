@@ -4,7 +4,7 @@ import sys
 import instr
 
 def main():
-    instrs = {ins.opcode: ins for ins in instr.load()}
+    instrs = {ins.opname: ins for ins in instr.load()}
 
     location = 0
     tokens = []

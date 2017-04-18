@@ -1,22 +1,22 @@
 module test 2
 
-method_ref 0
-method_ref 1
-module_ref io
-method_ref 0
-method_ref 1
+ref_method 0
+ref_method 1
+ref_module io
+ref_method 0
+ref_method 1
 
 # ------ method 0 ------
 method 0 4 method_0
 load_i -4
 call 2
-ret
+return
 method_0:
 
 # ------ method 1 ------
 method 1 0 method_1
 call 3
-ret_i
+return_i
 method_1:
 
 # ------ main ------

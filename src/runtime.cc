@@ -58,20 +58,20 @@ void Fin::Runtime::execute()
         auto op = readConst<Opcode>();
 
 #ifdef DEBUG
-        std::cerr << OpcodeNames.at(static_cast<uint8_t>(op)) << std::endl;
+        std::cerr << Opnames.at(static_cast<uint8_t>(op)) << std::endl;
 #endif
 
         switch (op)
         {
-            case Opcode::error:
+            case Opcode::Error:
                 throw std::runtime_error{"error"};
 
-            case Opcode::cookie:
+            case Opcode::Cookie:
                 // skip shebang
                 while (readConst<char>() != '\n');
                 continue;
 
-            case Opcode::module:
+            case Opcode::Module:
                 {
                     ModuleID id;
                     id.name = readStr();
@@ -82,7 +82,7 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::method:
+            case Opcode::Method:
                 {
                     if (!declModule)
                         throw std::runtime_error{"no declaring module"};
@@ -96,7 +96,7 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::module_ref:
+            case Opcode::RefModule:
                 {
                     ModuleID id;
                     id.name = readStr();
@@ -106,7 +106,7 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::method_ref:
+            case Opcode::RefMethod:
                 {
                     if (!declModule)
                         throw std::runtime_error{"no declaring module"};
@@ -121,7 +121,7 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::call:
+            case Opcode::Call:
                 {
                     if (!execModule)
                         throw std::runtime_error{"no executing module"};
@@ -151,21 +151,21 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::ret:
+            case Opcode::Return:
                 ret();
                 continue;
 
-            case Opcode::term:
+            case Opcode::Term:
                 return;
 
-            case Opcode::br:
+            case Opcode::Br:
                 {
                     auto offset = readConst<int16_t>();
                     jump(pc + offset);
                 }
                 continue;
 
-            case Opcode::br_false:
+            case Opcode::BrFalse:
                 {
                     auto offset = readConst<int16_t>();
                     if (!opStack.pop<bool>())
@@ -173,7 +173,7 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::br_true:
+            case Opcode::BrTrue:
                 {
                     auto offset = readConst<int16_t>();
                     if (opStack.pop<bool>())
@@ -181,77 +181,77 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::push:
+            case Opcode::Push:
                 {
                     auto size = readConst<uint16_t>();
                     opStack.resize(opStack.size() + size);
                 }
                 continue;
 
-            case Opcode::pop:
+            case Opcode::Pop:
                 {
                     auto size = readConst<uint16_t>();
                     opStack.resize(opStack.size() - size);
                 }
                 continue;
 
-            case Opcode::const_i:
+            case Opcode::ConstI:
                 loadConst<int32_t>();
                 continue;
 
-            case Opcode::load_i:
+            case Opcode::LoadI:
                 load<int32_t>();
                 continue;
 
-            case Opcode::store_i:
+            case Opcode::StoreI:
                 store<int32_t>();
                 continue;
 
-            case Opcode::ret_i:
+            case Opcode::ReturnI:
                 ret<int32_t>();
                 continue;
 
-            case Opcode::add_i:
+            case Opcode::AddI:
                 binaryOp<std::plus<int32_t>>();
                 continue;
 
-            case Opcode::sub_i:
+            case Opcode::SubI:
                 binaryOp<std::minus<int32_t>>();
                 continue;
 
-            case Opcode::mult_i:
+            case Opcode::MultI:
                 binaryOp<std::multiplies<int32_t>>();
                 continue;
 
-            case Opcode::div_i:
+            case Opcode::DivI:
                 binaryOp<std::divides<int32_t>>();
                 continue;
 
-            case Opcode::mod_i:
+            case Opcode::ModI:
                 binaryOp<std::modulus<int32_t>>();
                 continue;
 
-            case Opcode::eq_i:
+            case Opcode::EqI:
                 binaryOp<std::equal_to<int32_t>>();
                 continue;
 
-            case Opcode::ne_i:
+            case Opcode::NeI:
                 binaryOp<std::not_equal_to<int32_t>>();
                 continue;
 
-            case Opcode::lt_i:
+            case Opcode::LtI:
                 binaryOp<std::less<int32_t>>();
                 continue;
 
-            case Opcode::le_i:
+            case Opcode::LeI:
                 binaryOp<std::less_equal<int32_t>>();
                 continue;
 
-            case Opcode::gt_i:
+            case Opcode::GtI:
                 binaryOp<std::greater<int32_t>>();
                 continue;
 
-            case Opcode::ge_i:
+            case Opcode::GeI:
                 binaryOp<std::greater_equal<int32_t>>();
                 continue;
         }
@@ -265,7 +265,7 @@ void Fin::Runtime::run(std::istream &src)
 {
     instrs.assign(std::istreambuf_iterator<char>(src),
             std::istreambuf_iterator<char>());
-    instrs.emplace_back(static_cast<char>(Opcode::term));
+    instrs.emplace_back(static_cast<char>(Opcode::Term));
     execute();
 }
 
