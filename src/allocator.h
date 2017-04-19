@@ -2,6 +2,7 @@
 #define __ALLOCATOR_H__
 
 #include <cstdint>
+#include <stdexcept>
 #include <vector>
 
 namespace Fin
@@ -10,7 +11,13 @@ namespace Fin
 
     class Allocator
     {
-        std::vector<char *> heap;
+        struct Block
+        {
+            char *value;
+            uint32_t size;
+        };
+
+        std::vector<Block> heap;
     public:
         Allocator();
         ~Allocator();
@@ -19,7 +26,10 @@ namespace Fin
 
         template<typename T> T &deref(Ptr ptr, uint16_t offset = 0)
         {
-            return *reinterpret_cast<T *>(heap.at(ptr) + offset);
+            auto block = heap.at(ptr);
+            if (offset + sizeof(T) > block.size)
+                throw std::runtime_error{"invalid memory access"};
+            return *reinterpret_cast<T *>(block.value + offset);
         }
     };
 }
