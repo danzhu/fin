@@ -89,7 +89,7 @@ void Fin::Runtime::execute()
         switch (op)
         {
             case Opcode::Error:
-                throw std::runtime_error{"error"};
+                throw std::runtime_error{"error instruction reached"};
 
             case Opcode::Cookie:
                 // skip shebang
@@ -193,6 +193,14 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
+            case Opcode::Alloc:
+                opStack.push(alloc.alloc(opStack.pop<int32_t>()));
+                continue;
+
+            case Opcode::Dealloc:
+                alloc.dealloc(opStack.pop<Ptr>());
+                continue;
+
             case Opcode::Push:
                 {
                     auto size = readConst<uint16_t>();
@@ -207,20 +215,37 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
+            case Opcode::LoadArg4:
+                load<uint32_t>();
+                continue;
+
+            case Opcode::StoreArg4:
+                store<uint32_t>();
+                continue;
+
+            case Opcode::LoadPtr4:
+                {
+                    auto offset = readConst<uint16_t>();
+                    auto ptr = opStack.pop<Ptr>();
+                    opStack.push(alloc.deref<uint32_t>(ptr, offset));
+                }
+                continue;
+
+            case Opcode::StorePtr4:
+                {
+                    auto offset = readConst<uint16_t>();
+                    auto val = opStack.pop<uint32_t>();
+                    auto ptr = opStack.pop<Ptr>();
+                    alloc.deref<uint32_t>(ptr, offset) = val;
+                }
+                continue;
+
+            case Opcode::Return4:
+                ret<uint32_t>();
+                continue;
+
             case Opcode::ConstI:
-                loadConst<int32_t>();
-                continue;
-
-            case Opcode::LoadI:
-                load<int32_t>();
-                continue;
-
-            case Opcode::StoreI:
-                store<int32_t>();
-                continue;
-
-            case Opcode::ReturnI:
-                ret<int32_t>();
+                loadConst<uint32_t>();
                 continue;
 
             case Opcode::AddI:

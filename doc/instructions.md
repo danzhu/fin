@@ -99,9 +99,26 @@ Pop boolean from stack and branch if false.
 
 Pop boolean from stack and branch if true.
 
-## `push`
+## `alloc`
 
 **Opcode**: 0xb
+
+**Format**: `alloc`
+
+Pop int from stack, allocate that many bytes of heap memory, and push
+pointer onto stack.
+
+## `dealloc`
+
+**Opcode**: 0xc
+
+**Format**: `dealloc`
+
+Pop pointer from stack and deallocate memory used by that pointer.
+
+## `push`
+
+**Opcode**: 0xd
 
 **Format**: `push amount:H`
 
@@ -109,47 +126,63 @@ Push `amount` bytes onto stack.
 
 ## `pop`
 
-**Opcode**: 0xc
+**Opcode**: 0xe
 
 **Format**: `pop amount:H`
 
 Pop `amount` bytes from stack.
 
+## `load_arg_4`
+
+**Opcode**: 0xf
+
+**Format**: `load_arg_4 offset:h`
+
+Load value on frame at `offset` onto stack.
+
+## `store_arg_4`
+
+**Opcode**: 0x10
+
+**Format**: `store_arg_4 offset:h`
+
+Store value to frame at `offset` from stack.
+
+## `load_ptr_4`
+
+**Opcode**: 0x11
+
+**Format**: `load_ptr_4 offset:H`
+
+Load value of pointer onto stack.
+
+## `store_ptr_4`
+
+**Opcode**: 0x12
+
+**Format**: `store_ptr_4 offset:H`
+
+Store value from stack to pointer.
+
+## `return_4`
+
+**Opcode**: 0x13
+
+**Format**: `return_4`
+
+Return from method with a return value.
+
 ## `const_i`
 
-**Opcode**: 0xd
+**Opcode**: 0x14
 
 **Format**: `const_i value:i`
 
 Load constant `value` onto stack.
 
-## `load_i`
-
-**Opcode**: 0xe
-
-**Format**: `load_i offset:h`
-
-Load value on frame at `offset` onto stack.
-
-## `store_i`
-
-**Opcode**: 0xf
-
-**Format**: `store_i offset:h`
-
-Store value to frame at `offset` from stack.
-
-## `return_i`
-
-**Opcode**: 0x10
-
-**Format**: `return_i`
-
-Return from method with a return value.
-
 ## `add_i`
 
-**Opcode**: 0x11
+**Opcode**: 0x15
 
 **Format**: `add_i`
 
@@ -157,7 +190,7 @@ Pop two values from stack and push the sum.
 
 ## `sub_i`
 
-**Opcode**: 0x12
+**Opcode**: 0x16
 
 **Format**: `sub_i`
 
@@ -165,7 +198,7 @@ Pop two values from stack and push the difference.
 
 ## `mult_i`
 
-**Opcode**: 0x13
+**Opcode**: 0x17
 
 **Format**: `mult_i`
 
@@ -173,7 +206,7 @@ Pop two values from stack and push the product.
 
 ## `div_i`
 
-**Opcode**: 0x14
+**Opcode**: 0x18
 
 **Format**: `div_i`
 
@@ -181,7 +214,7 @@ Pop two values from stack and push the quotient.
 
 ## `mod_i`
 
-**Opcode**: 0x15
+**Opcode**: 0x19
 
 **Format**: `mod_i`
 
@@ -189,7 +222,7 @@ Pop two values from stack and push the modulo.
 
 ## `eq_i`
 
-**Opcode**: 0x16
+**Opcode**: 0x1a
 
 **Format**: `eq_i`
 
@@ -198,7 +231,7 @@ equal.
 
 ## `ne_i`
 
-**Opcode**: 0x17
+**Opcode**: 0x1b
 
 **Format**: `ne_i`
 
@@ -207,7 +240,7 @@ not equal.
 
 ## `lt_i`
 
-**Opcode**: 0x18
+**Opcode**: 0x1c
 
 **Format**: `lt_i`
 
@@ -215,7 +248,7 @@ Pop two values from stack and push the boolean representing if less than.
 
 ## `le_i`
 
-**Opcode**: 0x19
+**Opcode**: 0x1d
 
 **Format**: `le_i`
 
@@ -224,7 +257,7 @@ equal to.
 
 ## `gt_i`
 
-**Opcode**: 0x1a
+**Opcode**: 0x1e
 
 **Format**: `gt_i`
 
@@ -232,7 +265,7 @@ Pop two values from stack and push the boolean representing if greater than.
 
 ## `ge_i`
 
-**Opcode**: 0x1b
+**Opcode**: 0x1f
 
 **Format**: `ge_i`
 

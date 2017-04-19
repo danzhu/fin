@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include "allocator.h"
 #include "method.h"
 #include "module.h"
 #include "stack.h"
@@ -14,6 +15,7 @@ namespace Fin
     class Runtime
     {
         Stack opStack;
+        Allocator alloc;
         std::vector<std::unique_ptr<Module>> modules;
         std::map<ModuleID, Module *> modulesByID;
         std::vector<char> instrs;

@@ -37,23 +37,36 @@ br_false offset:h
 br_true offset:h
     Pop boolean from stack and branch if true.
 
+alloc
+    Pop int from stack, allocate that many bytes of heap memory, and push
+    pointer onto stack.
+
+dealloc
+    Pop pointer from stack and deallocate memory used by that pointer.
+
 push amount:H
     Push `amount` bytes onto stack.
 
 pop amount:H
     Pop `amount` bytes from stack.
 
-const_i value:i
-    Load constant `value` onto stack.
-
-load_i offset:h
+load_arg_4 offset:h
     Load value on frame at `offset` onto stack.
 
-store_i offset:h
+store_arg_4 offset:h
     Store value to frame at `offset` from stack.
 
-return_i
+load_ptr_4 offset:H
+    Load value of pointer onto stack.
+
+store_ptr_4 offset:H
+    Store value from stack to pointer.
+
+return_4
     Return from method with a return value.
+
+const_i value:i
+    Load constant `value` onto stack.
 
 add_i
     Pop two values from stack and push the sum.
