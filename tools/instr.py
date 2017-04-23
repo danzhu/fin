@@ -58,7 +58,7 @@ class Bytes:
         pass
 
     def write(self, out, table):
-        out.buffer.write(self.value)
+        out.write(self.value)
 
 
 class Label:
@@ -72,7 +72,7 @@ class Label:
 
     def write(self, out, table):
         value = table[self.label] - self.loc
-        out.buffer.write(encode(self.enc, value))
+        out.write(encode(self.enc, value))
 
 
 class Allocator:

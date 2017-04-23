@@ -51,7 +51,7 @@ ${OBJDIR}:
 	mkdir $@
 
 %.fm: %.asm tools/asm.py tools/instr.py
-	tools/asm.py < $< > $@
+	tools/asm.py $< -o $@
 	chmod +x $@
 
 ${SRCDIR}/opcode.h: tools/opcode.py tools/instr.py meta/instructions
