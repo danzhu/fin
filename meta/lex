@@ -1,0 +1,25 @@
+> start [ALPHA] ID
+> start 0 ZERO
+> start 123456789 NUM
+> start + PLUS
+> start - MINUS
+> start * STAR
+> start / SLASH
+> start % PERCENT
+> start = ASSN
+> start < LT
+> start > GT
+> start \ BACKSLASH
+> start [SPACE] start
+> start # comment
+> ID [ALPHA][NUM] ID
+> NUM [NUM] NUM
+> ASSN = EQ
+> LT = LE
+> GT = GE
+> comment [ANY] comment
+> comment [LF] start
+type ZERO NUM
+keyword if IF
+keyword else ELSE
+keyword while WHILE
