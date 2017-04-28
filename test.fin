@@ -2,6 +2,14 @@
 
 1 + 2 * 3 / (2 - 0)
 
+let int a
+a = 1
+a + 1
+let int &b
+b := a
+b = 4
+a + 1
+
 # a = b + c
 
 # if a < 0

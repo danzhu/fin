@@ -215,33 +215,53 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::LoadArg4:
-                load<uint32_t>();
-                continue;
-
-            case Opcode::StoreArg4:
-                store<uint32_t>();
-                continue;
-
-            case Opcode::LoadPtr4:
+            case Opcode::LoadArg:
                 {
-                    auto offset = readConst<uint16_t>();
-                    auto ptr = opStack.pop<Ptr>();
-                    opStack.push(alloc.deref<uint32_t>(ptr, offset));
+                    auto size = readConst<uint16_t>();
+                    opStack.push(opStack.at(fp + frameOffset(), size), size);
                 }
                 continue;
 
-            case Opcode::StorePtr4:
+            case Opcode::StoreArg:
                 {
-                    auto offset = readConst<uint16_t>();
-                    auto val = opStack.pop<uint32_t>();
-                    auto ptr = opStack.pop<Ptr>();
-                    alloc.deref<uint32_t>(ptr, offset) = val;
+                    auto size = readConst<uint16_t>();
+                    opStack.pop(opStack.at(fp + frameOffset(), size), size);
                 }
                 continue;
 
-            case Opcode::Return4:
-                ret<uint32_t>();
+            case Opcode::LoadPtr:
+                {
+                    auto offset = readConst<uint32_t>();
+                    auto size = readConst<uint16_t>();
+                    auto ptr = opStack.pop<Ptr>();
+                    opStack.push(alloc.deref(ptr + offset, size), size);
+                }
+                continue;
+
+            case Opcode::StorePtr:
+                {
+                    auto offset = readConst<uint32_t>();
+                    auto size = readConst<uint16_t>();
+                    auto ptr = opStack.pop<Ptr>();
+                    opStack.pop(alloc.deref(ptr + offset, size), size);
+                }
+                continue;
+
+            case Opcode::AddrFrame:
+                {
+                    auto offset = readConst<uint32_t>();
+                    opStack.push(static_cast<Ptr>(offset));
+                }
+                continue;
+
+            case Opcode::ReturnVal:
+                {
+                    auto size = readConst<uint16_t>();
+                    std::unique_ptr<char[]> val{new char[size]};
+                    opStack.pop(val.get(), size);
+                    ret();
+                    opStack.push(val.get(), size);
+                }
                 continue;
 
             case Opcode::ConstI:
@@ -296,6 +316,11 @@ void Fin::Runtime::execute()
         throw std::runtime_error{"invalid opcode "
             + std::to_string(static_cast<char>(op))};
     }
+}
+
+Fin::Runtime::Runtime()
+{
+    alloc.add(opStack.content(), opStack.capacity());
 }
 
 void Fin::Runtime::run(std::istream &src)

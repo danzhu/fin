@@ -132,49 +132,57 @@ Push `amount` bytes onto stack.
 
 Pop `amount` bytes from stack.
 
-## `load_arg_4`
+## `load_arg`
 
 **Opcode**: 0xf
 
-**Format**: `load_arg_4 offset:h`
+**Format**: `load_arg offset:h size:H`
 
 Load value on frame at `offset` onto stack.
 
-## `store_arg_4`
+## `store_arg`
 
 **Opcode**: 0x10
 
-**Format**: `store_arg_4 offset:h`
+**Format**: `store_arg offset:h size:H`
 
 Store value to frame at `offset` from stack.
 
-## `load_ptr_4`
+## `load_ptr`
 
 **Opcode**: 0x11
 
-**Format**: `load_ptr_4 offset:H`
+**Format**: `load_ptr offset:I size:H`
 
 Load value of pointer onto stack.
 
-## `store_ptr_4`
+## `store_ptr`
 
 **Opcode**: 0x12
 
-**Format**: `store_ptr_4 offset:H`
+**Format**: `store_ptr offset:I size:H`
 
 Store value from stack to pointer.
 
-## `return_4`
+## `addr_frame`
 
 **Opcode**: 0x13
 
-**Format**: `return_4`
+**Format**: `addr_frame offset:I`
+
+Load address of frame at `offset` onto stack.
+
+## `return_val`
+
+**Opcode**: 0x14
+
+**Format**: `return_val size:H`
 
 Return from method with a return value.
 
 ## `const_i`
 
-**Opcode**: 0x14
+**Opcode**: 0x15
 
 **Format**: `const_i value:i`
 
@@ -182,7 +190,7 @@ Load constant `value` onto stack.
 
 ## `add_i`
 
-**Opcode**: 0x15
+**Opcode**: 0x16
 
 **Format**: `add_i`
 
@@ -190,7 +198,7 @@ Pop two values from stack and push the sum.
 
 ## `sub_i`
 
-**Opcode**: 0x16
+**Opcode**: 0x17
 
 **Format**: `sub_i`
 
@@ -198,7 +206,7 @@ Pop two values from stack and push the difference.
 
 ## `mult_i`
 
-**Opcode**: 0x17
+**Opcode**: 0x18
 
 **Format**: `mult_i`
 
@@ -206,7 +214,7 @@ Pop two values from stack and push the product.
 
 ## `div_i`
 
-**Opcode**: 0x18
+**Opcode**: 0x19
 
 **Format**: `div_i`
 
@@ -214,7 +222,7 @@ Pop two values from stack and push the quotient.
 
 ## `mod_i`
 
-**Opcode**: 0x19
+**Opcode**: 0x1a
 
 **Format**: `mod_i`
 
@@ -222,7 +230,7 @@ Pop two values from stack and push the modulo.
 
 ## `eq_i`
 
-**Opcode**: 0x1a
+**Opcode**: 0x1b
 
 **Format**: `eq_i`
 
@@ -231,7 +239,7 @@ equal.
 
 ## `ne_i`
 
-**Opcode**: 0x1b
+**Opcode**: 0x1c
 
 **Format**: `ne_i`
 
@@ -240,7 +248,7 @@ not equal.
 
 ## `lt_i`
 
-**Opcode**: 0x1c
+**Opcode**: 0x1d
 
 **Format**: `lt_i`
 
@@ -248,7 +256,7 @@ Pop two values from stack and push the boolean representing if less than.
 
 ## `le_i`
 
-**Opcode**: 0x1d
+**Opcode**: 0x1e
 
 **Format**: `le_i`
 
@@ -257,7 +265,7 @@ equal to.
 
 ## `gt_i`
 
-**Opcode**: 0x1e
+**Opcode**: 0x1f
 
 **Format**: `gt_i`
 
@@ -265,7 +273,7 @@ Pop two values from stack and push the boolean representing if greater than.
 
 ## `ge_i`
 
-**Opcode**: 0x1f
+**Opcode**: 0x20
 
 **Format**: `ge_i`
 

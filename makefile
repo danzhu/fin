@@ -51,7 +51,8 @@ ${OBJDIR}:
 	mkdir $@
 
 %.fm: %.fin tools/asm.py tools/compiler.py tools/generator.py \
-	tools/instructions.py tools/lexer.py tools/parser.py
+	tools/instructions.py tools/lexer.py tools/node.py tools/parser.py \
+	meta/instructions meta/lex
 	tools/compiler.py $< -o $@
 	chmod +x $@
 

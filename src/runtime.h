@@ -54,24 +54,8 @@ namespace Fin
             auto op1 = opStack.pop<typename Op::first_argument_type>();
             opStack.push(Op{}(op1, op2));
         }
-
-        template<typename T> void load()
-        {
-            opStack.push(opStack.at<T>(fp + frameOffset()));
-        }
-
-        template<typename T> void store()
-        {
-            opStack.pop(opStack.at<T>(fp + frameOffset()));
-        }
-
-        template<typename T> void ret()
-        {
-            auto val = opStack.pop<T>();
-            ret();
-            opStack.push(val);
-        }
     public:
+        Runtime();
         void run(std::istream &src);
         Module &createModule(const std::string &name);
         Module &getModule(const std::string &name);

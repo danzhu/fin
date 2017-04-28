@@ -15,7 +15,9 @@ class Compiler:
         self.generator = Generator()
 
     def compile(self, src, out):
-        self.generator.generate(self.parser.parse(src), out)
+        root = self.parser.parse(src)
+        root.annotate()
+        self.generator.generate(root, out)
 
 
 def main():
@@ -27,13 +29,16 @@ def main():
             help='write output to <output>')
     args = parser.parse_args()
 
+    compile(args.src, args.out)
+
+def compile(src, out):
     with io.StringIO() as assembly:
         compiler = Compiler('meta/lex')
-        compiler.compile(args.src, assembly)
+        compiler.compile(src, assembly)
 
         assembly.seek(0)
 
-        asm.assemble(assembly, args.out.buffer)
+        asm.assemble(assembly, out.buffer)
 
 if __name__ == '__main__':
     main()

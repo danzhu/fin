@@ -2,21 +2,7 @@
 
 import sys
 from lexer import Lexer
-
-class Node:
-    def __init__(self, tp, var, *children):
-        self.type = tp
-        self.variant = var
-        self.children = children
-
-    def print(self, indent=0):
-        content = ' ' * indent + self.type
-        if self.variant:
-            content += ' {}'.format(self.variant)
-        print(content)
-        for c in self.children:
-            c.print(indent + 2)
-
+from node import Node
 
 class Parser:
     def __init__(self, lexer):
@@ -50,17 +36,23 @@ class Parser:
         raise SyntaxError(msg)
 
     def _empty(self):
-        return Node('STMTS', None)
+        return Node('STMTS', ())
 
     def _stmts(self):
         stmts = []
         while self._peek().type not in ['EOF', 'DEDENT']:
             stmts.append(self._stmt())
-        return Node('STMTS', None, *stmts)
+        return Node('STMTS', stmts)
 
     def _stmt(self):
         t = self._peek()
-        if t.type == 'IF':
+        if t.type == 'LET':
+            self._next()
+            tp = self._type()
+            name = Node('ID', (), self._expect('ID').value)
+            self._expect('EOL')
+            return Node('LET', (tp, name))
+        elif t.type == 'IF':
             self._next()
             cond = self._test()
             self._expect('EOL')
@@ -72,7 +64,7 @@ class Parser:
                 fail = self._block()
             else:
                 fail = self._empty()
-            return Node('IF', None, cond, succ, fail)
+            return Node('IF', (cond, succ, fail))
         elif t.type == 'WHILE':
             self._next()
             cond = self._test()
@@ -85,18 +77,30 @@ class Parser:
                 fail = self._block()
             else:
                 fail = self._empty()
-            return Node('WHILE', None, cond, cont, fail)
+            return Node('WHILE', (cond, cont, fail))
         else:
             t = self._expr()
             if self._peek().type in ['ASSN', 'PLUS_ASSN', 'MINUS_ASSN',
-                    'MULT_ASSN', 'DIV_ASSN']:
+                    'MULT_ASSN', 'DIV_ASSN', 'COLON']:
+                lvl = 0
+                while self._peek().type == 'COLON':
+                    self._next()
+                    lvl += 1
                 op = self._next()
                 r = self._expr()
-                t = Node('ASSN', op.type, t, r)
+                t = Node('ASSN', (t, r), op.type, lvl)
             else:
-                t = Node('EXPR', None, t)
+                t = Node('EXPR', (t,))
             self._expect('EOL')
             return t
+
+    def _type(self):
+        tp = self._expect('ID')
+        children = [Node('ID', (), tp.value)]
+        while self._peek().type == 'AMP':
+            self._next()
+            children.append(Node('AMP', ()))
+        return Node('TYPE', children)
 
     def _block(self):
         t = self._peek()
@@ -116,7 +120,7 @@ class Parser:
         if self._peek().type in ['EQ', 'NE', 'LT', 'GT', 'LE', 'GE']:
             op = self._next()
             r = self._expr()
-            t = Node('COMP', op.type, t, r)
+            t = Node('COMP', (t, r), op.type)
         return t
 
     def _expr(self):
@@ -124,7 +128,7 @@ class Parser:
         while self._peek().type in ['PLUS', 'MINUS']:
             op = self._next()
             r = self._term()
-            t = Node('BIN', op.type, t, r)
+            t = Node('BIN', (t, r), op.type)
         return t
 
     def _term(self):
@@ -132,13 +136,13 @@ class Parser:
         while self._peek().type in ['MULT', 'DIV']:
             op = self._next()
             r = self._factor()
-            t = Node('BIN', op.type, t, r)
+            t = Node('BIN', (t, r), op.type)
         return t
 
     def _factor(self):
         t = self._next()
         if t.type in ['ID', 'NUM']:
-            return t
+            return Node(t.type, (), t.value)
         elif t.type == 'LPAREN':
             t = self._test()
             self._expect('RPAREN')
@@ -151,4 +155,6 @@ if __name__ == '__main__':
     with open('meta/lex') as f:
         lexer = Lexer(f)
     parser = Parser(lexer)
-    parser.parse(sys.stdin).print()
+    root = parser.parse(sys.stdin)
+    root.annotate()
+    root.print()

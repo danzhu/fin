@@ -7,6 +7,8 @@
 > start / DIV
 > start % PERCENT
 > start = ASSN
+> start & AMP
+> start : COLON
 > start ( LPAREN
 > start ) RPAREN
 > start < LT
@@ -26,6 +28,7 @@
 > comment [ANY] comment
 > comment [LF] start
 type ZERO NUM
+keyword let LET
 keyword if IF
 keyword else ELSE
 keyword while WHILE

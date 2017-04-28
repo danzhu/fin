@@ -22,7 +22,7 @@ ref_method 'write'
 ref_method 'read'
 
 # ------ main ------
-push 12
+push 16
 
 # max = read()
 call 1

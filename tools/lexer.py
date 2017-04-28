@@ -17,9 +17,6 @@ class Token:
         self.type = tp
         self.value = val
 
-    def print(self, indent=0):
-        print(' ' * indent + '{0.type} {0.value}'.format(self))
-
 
 class Lexer:
     def __init__(self, syn):

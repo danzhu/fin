@@ -50,19 +50,22 @@ push amount:H
 pop amount:H
     Pop `amount` bytes from stack.
 
-load_arg_4 offset:h
+load_arg offset:h size:H
     Load value on frame at `offset` onto stack.
 
-store_arg_4 offset:h
+store_arg offset:h size:H
     Store value to frame at `offset` from stack.
 
-load_ptr_4 offset:H
+load_ptr offset:I size:H
     Load value of pointer onto stack.
 
-store_ptr_4 offset:H
+store_ptr offset:I size:H
     Store value from stack to pointer.
 
-return_4
+addr_frame offset:I
+    Load address of frame at `offset` onto stack.
+
+return_val size:H
     Return from method with a return value.
 
 const_i value:i
