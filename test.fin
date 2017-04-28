@@ -1,11 +1,13 @@
 # first example
 
-a = b + c
+1 + 2
 
-if a < 0
-    c = d \
-        - 1
-    if c
-        # what?
-    else
-        # no way
+# a = b + c
+
+# if a < 0
+#     c = 2 * (d - 1)
+#     # what?
+#     while c > 0
+#         c -= 1
+#     else
+#         c = 1

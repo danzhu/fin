@@ -2,10 +2,7 @@
 
 import sys
 import string
-from collections import namedtuple
 from enum import Enum
-
-Token = namedtuple('Token', 'type value')
 
 class State:
     def __init__(self, name):
@@ -13,6 +10,15 @@ class State:
         self.transitions = {}
 
         self.accept = self.name[0].isupper()
+
+
+class Token:
+    def __init__(self, tp, val=None):
+        self.type = tp
+        self.value = val
+
+    def print(self, indent=0):
+        print(' ' * indent + '{0.type} {0.value}'.format(self))
 
 
 class Lexer:
@@ -24,9 +30,9 @@ class Lexer:
         for line in syn:
             segs = line[:-1].split(' ')
             if segs[0] == '>':
-                start = self.state(segs[1])
-                trans = self.expand(segs[2])
-                end = self.state(segs[3])
+                start = self._state(segs[1])
+                trans = self._expand(segs[2])
+                end = self._state(segs[3])
                 for c in trans:
                     start.transitions[c] = end
             elif segs[0] == 'type':
@@ -36,14 +42,14 @@ class Lexer:
 
         self.start = self.states['start']
 
-    def expand(self, trans):
+    def _expand(self, trans):
         return trans.replace('[ALPHA]', string.ascii_letters) \
                 .replace('[NUM]', string.digits) \
                 .replace('[SPACE]', string.whitespace) \
                 .replace('[LF]', '\n') \
                 .replace('[ANY]', ''.join(map(chr, range(128))))
 
-    def state(self, name):
+    def _state(self, name):
         if name not in self.states:
             self.states[name] = State(name)
         return self.states[name]
@@ -51,8 +57,11 @@ class Lexer:
     def read(self, src):
         ind_amount = 0
         indent = 0
+        # TODO: line continuation
         for line in src:
-            if len(line.strip()) == 0:
+            stripped = line.strip()
+            # TODO: remove this hack
+            if len(stripped) == 0 or stripped[0] == '#':
                 continue
 
             new_indent = len(line) - len(line.lstrip())
@@ -64,13 +73,13 @@ class Lexer:
                 if (new_indent - indent) % ind_amount != 0:
                     raise Exception('wrong indent')
                 for i in range((new_indent - indent) // ind_amount):
-                    yield Token('INDENT', None)
+                    yield Token('INDENT')
 
             elif new_indent < indent:
                 if (indent - new_indent) % ind_amount != 0:
                     raise Exception('wrong dedent')
                 for i in range((indent - new_indent) // ind_amount):
-                    yield Token('DEDENT', None)
+                    yield Token('DEDENT')
 
             indent = new_indent
 
@@ -109,10 +118,11 @@ class Lexer:
                 start = end
                 state = self.start
 
-            yield Token('EOL', None)
+            yield Token('EOL')
 
-        for i in range(indent // ind_amount):
-            yield Token('DEDENT', None)
+        if ind_amount > 0:
+            for i in range(indent // ind_amount):
+                yield Token('DEDENT')
 
         yield Token('EOF', None)
 
@@ -122,4 +132,4 @@ if __name__ == '__main__':
         lexer = Lexer(f)
 
     for t in lexer.read(sys.stdin):
-        print(t)
+        t.print()

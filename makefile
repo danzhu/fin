@@ -50,6 +50,11 @@ ${OBJDIR}/%.o: ${SRCDIR}/%.cc | ${OBJDIR}
 ${OBJDIR}:
 	mkdir $@
 
+%.fm: %.fin tools/asm.py tools/compiler.py tools/generator.py \
+	tools/instructions.py tools/lexer.py tools/parser.py
+	tools/compiler.py $< -o $@
+	chmod +x $@
+
 %.fm: %.asm tools/asm.py tools/instr.py
 	tools/asm.py $< -o $@
 	chmod +x $@
