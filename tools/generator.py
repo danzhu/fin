@@ -14,6 +14,8 @@ class Generator:
     def generate(self, tree, out):
         self.out = out
         self._write('module', "'test'")
+        self._write('ref_module', "'io'")
+        self._write('ref_method', "'write'")
         self._gen(tree)
 
     def _write(self, *args):
@@ -28,7 +30,8 @@ class Generator:
 
     def EXPR(self, node):
         self._gen(node.children[0])
-        self._write('pop', '4')
+        # self._write('pop', '4')
+        self._write('call', '0')
 
     def BIN(self, node):
         self._gen(node.children[0])
