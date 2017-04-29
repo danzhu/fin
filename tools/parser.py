@@ -79,7 +79,7 @@ class Parser:
                 fail = self._empty()
             return Node('WHILE', (cond, cont, fail))
         else:
-            t = self._expr()
+            t = self._test()
             if self._peek().type in ['ASSN', 'PLUS_ASSN', 'MINUS_ASSN',
                     'MULT_ASSN', 'DIV_ASSN', 'COLON']:
                 lvl = 0
@@ -87,7 +87,7 @@ class Parser:
                     self._next()
                     lvl += 1
                 op = self._next()
-                r = self._expr()
+                r = self._test()
                 t = Node('ASSN', (t, r), op.type, lvl)
             else:
                 t = Node('EXPR', (t,))

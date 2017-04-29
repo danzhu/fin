@@ -7,6 +7,8 @@ class Node:
         self.value = val
         self.level = lvl
 
+        self.expr = False
+
     def print(self, indent=0):
         content = ' ' * indent + self.type
         if self.value:
@@ -23,14 +25,11 @@ class Node:
         self.vars = parent.vars if parent else SymbolTable()
 
         # expr
-        if not parent:
-            self.expr = False
-        elif parent.expr:
-            self.expr = True
-        elif parent.type in ['EXPR', 'ASSN']:
-            self.expr = True
-        else:
-            self.expr = False
+        if self.expr or self.type in ['EXPR', 'ASSN']:
+            for c in self.children:
+                c.expr = True
+        elif self.type in ['IF', 'WHILE']:
+            self.children[0].expr = True
 
         for c in self.children:
             c.annotate(self)
@@ -54,6 +53,9 @@ class Node:
                 raise TypeError()
 
             self.expr_type = ExprType(self.children[0].expr_type.type, 0)
+        elif self.type == 'COMP':
+            # TODO: type check
+            self.expr_type = ExprType(self.types['bool'], 0)
 
         if self.type == 'LET':
             self.vars.add(self.children[1].value, self.children[0].expr_type)
@@ -117,6 +119,7 @@ class DeclType:
 
 def builtin_types():
     types = {
-            DeclType('int', 4)
+            DeclType('int', 4),
+            DeclType('bool', 1)
             }
     return {tp.name: tp for tp in types}
