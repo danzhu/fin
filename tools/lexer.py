@@ -13,9 +13,14 @@ class State:
 
 
 class Token:
-    def __init__(self, tp, val=None):
+    def __init__(self, tp, val, line, col):
         self.type = tp
         self.value = val
+        self.line = line
+        self.column = col
+
+    def __str__(self):
+        return '{0.type} {0.value}'.format(self)
 
 
 class Lexer:
@@ -54,8 +59,11 @@ class Lexer:
     def read(self, src):
         ind_amount = 0
         indent = 0
+        ln = 0
         # TODO: line continuation
         for line in src:
+            ln += 1
+
             stripped = line.strip()
             # TODO: remove this hack
             if len(stripped) == 0 or stripped[0] == '#':
@@ -70,13 +78,13 @@ class Lexer:
                 if (new_indent - indent) % ind_amount != 0:
                     raise Exception('wrong indent')
                 for i in range((new_indent - indent) // ind_amount):
-                    yield Token('INDENT')
+                    yield Token('INDENT', None, ln, 0)
 
             elif new_indent < indent:
                 if (indent - new_indent) % ind_amount != 0:
                     raise Exception('wrong dedent')
                 for i in range((indent - new_indent) // ind_amount):
-                    yield Token('DEDENT')
+                    yield Token('DEDENT', None, ln, 0)
 
             indent = new_indent
 
@@ -110,18 +118,18 @@ class Lexer:
                 else:
                     tp = state.name
 
-                yield Token(tp, val)
+                yield Token(tp, val, ln, start + 1)
 
                 start = end
                 state = self.start
 
-            yield Token('EOL')
+            yield Token('EOL', val, ln, len(line) + 1)
 
         if ind_amount > 0:
             for i in range(indent // ind_amount):
-                yield Token('DEDENT')
+                yield Token('DEDENT', None, ln, 0)
 
-        yield Token('EOF', None)
+        yield Token('EOF', None, ln, 0)
 
 
 if __name__ == '__main__':
@@ -129,4 +137,4 @@ if __name__ == '__main__':
         lexer = Lexer(f)
 
     for t in lexer.read(sys.stdin):
-        t.print()
+        print(t)

@@ -14,6 +14,7 @@
 > start < LT
 > start > GT
 > start \ BACKSLASH
+> start , COMMA
 > start [SPACE] start
 > start # comment
 > ID [ALPHA][NUM] ID
@@ -28,6 +29,7 @@
 > comment [ANY] comment
 > comment [LF] start
 type ZERO NUM
+keyword import IMPORT
 keyword let LET
 keyword if IF
 keyword else ELSE

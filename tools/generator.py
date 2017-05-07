@@ -46,19 +46,21 @@ class Generator:
             self._write('')
 
     def LET(self, node):
-        tp = node.children[0].expr_type
+        tp = node.children[1].expr_type
         self._write('push', tp.var_size())
 
     def IF(self, node):
         els = self._label('ELSE')
         end = self._label('END_IF')
+        has_else = len(node.children[2].children) > 0
 
         self._gen(node.children[0], 0) # comp
-        self._write('br_false', els)
+        self._write('br_false', els if has_else else end)
         self._gen(node.children[1])
-        self._write('br', end)
-        self._write(els + ':')
-        self._gen(node.children[2])
+        if has_else:
+            self._write('br', end)
+            self._write(els + ':')
+            self._gen(node.children[2])
         self._write(end + ':')
 
     def WHILE(self, node):

@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 
+import tps
+from tps import ExprType
+
 class Node:
     def __init__(self, tp, children, val=None, lvl=0):
         self.type = tp
         self.children = children
         self.value = val
+        # TODO: maybe this should be stored somewhere else?
         self.level = lvl
 
         self.expr = False
@@ -14,38 +18,46 @@ class Node:
         if self.value:
             content += ' {}'.format(self.value)
         if self.expr:
-            content += ' [' + str(self.expr_type) + ']'
+            content += ' [{}]'.format(self.expr_type)
+        if self.level > 0:
+            content += ' {}'.format(self.level)
         print(content)
         for c in self.children:
             c.print(indent + 2)
 
-    def annotate(self, parent=None):
-        # types and var table
-        self.types = parent.types if parent else builtin_types()
-        self.vars = parent.vars if parent else SymbolTable()
+    def analyze(self):
+        types = tps.builtin_types()
+        fns = tps.builtin_fns()
+        ids = SymbolTable()
+        self._annotate(types, fns, ids)
 
+    def _annotate(self, types, fns, ids):
         # expr
-        if self.expr or self.type in ['EXPR', 'ASSN']:
+        if self.type == 'CALL':
+            pass
+        elif self.expr or self.type in ['EXPR', 'ASSN', 'ARGS']:
             for c in self.children:
                 c.expr = True
         elif self.type in ['IF', 'WHILE']:
             self.children[0].expr = True
 
+        # process children
         for c in self.children:
-            c.annotate(self)
+            c._annotate(types, fns, ids)
 
         # expr type
         if self.type == 'TYPE':
-            self.expr_type = ExprType(self.types[self.children[0].value],
-                    len(self.children))
+            tp = types[self.children[0].value]
+            lvl = len(self.children)
+            self.expr_type = ExprType(tp, lvl)
         elif not self.expr:
             # ignore type of non-expressions
             pass
         elif self.type == 'ID':
-            self.id = self.vars[self.value]
+            self.id = ids[self.value]
             self.expr_type = self.id.type
         elif self.type == 'NUM':
-            self.expr_type = ExprType(self.types['int'], 0)
+            self.expr_type = ExprType(tps.INT, 0)
         elif self.type == 'BIN':
             # TODO: implicit conversion
             if self.children[0].expr_type.type != \
@@ -55,10 +67,13 @@ class Node:
             self.expr_type = ExprType(self.children[0].expr_type.type, 0)
         elif self.type == 'COMP':
             # TODO: type check
-            self.expr_type = ExprType(self.types['bool'], 0)
+            self.expr_type = ExprType(tps.BOOL, 0)
+        elif self.type == 'CALL':
+            fn = fns[self.children[0].value]
+            self.expr_type = fn.ret
 
         if self.type == 'LET':
-            self.vars.add(self.children[1].value, self.children[0].expr_type)
+            ids.add(self.children[0].value, self.children[1].expr_type)
 
 
 class SymbolTable:
@@ -86,40 +101,3 @@ class Symbol:
         self.name = name
         self.offset = off
         self.type = tp
-
-
-class ExprType:
-    def __init__(self, tp, lvl):
-        self.type = tp
-        self.level = lvl
-
-    def __str__(self):
-        s = self.type.name
-        if self.level > 0:
-            s += ' ' + '&' * self.level
-        return s
-
-    def size(self, lvl=-1):
-        if lvl == -1:
-            lvl = self.level
-        if lvl > 0:
-            return 8 # size of pointer
-        else:
-            return self.type.size
-
-    def var_size(self):
-        return self.size(self.level - 1)
-
-
-class DeclType:
-    def __init__(self, name, size):
-        self.name = name
-        self.size = size
-
-
-def builtin_types():
-    types = {
-            DeclType('int', 4),
-            DeclType('bool', 1)
-            }
-    return {tp.name: tp for tp in types}

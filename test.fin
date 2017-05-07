@@ -1,36 +1,26 @@
-# first example
+import fin
 
-1 + 2 * 3 / (2 - 0)
+print(1 + 2 * 3 / (2 - 0))
 
-let int a
+let a Int
 a = 1
-a + 1
-let int &b
+print(a + 1)
+let b Int&
 b := a
 b = 4
-a + 1
+print(a + 1)
 
-let bool c
+let c Bool
 c = a > 1
 if c
-    1
+    print(1)
 else
-    0
+    print(0)
 
 if a > 1
-    2
+    print(2)
 
 a = 10
 while a > 0
-    a
+    print(a)
     a = a - 1
-
-# a = b + c
-
-# if a < 0
-#     c = 2 * (d - 1)
-#     # what?
-#     while c > 0
-#         c -= 1
-#     else
-#         c = 1

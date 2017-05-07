@@ -1,0 +1,5 @@
+version 0.1
+class Int 4
+class Bool 1
+def print val fin.Int
+def input -> fin.Int
