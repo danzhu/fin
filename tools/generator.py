@@ -40,6 +40,15 @@ class Generator:
         self._labels[name] = count + 1
         return '{}_{}'.format(name, count)
 
+    def FILE(self, node):
+        for c in node.children:
+            self._gen(c)
+            self._write('')
+
+    def IMPORT(self, node):
+        # TODO
+        pass
+
     def STMTS(self, node):
         for c in node.children:
             self._gen(c)
@@ -78,13 +87,18 @@ class Generator:
 
     def EXPR(self, node):
         self._gen(node.children[0], 0)
-        # self._write('pop', '4')
-        self._write('call', 0)
+        self._write('pop', node.children[0].expr_type.size())
 
     def ASSN(self, node):
         self._gen(node.children[1], node.level) # value
         self._gen(node.children[0], node.level + 1) # id
         self._write('store_ptr', 0, node.children[1].expr_type.size(node.level))
+
+    def CALL(self, node):
+        for c in node.children[1:]:
+            self._gen(c, 0)
+        # TODO: resolve function
+        self._write('call', 0)
 
     def COMP(self, node):
         self._gen(node.children[0], 0)
@@ -114,8 +128,8 @@ class Generator:
 if __name__ == '__main__':
     with open('meta/lex') as f:
         lexer = Lexer(f)
-    parser = Parser(lexer)
+    parser = Parser()
     generator = Generator()
-    root = parser.parse(sys.stdin)
-    root.annotate()
+    root = parser.parse(lexer.read(sys.stdin))
+    root.analyze()
     generator.generate(root, sys.stdout)

@@ -14,13 +14,11 @@ class Parser:
         self._lookahead = next(self._src)
 
     def _expect(self, *types):
-        t = self._lookahead
-        if t.type not in types:
+        if self._lookahead.type not in types:
             self._error('expected {}, but got {}'.format(
                 ' or '.join(types),
-                t.type))
+                self._lookahead.type))
         self._next()
-        return t
 
     def _error(self, msg):
         raise SyntaxError(msg
@@ -121,17 +119,6 @@ class Parser:
         return Node('STMTS', stmts)
 
     def _args(self):
-        args = []
-        self._expect('LPAREN')
-        if self._lookahead.type == 'RPAREN':
-            self._next()
-        else:
-            while True:
-                args.append(self._test())
-
-                t = self._expect('COMMA', 'RPAREN')
-                if t.type == 'RPAREN':
-                    break
         return Node('ARGS', args)
 
     def _test(self):
@@ -170,8 +157,19 @@ class Parser:
             if self._lookahead.type != 'LPAREN':
                 return node
 
-            args = self._args()
-            return Node('CALL', (node, args))
+            children = [node]
+            self._next()
+            if self._lookahead.type == 'RPAREN':
+                self._next()
+            else:
+                while True:
+                    children.append(self._test())
+
+                    tp = self._lookahead.type
+                    self._expect('COMMA', 'RPAREN')
+                    if tp == 'RPAREN':
+                        break
+            return Node('CALL', children)
 
         elif self._lookahead.type == 'NUM':
             val = self._lookahead.value
@@ -189,7 +187,8 @@ class Parser:
             self._expect('ID', 'NUM', 'LPAREN')
 
     def _id(self):
-        name = self._expect('ID').value
+        name = self._lookahead.value
+        self._expect('ID')
         return Node('ID', (), name)
 
 

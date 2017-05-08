@@ -10,13 +10,14 @@ import asm
 class Compiler:
     def __init__(self, lex):
         with open(lex) as f:
-            lexer = Lexer(f)
-        self.parser = Parser(lexer)
+            self.lexer = Lexer(f)
+        self.parser = Parser()
         self.generator = Generator()
 
     def compile(self, src, out):
-        root = self.parser.parse(src)
-        root.annotate()
+        tokens = self.lexer.read(src)
+        root = self.parser.parse(tokens)
+        root.analyze()
         self.generator.generate(root, out)
 
 

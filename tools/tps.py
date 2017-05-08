@@ -28,8 +28,9 @@ class ExprType:
 
 
 class FunctionType:
-    def __init__(self, ret: ExprType):
+    def __init__(self, ret, args):
         self.ret = ret
+        self.args = args
 
     def __str__(self):
         return '{}'.format(self.ret)
@@ -45,6 +46,6 @@ def builtin_types():
 
 def builtin_fns():
     return {
-            'print': FunctionType(ExprType(NONE, 0)),
-            'input': FunctionType(ExprType(INT, 0)),
+            'print': FunctionType(ExprType(NONE, 0), [ExprType(INT, 0)]),
+            'input': FunctionType(ExprType(INT, 0), []),
             }
