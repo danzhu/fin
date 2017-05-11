@@ -217,15 +217,17 @@ void Fin::Runtime::execute()
 
             case Opcode::LoadArg:
                 {
+                    auto offset = frameOffset();
                     auto size = readConst<uint16_t>();
-                    opStack.push(opStack.at(fp + frameOffset(), size), size);
+                    opStack.push(opStack.at(fp + offset, size), size);
                 }
                 continue;
 
             case Opcode::StoreArg:
                 {
+                    auto offset = frameOffset();
                     auto size = readConst<uint16_t>();
-                    opStack.pop(opStack.at(fp + frameOffset(), size), size);
+                    opStack.pop(opStack.at(fp + offset, size), size);
                 }
                 continue;
 

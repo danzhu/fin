@@ -27,7 +27,8 @@ namespace Fin
         char *at(uint32_t idx, uint32_t size)
         {
             if (idx + size > _size)
-                throw std::length_error{"invalid stack access"};
+                throw std::length_error{"invalid stack access at "
+                    + std::to_string(idx) + ", size " + std::to_string(size)};
 
             return _content + idx;
         }

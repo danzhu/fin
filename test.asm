@@ -58,14 +58,14 @@ br_true begin_while
 # ptr = alloc(4)
 const_i 4
 alloc
-store_arg 8 4
+store_arg 8 8
 
 # *ptr = i
-load_arg 8 4
 load_arg 4 4
+load_arg 8 8
 store_ptr 0 4
 
 # write(*ptr)
-load_arg 8 4
+load_arg 8 8
 load_ptr 0 4
 call 0
