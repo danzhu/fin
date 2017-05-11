@@ -32,10 +32,6 @@ class Parser:
         while self._lookahead.type != 'EOF':
             if self._lookahead.type == 'IMPORT':
                 children.append(self._import())
-            elif self._lookahead.type == 'CLASS':
-                pass # TODO
-            elif self._lookahead.type == 'DEF':
-                pass # TODO
             else:
                 children.append(self._stmt())
         return Node('FILE', children)

@@ -63,7 +63,6 @@ class Assembler:
         self.refs = set()
         self.self_refs = []
 
-        # TODO: line continuation
         body = []
         for line in src:
             line = line.strip()

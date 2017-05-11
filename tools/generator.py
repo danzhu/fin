@@ -93,7 +93,6 @@ class Generator:
     def CALL(self, node):
         for c in node.children[1:]:
             self._gen(c, 0)
-        # TODO: resolve function
         self._write('call', str(node.fn))
 
     def COMP(self, node):
