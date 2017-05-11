@@ -2,12 +2,12 @@
 #include <iostream>
 #include "runtime.h"
 
-void write(Fin::Runtime &rt, Fin::Stack &st)
+void print(Fin::Runtime &rt, Fin::Stack &st)
 {
     std::cout << st.pop<int32_t>() << std::endl;
 }
 
-void read(Fin::Runtime &rt, Fin::Stack &st)
+void input(Fin::Runtime &rt, Fin::Stack &st)
 {
     int32_t val;
     std::cin >> val;
@@ -22,9 +22,9 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    std::ifstream input{argv[1]};
+    std::ifstream src{argv[1]};
 
-    if (!input)
+    if (!src)
     {
         std::cerr << "cannot open file" << std::endl;
         return 1;
@@ -32,11 +32,11 @@ int main(int argc, const char *argv[])
 
     Fin::Runtime runtime;
 
-    auto &io = runtime.createModule("io");
-    io.addMethod("write", Fin::Method{write});
-    io.addMethod("read", Fin::Method{read});
+    auto &fin = runtime.createModule("fin");
+    fin.addMethod("print(fin.Int)fin.None", Fin::Method{print});
+    fin.addMethod("input()fin.Int", Fin::Method{input});
 
-    runtime.run(input);
+    runtime.run(src);
 
     return 0;
 }

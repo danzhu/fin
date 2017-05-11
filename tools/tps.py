@@ -7,7 +7,7 @@ class RuntimeType:
 
 
 class ExprType:
-    def __init__(self, tp: RuntimeType, lvl):
+    def __init__(self, tp: RuntimeType, lvl=0):
         self.type = tp
         self.level = lvl
 
@@ -28,24 +28,30 @@ class ExprType:
 
 
 class FunctionType:
-    def __init__(self, ret, args):
-        self.ret = ret
+    def __init__(self, name, args, ret):
+        self.name = name
         self.args = args
+        self.ret = ret
 
     def __str__(self):
-        return '{}'.format(self.ret)
+        return '{}({}){}'.format(
+                self.name,
+                ','.join(str(arg) for arg in self.args),
+                self.ret)
 
 
-NONE = RuntimeType('None', 0)
-BOOL = RuntimeType('Bool', 1)
-INT = RuntimeType('Int', 4)
+NONE = RuntimeType('fin.None', 0)
+BOOL = RuntimeType('fin.Bool', 1)
+INT = RuntimeType('fin.Int', 4)
 
 def builtin_types():
-    types = { BOOL, INT }
-    return {tp.name: tp for tp in types}
+    return {
+            'Bool': BOOL,
+            'Int': INT
+            }
 
 def builtin_fns():
     return {
-            'print': FunctionType(ExprType(NONE, 0), [ExprType(INT, 0)]),
-            'input': FunctionType(ExprType(INT, 0), []),
+            'print': FunctionType('fin.print', [ExprType(INT)], ExprType(NONE)),
+            'input': FunctionType('fin.input', [], ExprType(INT)),
             }

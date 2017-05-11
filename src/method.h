@@ -19,12 +19,10 @@ namespace Fin
         Module *module = nullptr;
         NativeMethod *nativeMethod = nullptr;
         uint32_t location;
-        uint16_t argSize;
 
         Method() {}
         Method(NativeMethod *method): nativeMethod{method} {}
-        Method(Module *module, uint32_t loc, uint16_t argSize):
-            module{module}, location{loc}, argSize{argSize} {}
+        Method(uint32_t loc): location{loc} {}
     };
 }
 

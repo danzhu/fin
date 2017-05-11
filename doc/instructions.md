@@ -30,7 +30,7 @@ Declare new module, and set declaring module to this module.
 
 **Opcode**: 0x2
 
-**Format**: `method name:s argSize:H skip:I`
+**Format**: `method name:s skip:I`
 
 Declare method `name` of declaring module.
 
@@ -40,7 +40,7 @@ Declare method `name` of declaring module.
 
 **Format**: `ref_module name:s`
 
-Add module reference.
+Set referencing module.
 
 ## `ref_method`
 
@@ -48,15 +48,16 @@ Add module reference.
 
 **Format**: `ref_method name:s`
 
-Add method `name` to list of references of declaring module.
+Add method `name` of referencing module to list of references of declaring
+module.
 
 ## `call`
 
 **Opcode**: 0x5
 
-**Format**: `call index:H`
+**Format**: `call fn:r`
 
-Call method at `index` of references in executing module.
+Call method `fn` of references in executing module.
 
 ## `return`
 

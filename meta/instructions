@@ -9,17 +9,18 @@ cookie=35
 module name:s
     Declare new module, and set declaring module to this module.
 
-method name:s argSize:H skip:I
+method name:s skip:I
     Declare method `name` of declaring module.
 
 ref_module name:s
-    Add module reference.
+    Set referencing module.
 
 ref_method name:s
-    Add method `name` to list of references of declaring module.
+    Add method `name` of referencing module to list of references of declaring
+    module.
 
-call index:H
-    Call method at `index` of references in executing module.
+call fn:r
+    Call method `fn` of references in executing module.
 
 return
     Return from the current method.

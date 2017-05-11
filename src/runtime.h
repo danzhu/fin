@@ -25,7 +25,8 @@ namespace Fin
 
         std::string readStr();
         void jump(int16_t target);
-        int16_t frameOffset();
+        int16_t frameTarget();
+        int16_t branchTarget();
         void ret();
         void execute();
         void call(const Method &method);

@@ -15,10 +15,6 @@ class Generator:
 
     def generate(self, tree, out):
         self.out = out
-        self._write('module', "'test'")
-        self._write('ref_module', "'io'")
-        self._write('ref_method', "'write'")
-        self._write('')
         self._gen(tree)
 
     def _write(self, *args):
@@ -98,16 +94,18 @@ class Generator:
         for c in node.children[1:]:
             self._gen(c, 0)
         # TODO: resolve function
-        self._write('call', 0)
+        self._write('call', str(node.fn))
 
     def COMP(self, node):
         self._gen(node.children[0], 0)
         self._gen(node.children[1], 0)
+        # TODO: use actual type
         self._write(node.value.lower() + '_i')
 
     def BIN(self, node):
         self._gen(node.children[0], 0)
         self._gen(node.children[1], 0)
+        # TODO: use actual type
         if node.value == 'PLUS':
             self._write('add_i')
         elif node.value == 'MINUS':

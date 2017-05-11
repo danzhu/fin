@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import struct
 import heapq
 
 class Instr:
@@ -17,9 +16,6 @@ class Instr:
         self.params = [Param(param) for param in segs[1:]]
         self.comment = ''
 
-    def encode(self):
-        return Bytes(encode('B', self.opcode))
-
     def format(self):
         val = self.opname
         for p in self.params:
@@ -34,45 +30,8 @@ class Param:
         self.name = segs[0]
         self.type = segs[1]
 
-    def encode(self, src):
-        if self.type == 's':
-            if src[0] != "'" or src[-1] != "'":
-                raise ValueError('missing quotes')
-            src = src[1:-1]
-            return Bytes(encode('H', len(src)) + src.encode())
-        elif src[0].isalpha():
-            return Label(self.type, src)
-        else:
-            return Bytes(encode(self.type, int(src, 0)))
-
     def format(self):
         return '{}:{}'.format(self.name, self.type)
-
-
-class Bytes:
-    def __init__(self, val):
-        self.value = val
-        self.size = len(val)
-
-    def locate(self, loc):
-        pass
-
-    def write(self, out, table):
-        out.write(self.value)
-
-
-class Label:
-    def __init__(self, enc, label):
-        self.enc = enc
-        self.label = label
-        self.size = struct.calcsize(enc)
-
-    def locate(self, loc):
-        self.loc = loc
-
-    def write(self, out, table):
-        value = table[self.label] - self.loc
-        out.write(encode(self.enc, value))
 
 
 class Allocator:
@@ -93,9 +52,6 @@ class Allocator:
             raise ValueError('already used value')
         heapq.heappush(self.removed, val)
 
-
-def encode(fmt, val):
-    return struct.pack('<' + fmt, val)
 
 def load(source = 'meta/instructions'):
     # available enum values

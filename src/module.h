@@ -27,10 +27,11 @@ namespace Fin
         std::unordered_map<std::string, Method> methods;
         std::vector<Method *> refMethods;
 
-        void addMethod(const std::string &name, Method &&method)
+        Method &addMethod(const std::string &name, Method &&method)
         {
             method.name = name;
-            methods.emplace(name, std::move(method));
+            method.module = this;
+            return methods.emplace(name, std::move(method)).first->second;
         }
     };
 }

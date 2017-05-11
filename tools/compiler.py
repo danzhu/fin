@@ -5,7 +5,7 @@ import io
 from lexer import Lexer
 from parser import Parser
 from generator import Generator
-import asm
+from asm import Assembler
 
 class Compiler:
     def __init__(self, lex):
@@ -13,12 +13,16 @@ class Compiler:
             self.lexer = Lexer(f)
         self.parser = Parser()
         self.generator = Generator()
+        self.assembler = Assembler()
 
-    def compile(self, src, out):
+    def compile(self, src, out, name):
         tokens = self.lexer.read(src)
         root = self.parser.parse(tokens)
         root.analyze()
-        self.generator.generate(root, out)
+        with io.StringIO() as assembly:
+            self.generator.generate(root, assembly)
+            assembly.seek(0)
+            self.assembler.assemble(assembly, out.buffer, name)
 
 
 def main():
@@ -28,18 +32,12 @@ def main():
     parser.add_argument('-o', dest='out', metavar='<output>',
             type=argparse.FileType('w'), default='a.fm',
             help='write output to <output>')
+    parser.add_argument('-n', dest='name', metavar='<name>', default='main',
+            help='name of the module')
     args = parser.parse_args()
 
-    compile(args.src, args.out)
-
-def compile(src, out):
-    with io.StringIO() as assembly:
-        compiler = Compiler('meta/lex')
-        compiler.compile(src, assembly)
-
-        assembly.seek(0)
-
-        asm.assemble(assembly, out.buffer)
+    compiler = Compiler('meta/lex')
+    compiler.compile(args.src, args.out, args.name)
 
 if __name__ == '__main__':
     main()
