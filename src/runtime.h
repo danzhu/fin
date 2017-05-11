@@ -24,9 +24,9 @@ namespace Fin
         uint32_t fp;
 
         std::string readStr();
-        void jump(int16_t target);
-        int16_t frameTarget();
-        int16_t branchTarget();
+        void jump(int32_t target);
+        int32_t frameTarget();
+        int32_t branchTarget();
         void ret();
         void execute();
         void call(const Method &method);

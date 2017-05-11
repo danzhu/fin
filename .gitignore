@@ -1,7 +1,4 @@
-# make output
-/fin
-/fin.zip
-/obj/
+/build
 
 # compiled files
 *.fm

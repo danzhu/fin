@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace Fin
@@ -39,7 +40,7 @@ namespace Fin
 
         char *deref(Ptr ptr, uint32_t size) const
         {
-            auto block = heap.at(ptr >> OFFSET_WIDTH);
+            auto block = heap.at(static_cast<uint32_t>(ptr >> OFFSET_WIDTH));
             auto offset = ptr & ((1l << OFFSET_WIDTH) - 1);
             if (block.state == State::Freed || offset + size > block.size)
                 throw std::runtime_error{"invalid memory access at "

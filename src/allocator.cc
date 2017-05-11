@@ -29,7 +29,7 @@ Fin::Ptr Fin::Allocator::add(char *addr, uint32_t size)
 
 void Fin::Allocator::dealloc(Ptr ptr)
 {
-    auto &val = heap.at(ptr >> OFFSET_WIDTH);
+    auto &val = heap.at(static_cast<uint32_t>(ptr >> OFFSET_WIDTH));
     if (val.state != State::Allocated)
         throw std::runtime_error{"invalid free"};
     delete[] val.value;
@@ -38,6 +38,6 @@ void Fin::Allocator::dealloc(Ptr ptr)
 
 void Fin::Allocator::remove(Ptr ptr)
 {
-    auto &val = heap.at(ptr >> OFFSET_WIDTH);
+    auto &val = heap.at(static_cast<uint32_t>(ptr >> OFFSET_WIDTH));
     val.state = State::Freed;
 }

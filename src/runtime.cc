@@ -4,14 +4,14 @@
 #include <iostream>
 #include "opcode.h"
 
-void Fin::Runtime::jump(int16_t target)
+void Fin::Runtime::jump(int32_t target)
 {
     pc = target;
     if (pc > instrs.size())
         throw std::out_of_range{"pc out of range"};
 }
 
-int16_t Fin::Runtime::frameTarget()
+int32_t Fin::Runtime::frameTarget()
 {
     auto offset = readConst<int16_t>();
     if (offset < 0)
@@ -20,7 +20,7 @@ int16_t Fin::Runtime::frameTarget()
     return fp + offset;
 }
 
-int16_t Fin::Runtime::branchTarget()
+int32_t Fin::Runtime::branchTarget()
 {
     // backup previous pc since readConst changes it
     auto address = pc;
