@@ -2,7 +2,7 @@
 
 import sys
 from lexer import Lexer
-from parser import Parser
+from parse import Parser
 
 class Generator:
     def __init__(self):

@@ -3,7 +3,7 @@
 import argparse
 import io
 from lexer import Lexer
-from parser import Parser
+from parse import Parser
 from generator import Generator
 from asm import Assembler
 
