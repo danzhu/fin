@@ -120,13 +120,3 @@ class Generator:
     def ID(self, node):
         offset = node.id.offset
         self._write('addr_frame', offset)
-
-
-if __name__ == '__main__':
-    with open('meta/lex') as f:
-        lexer = Lexer(f)
-    parser = Parser()
-    generator = Generator()
-    root = parser.parse(lexer.read(sys.stdin))
-    root.analyze()
-    generator.generate(root, sys.stdout)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import tps
-from tps import ExprType
+import data
+from data import Location, SymbolTable, Type
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=0):
@@ -25,18 +25,17 @@ class Node:
         for c in self.children:
             c.print(indent + 2)
 
-    def analyze(self):
-        types = tps.builtin_types()
-        fns = tps.builtin_fns()
-        ids = SymbolTable()
-        self._annotate(types, fns, ids)
+    def analyze(self, tps, fns):
+        # TODO: global
+        ids = SymbolTable(Location.Frame)
+        self._annotate(tps, fns, ids)
 
     def _expect_type(self, tp):
-        if self.expr_type.type == tp.type:
+        if self.expr_type.cls == tp.cls:
             return
         raise TypeError('expected {}, but got {}'.format(tp, self.expr_type))
 
-    def _annotate(self, types, fns, ids):
+    def _annotate(self, tps, fns, ids):
         # expr
         if self.type == 'CALL':
             for c in self.children[1:]:
@@ -49,13 +48,13 @@ class Node:
 
         # process children
         for c in self.children:
-            c._annotate(types, fns, ids)
+            c._annotate(tps, fns, ids)
 
         # expr type
         if self.type == 'TYPE':
-            tp = types[self.children[0].value]
+            tp = tps[self.children[0].value]
             lvl = len(self.children)
-            self.expr_type = ExprType(tp, lvl)
+            self.expr_type = Type(tp, lvl)
 
         elif not self.expr:
             # ignore type of non-expressions
@@ -66,18 +65,18 @@ class Node:
             self.expr_type = self.id.type
 
         elif self.type == 'NUM':
-            self.expr_type = ExprType(tps.INT, 0)
+            self.expr_type = Type(data.INT)
 
         elif self.type == 'BIN':
             # TODO: implicit conversion
             self.children[0]._expect_type(self.children[1].expr_type)
 
-            self.expr_type = ExprType(self.children[0].expr_type.type, 0)
+            self.expr_type = Type(self.children[0].expr_type.cls)
 
         elif self.type == 'COMP':
             # TODO: comparable type check
             self.children[0]._expect_type(self.children[1].expr_type)
-            self.expr_type = ExprType(tps.BOOL, 0)
+            self.expr_type = Type(data.BOOL)
 
         elif self.type == 'CALL':
             self.fn = fns[self.children[0].value]
@@ -92,31 +91,4 @@ class Node:
 
         # type checks
         if self.type in ['IF', 'WHILE']:
-            self.children[0]._expect_type(ExprType(tps.BOOL, 0))
-
-
-class SymbolTable:
-    def __init__(self, parent=None):
-        self.symbols = {}
-        self.offset = 0
-        self.parent = parent
-
-    def __getitem__(self, name):
-        if name in self.symbols:
-            return self.symbols[name]
-        elif self.parent:
-            return self.parent[name]
-        else:
-            raise KeyError(name)
-
-    def add(self, name, tp):
-        # TODO: get real size
-        self.symbols[name] = Symbol(name, self.offset, tp)
-        self.offset += tp.var_size()
-
-
-class Symbol:
-    def __init__(self, name, off, tp):
-        self.name = name
-        self.offset = off
-        self.type = tp
+            self.children[0]._expect_type(Type(data.BOOL))

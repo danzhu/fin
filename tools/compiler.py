@@ -6,6 +6,7 @@ from lexer import Lexer
 from parse import Parser
 from generator import Generator
 from asm import Assembler
+import data
 
 class Compiler:
     def __init__(self, lex):
@@ -18,7 +19,12 @@ class Compiler:
     def compile(self, src, out, name):
         tokens = self.lexer.read(src)
         root = self.parser.parse(tokens)
-        root.analyze()
+
+        tps = data.builtin_types()
+        fns = {}
+        data.load_module('fin', tps, fns)
+
+        root.analyze(tps, fns)
         with io.StringIO() as assembly:
             self.generator.generate(root, assembly)
             assembly.seek(0)

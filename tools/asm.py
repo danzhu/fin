@@ -117,7 +117,7 @@ class Assembler:
             if param.type == 's':
                 token = Bytes(encode('H', len(arg)) + arg.encode())
             elif param.type == 'r':
-                ref = tuple(arg.split('.', 1))
+                ref = tuple(arg.split(':', 1))
                 token = Reference(ref)
                 if ref[0] != '':
                     self.refs.add(ref)

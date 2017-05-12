@@ -130,11 +130,3 @@ class Lexer:
                 yield Token('DEDENT', None, ln, 0)
 
         yield Token('EOF', None, ln, 0)
-
-
-if __name__ == '__main__':
-    with open('meta/lex') as f:
-        lexer = Lexer(f)
-
-    for t in lexer.read(sys.stdin):
-        print(t)

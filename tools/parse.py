@@ -186,12 +186,3 @@ class Parser:
         name = self._lookahead.value
         self._expect('ID')
         return Node('ID', (), name)
-
-
-if __name__ == '__main__':
-    with open('meta/lex') as f:
-        lexer = Lexer(f)
-    parser = Parser()
-    root = parser.parse(lexer.read(sys.stdin))
-    root.analyze()
-    root.print()

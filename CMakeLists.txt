@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 project(fin)
 
@@ -16,4 +16,4 @@ endif()
 
 # fin
 file(GLOB SOURCES "src/*.cc")
-add_executable(fin ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES})
