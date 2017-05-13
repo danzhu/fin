@@ -11,23 +11,6 @@ void Fin::Runtime::jump(int32_t target)
         throw std::out_of_range{"pc out of range"};
 }
 
-int32_t Fin::Runtime::frameTarget()
-{
-    auto offset = readConst<int16_t>();
-    if (offset < 0)
-        offset -= sizeof(Module::id) + sizeof(pc) + sizeof(fp);
-
-    return fp + offset;
-}
-
-int32_t Fin::Runtime::branchTarget()
-{
-    // backup previous pc since readConst changes it
-    auto address = pc;
-    address += readConst<int16_t>();
-    return address;
-}
-
 std::string Fin::Runtime::readStr()
 {
     auto len = readConst<uint16_t>();
@@ -38,33 +21,30 @@ std::string Fin::Runtime::readStr()
 
 void Fin::Runtime::ret()
 {
+    auto frame = rtStack.top();
+
     // restore previous frame
-    opStack.resize(fp);
+    opStack.resize(fp - frame.argSize);
 
-    opStack.pop(fp);
-    opStack.pop(pc);
-    auto id = opStack.pop<decltype(Module::id)>();
-
-    execModule = modules.at(id).get();
+    execModule = &frame.module;
+    pc = frame.returnAddress;
+    fp = frame.framePointer;
 }
 
-void Fin::Runtime::call(const Method &method)
+void Fin::Runtime::call(const Method &method, uint16_t argSize)
 {
 #ifdef DEBUG
     std::cerr << "  calling " << method.name << std::endl;
 #endif
     if (method.nativeMethod)
     {
+        // TODO: update runtime stack
         method.nativeMethod(*this, opStack);
     }
     else
     {
-        auto &module = *method.module;
-
         // store current frame
-        opStack.push(module.id);
-        opStack.push(pc);
-        opStack.push(fp);
+        rtStack.emplace(Frame{*method.module, pc, fp, argSize});
 
         // update frame
         fp = opStack.size();
@@ -114,8 +94,8 @@ void Fin::Runtime::execute()
                         throw std::runtime_error{"no declaring module"};
 
                     auto name = readStr();
-                    auto target = pc;
-                    pc += readConst<uint32_t>();
+                    auto skip = readConst<uint32_t>();
+                    auto target = pc + skip;
 
                     Method *method = &declModule->addMethod(name, Method{pc});
                     declModule->refMethods.emplace_back(method);
@@ -143,7 +123,8 @@ void Fin::Runtime::execute()
 
                     auto it = refModule->methods.find(name);
                     if (it == refModule->methods.end())
-                        throw std::runtime_error{"unable to find method '" + name + "'"};
+                        throw std::runtime_error{"unable to find method '"
+                            + name + "'"};
 
                     declModule->refMethods.emplace_back(&it->second);
                 }
@@ -155,8 +136,10 @@ void Fin::Runtime::execute()
                         throw std::runtime_error{"no executing module"};
 
                     auto idx = readConst<uint32_t>();
+                    auto argSize = readConst<uint16_t>();
+
                     auto &method = *execModule->refMethods.at(idx);
-                    call(method);
+                    call(method, argSize);
                 }
                 continue;
 
@@ -169,14 +152,18 @@ void Fin::Runtime::execute()
 
             case Opcode::Br:
                 {
-                    auto target = branchTarget();
+                    auto offset = readConst<int16_t>();
+                    auto target = pc + offset;
+
                     jump(target);
                 }
                 continue;
 
             case Opcode::BrFalse:
                 {
-                    auto target = branchTarget();
+                    auto offset = readConst<int16_t>();
+                    auto target = pc + offset;
+
                     if (!opStack.pop<bool>())
                         jump(target);
                 }
@@ -184,7 +171,9 @@ void Fin::Runtime::execute()
 
             case Opcode::BrTrue:
                 {
-                    auto target = branchTarget();
+                    auto offset = readConst<int16_t>();
+                    auto target = pc + offset;
+
                     if (opStack.pop<bool>())
                         jump(target);
                 }
@@ -214,16 +203,20 @@ void Fin::Runtime::execute()
 
             case Opcode::LoadArg:
                 {
-                    auto target = frameTarget();
+                    auto offset = readConst<int16_t>();
+                    auto target = fp + offset;
                     auto size = readConst<uint16_t>();
+
                     opStack.push(opStack.at(target, size), size);
                 }
                 continue;
 
             case Opcode::StoreArg:
                 {
-                    auto target = frameTarget();
+                    auto offset = readConst<int16_t>();
+                    auto target = fp + offset;
                     auto size = readConst<uint16_t>();
+
                     opStack.pop(opStack.at(target, size), size);
                 }
                 continue;
@@ -341,7 +334,7 @@ Fin::Module &Fin::Runtime::createModule(const std::string &name)
     id.name = name;
 
     auto module = std::make_unique<Module>();
-    module->id = modules.size();
+    module->id = static_cast<decltype(Module::id)>(modules.size());
 
     auto p = module.get();
     modules.emplace_back(std::move(module));

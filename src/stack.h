@@ -1,5 +1,5 @@
-#ifndef __STACK_H__
-#define __STACK_H__
+#ifndef FIN_STACK_H
+#define FIN_STACK_H
 
 #include <cstdint>
 #include <stdexcept>
@@ -28,7 +28,7 @@ namespace Fin
         char *at(uint32_t idx, uint32_t size)
         {
             if (idx + size > _size)
-                throw std::length_error{"invalid stack access at "
+                throw std::out_of_range{"invalid stack access at "
                     + std::to_string(idx) + ", size " + std::to_string(size)};
 
             return _content + idx;

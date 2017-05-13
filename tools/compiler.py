@@ -16,8 +16,14 @@ class Compiler:
         self.generator = Generator()
         self.assembler = Assembler()
 
-    def compile(self, src, out, name):
+    def compile(self, src, out, name, stage):
         tokens = self.lexer.read(src)
+
+        if stage == 'lex':
+            for t in tokens:
+                print(t)
+            return
+
         root = self.parser.parse(tokens)
 
         tps = data.builtin_types()
@@ -25,10 +31,25 @@ class Compiler:
         data.load_module('fin', tps, fns)
 
         root.analyze(tps, fns)
+
+        if stage == 'parse':
+            root.print()
+            return
+
         with io.StringIO() as assembly:
             self.generator.generate(root, assembly)
+
+            if stage == 'asm':
+                print(assembly.getvalue())
+                return
+
             assembly.seek(0)
             self.assembler.assemble(assembly, out.buffer, name)
+
+            if stage == 'exec':
+                return
+
+        raise ValueError('invalid stage')
 
 
 def main():
@@ -40,10 +61,12 @@ def main():
             help='write output to <output>')
     parser.add_argument('-n', dest='name', metavar='<name>', default='main',
             help='name of the module')
+    parser.add_argument('-s', dest='stage', metavar='<stage>', default='exec',
+            help='compilation stage')
     args = parser.parse_args()
 
     compiler = Compiler('meta/lex')
-    compiler.compile(args.src, args.out, args.name)
+    compiler.compile(args.src, args.out, args.name, args.stage)
 
 if __name__ == '__main__':
     main()

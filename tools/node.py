@@ -81,6 +81,7 @@ class Node:
         elif self.type == 'CALL':
             self.fn = fns[self.children[0].value]
             self.expr_type = self.fn.ret
+            self.arg_size = sum(c.size() for c in self.fn.args)
 
             for i in range(len(self.fn.args)):
                 self.children[i + 1]._expect_type(self.fn.args[i])

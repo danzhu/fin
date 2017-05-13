@@ -38,7 +38,7 @@ class Branch:
         self.location = loc
 
     def write(self, out, syms, refs):
-        value = syms[self.label] - self.location
+        value = syms[self.label] - (self.location + self.size)
         out.write(encode(self.enc, value))
 
 
@@ -78,22 +78,25 @@ class Assembler:
             if segs == [] or segs[0] == '#':
                 continue
 
-            self.instr(segs[0], segs[1:], body)
+            self.instr(body, segs[0], *segs[1:])
 
         references = sorted(self.refs) + self.self_refs
         refs = { ref: i for i, ref in enumerate(references) }
 
         head = []
         head.append(Bytes(b'#!/usr/bin/env fin\n'))
-        self.instr('module', [name], head)
+        self.instr(head, 'module', name)
 
-        module = ''
+        module = None
         for mod, fn in references:
+            if mod == '':
+                break
+
             if module != mod:
-                self.instr('ref_module', [mod], head)
+                self.instr(head, 'ref_module', mod)
                 module = mod
 
-            self.instr('ref_method', [fn], head)
+            self.instr(head, 'ref_method', fn)
 
         tokens = head + body
         syms = {}
@@ -105,7 +108,7 @@ class Assembler:
         for token in tokens:
             token.write(out, syms, refs)
 
-    def instr(self, opname, args, tokens):
+    def instr(self, tokens, opname, *args):
         ins = self.instrs[opname]
         token = Bytes(encode('B', ins.opcode))
         tokens.append(token)

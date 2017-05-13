@@ -1,5 +1,5 @@
-#ifndef __METHOD_H__
-#define __METHOD_H__
+#ifndef FIN_METHOD_H
+#define FIN_METHOD_H
 
 #include <cstdint>
 #include <string>

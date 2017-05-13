@@ -19,7 +19,7 @@ ref_method name:s
     Add method `name` of referencing module to list of references of declaring
     module.
 
-call fn:r
+call fn:r argSize:H
     Call method `fn` of references in executing module.
 
 return

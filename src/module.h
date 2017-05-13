@@ -1,5 +1,5 @@
-#ifndef __MODULE_H__
-#define __MODULE_H__
+#ifndef FIN_MODULE_H
+#define FIN_MODULE_H
 
 #include <string>
 #include <unordered_map>

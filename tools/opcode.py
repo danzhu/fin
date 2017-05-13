@@ -2,8 +2,8 @@
 
 import instr
 
-FORMAT = """#ifndef __OPCODE_H__
-#define __OPCODE_H__
+FORMAT = """#ifndef FIN_OPCODE_H
+#define FIN_OPCODE_H
 
 #include <array>
 
@@ -14,29 +14,19 @@ namespace Fin
 {opcodes}
     }};
 
-    std::array<const char *, 256> Opnames =
-    {{
-{opnames}
-    }};
+    extern std::array<const char *, 256> Opnames;
 }}
 
 #endif"""
 
 def main():
-    instrs = {ins.opcode: ins for ins in instr.load()}
+    opcodes = sorted((ins.opcode, ins.opname) for ins in instr.load())
 
-    opcodes = []
-    opnames = []
-    for i in range(256):
-        ins = instrs.get(i)
-        if ins:
-            opname = ''.join(s.title() for s in ins.opname.split('_'))
-            opcodes.append('        {} = {},'.format(opname, hex(i)))
-        opnames.append('        "{}",'.format(ins.opname if ins else hex(i)))
-
-    print(FORMAT.format(
-        opcodes='\n'.join(opcodes),
-        opnames='\n'.join(opnames)))
+    print(FORMAT.format(opcodes=',\n'.join(
+        '        {} = {}'.format(
+            ''.join(s.title() for s in e[1].split('_')),
+            hex(e[0]))
+        for e in opcodes)))
 
 if __name__ == '__main__':
     main()

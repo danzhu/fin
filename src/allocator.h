@@ -1,5 +1,5 @@
-#ifndef __ALLOCATOR_H__
-#define __ALLOCATOR_H__
+#ifndef FIN_ALLOCATOR_H
+#define FIN_ALLOCATOR_H
 
 #include <cstdint>
 #include <stdexcept>

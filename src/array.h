@@ -1,5 +1,5 @@
-#ifndef __ARRAY_H__
-#define __ARRAY_H__
+#ifndef FIN_ARRAY_H
+#define FIN_ARRAY_H
 
 #include <cstdint>
 #include <stdexcept>
@@ -15,7 +15,7 @@ namespace Fin
         Array(const Array &other) = delete;
         ~Array()
         {
-            delete _content;
+            delete[] _content;
         }
 
         Array &operator=(const Array &other) = delete;

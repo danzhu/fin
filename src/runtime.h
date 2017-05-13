@@ -1,11 +1,13 @@
-#ifndef __RUNTIME_H__
-#define __RUNTIME_H__
+#ifndef FIN_RUNTIME_H
+#define FIN_RUNTIME_H
 
 #include <iosfwd>
 #include <map>
 #include <memory>
+#include <stack>
 #include <vector>
 #include "allocator.h"
+#include "frame.h"
 #include "method.h"
 #include "module.h"
 #include "stack.h"
@@ -16,6 +18,7 @@ namespace Fin
     {
         Stack opStack;
         Allocator alloc;
+        std::stack<Frame> rtStack;
         std::vector<std::unique_ptr<Module>> modules;
         std::map<ModuleID, Module *> modulesByID;
         std::vector<char> instrs;
@@ -25,11 +28,9 @@ namespace Fin
 
         std::string readStr();
         void jump(int32_t target);
-        int32_t frameTarget();
-        int32_t branchTarget();
         void ret();
         void execute();
-        void call(const Method &method);
+        void call(const Method &method, uint16_t argSize);
 
         template<typename T> T readConst()
         {

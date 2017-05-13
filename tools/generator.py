@@ -71,7 +71,6 @@ class Generator:
     def WHILE(self, node):
         start = self._label('WHILE')
         cond = self._label('TEST')
-        end = self._label('END_WHILE')
 
         self._write('br', cond)
         self._write(start + ':')
@@ -79,7 +78,6 @@ class Generator:
         self._write(cond + ':')
         self._gen(node.children[0], 0) # comp
         self._write('br_true', start)
-        self._write(end + ':')
 
     def EXPR(self, node):
         self._gen(node.children[0], 0)
@@ -93,7 +91,7 @@ class Generator:
     def CALL(self, node):
         for c in node.children[1:]:
             self._gen(c, 0)
-        self._write('call', str(node.fn))
+        self._write('call', str(node.fn), node.arg_size)
 
     def COMP(self, node):
         self._gen(node.children[0], 0)

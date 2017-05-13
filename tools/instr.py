@@ -2,6 +2,17 @@
 
 import heapq
 
+HEADER = """# Fin Instruction Set"""
+
+FORMAT = """
+## `{ins.opname}`
+
+**Opcode**: 0x{ins.opcode:x}
+
+**Format**: `{format}`
+
+{ins.comment}"""
+
 class Instr:
     def __init__(self, line, alloc):
         segs = line.split(' ')
@@ -74,3 +85,17 @@ def load(source = 'meta/instructions'):
             instrs.append(instr)
 
     return instrs
+
+def main():
+    instrs = load()
+
+    print(HEADER)
+
+    for ins in instrs:
+        print(FORMAT.format(
+            ins=ins,
+            format=ins.format()
+            ), end='')
+
+if __name__ == '__main__':
+    main()
