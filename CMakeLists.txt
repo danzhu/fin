@@ -69,8 +69,19 @@ add_custom_command(
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 
+add_custom_command(
+    OUTPUT test.fm
+    DEPENDS test.fin
+    COMMAND tools/compiler.py test.fin -o "${CMAKE_CURRENT_BINARY_DIR}/test.fm"
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    )
+
 # targets
 file(GLOB SOURCES "src/*.cc")
-add_executable(${PROJECT_NAME} ${SOURCES} opcode.h opcode.cc)
+add_executable(fin ${SOURCES} opcode.h opcode.cc)
 
 add_custom_target(doc DEPENDS instructions.md)
+
+add_custom_target(run
+    COMMAND fin ${CMAKE_CURRENT_BINARY_DIR}/test.fm
+    DEPENDS test.fm)
