@@ -63,7 +63,7 @@ load_ptr offset:I size:H
 store_ptr offset:I size:H
     Store value from stack to pointer.
 
-addr_frame offset:I
+addr_frame offset:h
     Load address of frame at `offset` onto stack.
 
 return_val size:H

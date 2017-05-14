@@ -8,6 +8,7 @@
 > start % PERCENT
 > start = ASSN
 > start & AMP
+> start ! EXCL
 > start : COLON
 > start ( LPAREN
 > start ) RPAREN
@@ -24,13 +25,16 @@
 > MULT = MULT_ASSN
 > DIV = DIV_ASSN
 > ASSN = EQ
+> EXCL = NE
 > LT = LE
 > GT = GE
 > comment [ANY] comment
 > comment [LF] start
 type ZERO NUM
 keyword import IMPORT
+keyword def DEF
 keyword let LET
 keyword if IF
 keyword else ELSE
 keyword while WHILE
+keyword return RETURN

@@ -61,7 +61,7 @@ class Assembler:
 
     def assemble(self, src, out, name):
         self.refs = set()
-        self.self_refs = []
+        self.self_refs = set()
 
         body = []
         for line in src:
@@ -80,7 +80,7 @@ class Assembler:
 
             self.instr(body, segs[0], *segs[1:])
 
-        references = sorted(self.refs) + self.self_refs
+        references = sorted(self.refs) + sorted(self.self_refs)
         refs = { ref: i for i, ref in enumerate(references) }
 
         head = []
@@ -125,7 +125,7 @@ class Assembler:
                 if ref[0] != '':
                     self.refs.add(ref)
                 else:
-                    self.self_refs.append(ref)
+                    self.self_refs.add(ref)
 
             elif arg[0].isalpha():
                 token = Branch(param.type, arg)

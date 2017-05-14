@@ -22,6 +22,7 @@ std::string Fin::Runtime::readStr()
 void Fin::Runtime::ret()
 {
     auto frame = rtStack.top();
+    rtStack.pop();
 
     // restore previous frame
     opStack.resize(fp - frame.argSize);
@@ -241,8 +242,8 @@ void Fin::Runtime::execute()
 
             case Opcode::AddrFrame:
                 {
-                    auto offset = readConst<uint32_t>();
-                    opStack.push(static_cast<Ptr>(offset));
+                    auto offset = readConst<int16_t>();
+                    opStack.push(static_cast<Ptr>(fp + offset));
                 }
                 continue;
 

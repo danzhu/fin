@@ -10,8 +10,8 @@ namespace Fin
     struct Frame
     {
         Module &module;
-        uint32_t framePointer;
         uint32_t returnAddress;
+        uint32_t framePointer;
         uint16_t argSize;
     };
 }

@@ -45,6 +45,20 @@ class Generator:
         # TODO
         pass
 
+    def DEF(self, node):
+        end = 'END_METHOD_' + node.fn.name
+
+        self._write('method', str(node.fn), end)
+        self._gen(node.children[3])
+
+        if node.children[3].children[-1].type != 'RETURN':
+            if not node.fn.ret.none():
+                raise TypeError('no return statement')
+            self._write('return')
+
+        self._write(end + ':')
+        self._write('')
+
     def STMTS(self, node):
         for c in node.children:
             self._gen(c)
@@ -78,6 +92,15 @@ class Generator:
         self._write(cond + ':')
         self._gen(node.children[0], 0) # comp
         self._write('br_true', start)
+
+        # TODO: else
+
+    def RETURN(self, node):
+        if len(node.children) == 0:
+            self._write('return')
+        else:
+            self._gen(node.children[0])
+            self._write('return_val', node.children[0].expr_type.size())
 
     def EXPR(self, node):
         self._gen(node.children[0], 0)
@@ -115,6 +138,6 @@ class Generator:
     def NUM(self, node):
         self._write('const_i', node.value)
 
-    def ID(self, node):
-        offset = node.id.offset
+    def VAR(self, node):
+        offset = node.sym.offset
         self._write('addr_frame', offset)

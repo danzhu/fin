@@ -7,6 +7,7 @@ from parse import Parser
 from generator import Generator
 from asm import Assembler
 import data
+from data import Location, SymbolTable
 
 class Compiler:
     def __init__(self, lex):
@@ -26,13 +27,17 @@ class Compiler:
 
         root = self.parser.parse(tokens)
 
-        tps = data.builtin_types()
-        fns = {}
-        data.load_module('fin', tps, fns)
-
-        root.analyze(tps, fns)
+        syms = SymbolTable(Location.Global)
+        data.load_builtins(syms)
+        data.load_module('fin', syms)
 
         if stage == 'parse':
+            root.print()
+            return
+
+        root.analyze(syms)
+
+        if stage == 'ast':
             root.print()
             return
 
@@ -62,7 +67,7 @@ def main():
     parser.add_argument('-n', dest='name', metavar='<name>', default='main',
             help='name of the module')
     parser.add_argument('-s', dest='stage', metavar='<stage>', default='exec',
-            choices=['lex', 'parse', 'asm', 'exec'],
+            choices=['lex', 'parse', 'ast', 'asm', 'exec'],
             help='compilation stage')
     args = parser.parse_args()
 

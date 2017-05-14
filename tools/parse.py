@@ -32,6 +32,8 @@ class Parser:
         while self._lookahead.type != 'EOF':
             if self._lookahead.type == 'IMPORT':
                 children.append(self._import())
+            elif self._lookahead.type == 'DEF':
+                children.append(self._def())
             else:
                 children.append(self._stmt())
         return Node('FILE', children)
@@ -42,6 +44,38 @@ class Parser:
         self._expect('EOL')
         return Node('IMPORT', (name,))
 
+    def _def(self):
+        self._expect('DEF')
+
+        name = self._id()
+        params = self._params()
+
+        if self._lookahead.type == 'EOL':
+            # TODO: should we create this in _type()?
+            ret = Node('TYPE', ())
+        else:
+            ret = self._type()
+
+        self._expect('EOL')
+
+        cont = self._block()
+        return Node('DEF', (name, params, ret, cont))
+
+    def _params(self):
+        self._expect('LPAREN')
+        children = []
+        if self._lookahead.type == 'RPAREN':
+            self._next()
+        else:
+            while True:
+                children.append(self._param())
+
+                tp = self._lookahead.type
+                self._expect('COMMA', 'RPAREN')
+                if tp == 'RPAREN':
+                    break
+        return Node('PARAMS', children)
+
     def _stmt(self):
         if self._lookahead.type == 'LET':
             return self._let()
@@ -49,6 +83,8 @@ class Parser:
             return self._if()
         elif self._lookahead.type == 'WHILE':
             return self._while()
+        elif self._lookahead.type == 'RETURN':
+            return self._return()
         else:
             node = self._test()
             if self._lookahead.type in ['ASSN', 'PLUS_ASSN', 'MINUS_ASSN',
@@ -98,6 +134,20 @@ class Parser:
         else:
             fail = self._empty()
         return Node('WHILE', (cond, cont, fail))
+
+    def _return(self):
+        self._expect('RETURN')
+        if self._lookahead.type == 'EOL':
+            children = ()
+        else:
+            children = (self._test(),)
+        self._expect('EOL')
+        return Node('RETURN', children)
+
+    def _param(self):
+        name = self._id()
+        tp = self._type()
+        return Node('PARAM', (name, tp))
 
     def _type(self):
         children = [self._id()]
@@ -149,11 +199,12 @@ class Parser:
 
     def _factor(self):
         if self._lookahead.type == 'ID':
-            node = self._id()
+            name = self._lookahead.value
+            self._expect('ID')
             if self._lookahead.type != 'LPAREN':
-                return node
+                return Node('VAR', (), name)
 
-            children = [node]
+            children = [Node('ID', (), name)]
             self._next()
             if self._lookahead.type == 'RPAREN':
                 self._next()

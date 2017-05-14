@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import data
-from data import Location, SymbolTable, Type
+from data import Location, SymbolTable, Type, Module, Function
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=0):
@@ -11,13 +11,13 @@ class Node:
         # TODO: maybe this should be stored somewhere else?
         self.level = lvl
 
-        self.expr = False
+        self.expr_type = None
 
     def print(self, indent=0):
         content = ' ' * indent + self.type
         if self.value:
             content += ' {}'.format(self.value)
-        if self.expr:
+        if self.expr_type:
             content += ' [{}]'.format(self.expr_type)
         if self.level > 0:
             content += ' {}'.format(self.level)
@@ -25,44 +25,59 @@ class Node:
         for c in self.children:
             c.print(indent + 2)
 
-    def analyze(self, tps, fns):
-        # TODO: global
-        ids = SymbolTable(Location.Frame)
-        self._annotate(tps, fns, ids)
+    def analyze(self, syms):
+        mod = Module('')
+
+        for c in self.children:
+            if c.type == 'DEF':
+                c._decl(syms, mod)
+
+        self._annotate(syms)
 
     def _expect_type(self, tp):
         if self.expr_type.cls == tp.cls:
             return
         raise TypeError('expected {}, but got {}'.format(tp, self.expr_type))
 
-    def _annotate(self, tps, fns, ids):
-        # expr
-        if self.type == 'CALL':
-            for c in self.children[1:]:
-                c.expr = True
-        elif self.expr or self.type in ['EXPR', 'ASSN', 'ARGS']:
-            for c in self.children:
-                c.expr = True
-        elif self.type in ['IF', 'WHILE']:
-            self.children[0].expr = True
+    def _decl(self, syms, mod):
+        name = self.children[0].value
+        params = [p.children[1]._type(syms) for p in self.children[1].children]
+        ret = self.children[2]._type(syms)
+        self.fn = Function(mod, name, params, ret)
+        syms.add_function(self.fn)
+
+    def _type(self, syms, var=False):
+        if len(self.children) == 0:
+            tp = 'None'
+            lvl = 0
+        else:
+            tp = self.children[0].value
+            lvl = len(self.children) - 1
+        if var:
+            lvl += 1
+        return Type(syms.get(tp, 'CLASS'), lvl)
+
+    def _annotate(self, syms):
+        self.annotated = True
+
+        # local variable symbol creation
+        if self.type == 'PARAM':
+            syms.add_param(self.children[0].value, self.children[1]._type(syms, True))
+        elif self.type == 'LET':
+            syms.add_local(self.children[0].value, self.children[1]._type(syms, True))
+
+        # symbol table
+        if self.type == 'DEF':
+            syms = SymbolTable(Location.Frame, syms)
 
         # process children
         for c in self.children:
-            c._annotate(tps, fns, ids)
+            c._annotate(syms)
 
         # expr type
-        if self.type == 'TYPE':
-            tp = tps[self.children[0].value]
-            lvl = len(self.children)
-            self.expr_type = Type(tp, lvl)
-
-        elif not self.expr:
-            # ignore type of non-expressions
-            pass
-
-        elif self.type == 'ID':
-            self.id = ids[self.value]
-            self.expr_type = self.id.type
+        if self.type == 'VAR':
+            self.sym = syms.get(self.value)
+            self.expr_type = self.sym.type
 
         elif self.type == 'NUM':
             self.expr_type = Type(data.INT)
@@ -79,16 +94,12 @@ class Node:
             self.expr_type = Type(data.BOOL)
 
         elif self.type == 'CALL':
-            self.fn = fns[self.children[0].value]
+            self.fn = syms.get(self.children[0].value, 'FUNCTION')
             self.expr_type = self.fn.ret
-            self.arg_size = sum(c.size() for c in self.fn.args)
+            self.arg_size = sum(c.size() for c in self.fn.params)
 
-            for i in range(len(self.fn.args)):
-                self.children[i + 1]._expect_type(self.fn.args[i])
-
-        # local variable symbol creation
-        if self.type == 'LET':
-            ids.add(self.children[0].value, self.children[1].expr_type)
+            for i in range(len(self.fn.params)):
+                self.children[i + 1]._expect_type(self.fn.params[i])
 
         # type checks
         if self.type in ['IF', 'WHILE']:

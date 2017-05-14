@@ -13,22 +13,51 @@ class SymbolTable:
         self.parent = parent
 
         self.symbols = {}
-        self.offset = 0
+        self.local_offset = 0
+        self.param_offset = 0
 
-    def __getitem__(self, name):
+    def _check_exists(self, name):
         if name in self.symbols:
-            return self.symbols[name]
+            raise KeyError('symbol exists')
+
+    def add_class(self, cls):
+        self._check_exists(cls.name)
+
+        self.symbols[cls.name] = cls
+
+    def add_function(self, fn):
+        self._check_exists(fn.name)
+
+        self.symbols[fn.name] = fn
+
+    def add_param(self, name, tp):
+        self._check_exists(name)
+
+        self.param_offset -= tp.var_size()
+        self.symbols[name] = Variable(name, self.location, self.param_offset, tp)
+
+    def add_local(self, name, tp):
+        self._check_exists(name)
+
+        self.symbols[name] = Variable(name, self.location, self.local_offset, tp)
+        self.local_offset += tp.var_size()
+
+    def get(self, name, tp=None):
+        if name in self.symbols:
+            sym = self.symbols[name]
+            if tp is None or sym.TYPE == tp:
+                return sym
+
+            raise LookupError('expected {}, but got {} "{}"'.format(tp, sym.TYPE, name))
         elif self.parent:
-            return self.parent[name]
+            return self.parent.get(name, tp)
         else:
             raise KeyError(name)
 
-    def add(self, name, tp):
-        self.symbols[name] = Symbol(name, self.location, self.offset, tp)
-        self.offset += tp.var_size()
 
+class Variable:
+    TYPE = 'VARIABLE'
 
-class Symbol:
     def __init__(self, name, loc, off, tp):
         self.name = name
         self.location = loc
@@ -37,9 +66,12 @@ class Symbol:
 
 
 class Class:
+    TYPE = 'CLASS'
+
     def __init__(self, name, size):
         self.name = name
         self.size = size
+        self.type = None
 
 
 class Type:
@@ -62,11 +94,17 @@ class Type:
     def var_size(self):
         return self.size(self.level - 1)
 
+    def none(self):
+        return self.cls.size == 0 and self.level == 0
+
 
 class Module:
+    TYPE = 'MODULE'
+
     def __init__(self, name):
         # TODO: version
         self.name = name
+        self.type = None
         self.functions = {}
 
     def add_function(self, fn):
@@ -74,17 +112,20 @@ class Module:
 
 
 class Function:
-    def __init__(self, mod, name, args, ret):
+    TYPE = 'FUNCTION'
+
+    def __init__(self, mod, name, params, ret):
         self.module = mod
         self.name = name
-        self.args = args
+        self.params = params
         self.ret = ret
+        self.type = ret
 
     def __str__(self):
         return '{}:{}({}){}'.format(
                 self.module.name,
                 self.name,
-                ','.join(str(arg) for arg in self.args),
+                ','.join(str(param) for param in self.params),
                 self.ret)
 
 
@@ -92,16 +133,16 @@ NONE = Class('None', 0)
 BOOL = Class('Bool', 1)
 INT = Class('Int', 4)
 
-def builtin_types():
-    tps = { NONE, BOOL, INT }
-    return { cls.name: cls for cls in tps }
+def load_builtins(syms):
+    for tp in { NONE, BOOL, INT }:
+        syms.add_class(tp)
 
-def to_type(tp, tps):
+def to_type(tp, syms):
     name = tp.rstrip('&')
     lvl = len(tp) - len(name)
-    return Type(tps[name], lvl)
+    return Type(syms.get(name, 'CLASS'), lvl)
 
-def load_module(mod_name, tps, fns):
+def load_module(mod_name, syms):
     # TODO: a better way to locate
     filename = 'ref/{}.fd'.format(mod_name)
     with open(filename) as f:
@@ -110,11 +151,11 @@ def load_module(mod_name, tps, fns):
             [tp, name, *args] = line.split()
 
             if tp == 'def':
-                params = [to_type(tp, tps) for tp in args[:-1]]
-                ret = to_type(args[-1], tps)
+                params = [to_type(tp, syms) for tp in args[:-1]]
+                ret = to_type(args[-1], syms)
                 fn = Function(mod, name, params, ret)
                 mod.add_function(fn)
-                fns[fn.name] = fn
+                syms.add_function(fn)
 
             else:
                 raise ValueError('invalid declaration type')
