@@ -1,8 +1,9 @@
-def fib(n Int) Int
-    if n == 0
-        return 0
-    if n == 1
-        return 1
-    return fib(n - 1) + fib(n - 2)
+def test()
+    let f Float
 
-print(fib(20))
+    f = 1.2
+
+    if f > 1.
+        print(1)
+
+test()

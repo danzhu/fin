@@ -34,10 +34,12 @@ class Node:
 
         self._annotate(syms)
 
-    def _expect_type(self, tp):
-        if self.expr_type.cls == tp.cls:
+    def _expect_type(self, *tps):
+        if self.expr_type.cls in tps:
             return
-        raise TypeError('expected {}, but got {}'.format(tp, self.expr_type))
+        raise TypeError('expected {}, but got {}'.format(
+            ' or '.join(tp),
+            self.expr_type))
 
     def _decl(self, syms, mod):
         name = self.children[0].value
@@ -85,21 +87,31 @@ class Node:
         elif self.type == 'NUM':
             self.expr_type = Type(data.INT)
 
+        elif self.type == 'FLOAT':
+            self.expr_type = Type(data.FLOAT)
+
         elif self.type == 'TEST':
-            self.children[0]._expect_type(Type(data.BOOL))
-            self.children[1]._expect_type(Type(data.BOOL))
+            self.children[0]._expect_type(data.BOOL)
+            self.children[1]._expect_type(data.BOOL)
 
             self.expr_type = Type(data.BOOL)
 
         elif self.type == 'BIN':
+            # TODO: custom operator overload
+            self.children[0]._expect_type(data.INT, data.FLOAT)
+
             # TODO: implicit conversion
-            self.children[0]._expect_type(self.children[1].expr_type)
+            if self.children[0].expr_type.cls != self.children[1].expr_type.cls:
+                raise TypeError('unmatched type')
 
             self.expr_type = Type(self.children[0].expr_type.cls)
 
         elif self.type == 'COMP':
             # TODO: comparable type check
-            self.children[0]._expect_type(self.children[1].expr_type)
+            self.children[0]._expect_type(data.INT, data.FLOAT)
+
+            if self.children[0].expr_type.cls != self.children[1].expr_type.cls:
+                raise TypeError('unmatched type')
 
             self.expr_type = Type(data.BOOL)
 
@@ -109,8 +121,8 @@ class Node:
             self.arg_size = sum(c.size() for c in self.fn.params)
 
             for i in range(len(self.fn.params)):
-                self.children[i + 1]._expect_type(self.fn.params[i])
+                self.children[i + 1]._expect_type(self.fn.params[i].cls)
 
         # type checks
         if self.type in ['IF', 'WHILE']:
-            self.children[0]._expect_type(Type(data.BOOL))
+            self.children[0]._expect_type(data.BOOL)

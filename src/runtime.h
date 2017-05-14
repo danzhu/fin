@@ -34,11 +34,9 @@ namespace Fin
 
         template<typename T> T readConst()
         {
-            std::make_unsigned_t<T> val{};
-            for (uint16_t i = 0; i < sizeof(T); ++i)
-                val |= instrs.at(pc + i) << (i * 8);
+            T val = *reinterpret_cast<T*>(&instrs.at(pc));
             jump(pc + sizeof(T));
-            return *reinterpret_cast<T*>(&val);
+            return val;
         }
         template<typename T> void readConst(T &val)
         {

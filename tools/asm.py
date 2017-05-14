@@ -139,6 +139,9 @@ class Assembler:
             elif arg[0].isalpha():
                 token = Branch(param.type, arg)
 
+            elif param.type == 'f':
+                token = Bytes(encode(param.type, float(arg)))
+
             else:
                 token = Bytes(encode(param.type, int(arg, 0)))
 

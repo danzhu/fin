@@ -87,8 +87,8 @@ class Parser:
             return self._return()
         else:
             node = self._test()
-            if self._lookahead.type in ['ASSN', 'PLUS_ASSN', 'MINUS_ASSN',
-                    'MULT_ASSN', 'DIV_ASSN', 'COLON']:
+            if self._lookahead.type in ['ASSN', 'ADD_ASSN', 'SUB_ASSN',
+                    'MULT_ASSN', 'DIV_ASSN', 'MOD_ASSN', 'COLON']:
                 lvl = 0
                 while self._lookahead.type == 'COLON':
                     self._next()
@@ -197,7 +197,7 @@ class Parser:
 
     def _expr(self):
         node = self._term()
-        while self._lookahead.type in ['PLUS', 'MINUS']:
+        while self._lookahead.type in ['ADD', 'SUB']:
             op = self._lookahead.type
             self._next()
             r = self._term()
@@ -206,7 +206,7 @@ class Parser:
 
     def _term(self):
         node = self._factor()
-        while self._lookahead.type in ['MULT', 'DIV']:
+        while self._lookahead.type in ['MULT', 'DIV', 'MOD']:
             op = self._lookahead.type
             self._next()
             r = self._factor()
@@ -238,6 +238,11 @@ class Parser:
             val = self._lookahead.value
             self._next()
             return Node('NUM', (), val)
+
+        elif self._lookahead.type == 'FLOAT':
+            val = self._lookahead.value
+            self._next()
+            return Node('FLOAT', (), val)
 
         elif self._lookahead.type == 'LPAREN':
             self._next()

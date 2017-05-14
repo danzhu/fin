@@ -71,7 +71,6 @@ class Class:
     def __init__(self, name, size):
         self.name = name
         self.size = size
-        self.type = None
 
 
 class Type:
@@ -104,7 +103,6 @@ class Module:
     def __init__(self, name):
         # TODO: version
         self.name = name
-        self.type = None
         self.functions = {}
 
     def add_function(self, fn):
@@ -119,22 +117,22 @@ class Function:
         self.name = name
         self.params = params
         self.ret = ret
-        self.type = ret
 
     def __str__(self):
         return '{}:{}({}){}'.format(
                 self.module.name,
                 self.name,
                 ','.join(str(param) for param in self.params),
-                self.ret)
+                self.ret if not self.ret.none() else '')
 
 
 NONE = Class('None', 0)
 BOOL = Class('Bool', 1)
 INT = Class('Int', 4)
+FLOAT = Class('Float', 4)
 
 def load_builtins(syms):
-    for tp in { NONE, BOOL, INT }:
+    for tp in { NONE, BOOL, INT, FLOAT }:
         syms.add_class(tp)
 
 def to_type(tp, syms):

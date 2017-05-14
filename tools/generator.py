@@ -144,24 +144,24 @@ class Generator:
     def COMP(self, node):
         self._gen(node.children[0], 0)
         self._gen(node.children[1], 0)
-        # TODO: use actual type
-        self._write(node.value.lower() + '_i')
+
+        op = node.value.lower()
+        tp = node.children[0].expr_type.cls.name[0].lower()
+        self._write('{}_{}'.format(op, tp))
 
     def BIN(self, node):
         self._gen(node.children[0], 0)
         self._gen(node.children[1], 0)
-        # TODO: use actual type
-        if node.value == 'PLUS':
-            self._write('add_i')
-        elif node.value == 'MINUS':
-            self._write('sub_i')
-        elif node.value == 'MULT':
-            self._write('mult_i')
-        elif node.value == 'DIV':
-            self._write('div_i')
+
+        op = node.value.lower()
+        tp = node.children[0].expr_type.cls.name[0].lower()
+        self._write('{}_{}'.format(op, tp))
 
     def NUM(self, node):
         self._write('const_i', node.value)
+
+    def FLOAT(self, node):
+        self._write('const_f', node.value)
 
     def VAR(self, node):
         if node.sym.location == Location.Frame:

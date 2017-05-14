@@ -114,3 +114,43 @@ gt_i
 ge_i
     Pop two values from stack and push the boolean representing if greater than
     or equal to.
+
+const_f value:f
+    Load constant `value` onto stack.
+
+add_f
+    Pop two values from stack and push the sum.
+
+sub_f
+    Pop two values from stack and push the difference.
+
+mult_f
+    Pop two values from stack and push the product.
+
+div_f
+    Pop two values from stack and push the quotient.
+
+mod_f
+    Pop two values from stack and push the modulo.
+
+eq_f
+    Pop two values from stack and push the boolean representing if they are
+    equal.
+
+ne_f
+    Pop two values from stack and push the boolean representing if they are
+    not equal.
+
+lt_f
+    Pop two values from stack and push the boolean representing if less than.
+
+le_f
+    Pop two values from stack and push the boolean representing if less than or
+    equal to.
+
+gt_f
+    Pop two values from stack and push the boolean representing if greater than.
+
+ge_f
+    Pop two values from stack and push the boolean representing if greater than
+    or equal to.

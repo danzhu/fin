@@ -1,5 +1,6 @@
 #include "runtime.h"
 
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include "opcode.h"
@@ -311,6 +312,58 @@ void Fin::Runtime::execute()
 
             case Opcode::GeI:
                 binaryOp<std::greater_equal<int32_t>>();
+                continue;
+
+            case Opcode::ConstF:
+                loadConst<float>();
+                continue;
+
+            case Opcode::AddF:
+                binaryOp<std::plus<float>>();
+                continue;
+
+            case Opcode::SubF:
+                binaryOp<std::minus<float>>();
+                continue;
+
+            case Opcode::MultF:
+                binaryOp<std::multiplies<float>>();
+                continue;
+
+            case Opcode::DivF:
+                binaryOp<std::divides<float>>();
+                continue;
+
+            case Opcode::ModF:
+                {
+                    auto op2 = opStack.pop<float>();
+                    auto op1 = opStack.pop<float>();
+                    opStack.push(std::fmod(op1, op2));
+                }
+                continue;
+
+            case Opcode::EqF:
+                binaryOp<std::equal_to<float>>();
+                continue;
+
+            case Opcode::NeF:
+                binaryOp<std::not_equal_to<float>>();
+                continue;
+
+            case Opcode::LtF:
+                binaryOp<std::less<float>>();
+                continue;
+
+            case Opcode::LeF:
+                binaryOp<std::less_equal<float>>();
+                continue;
+
+            case Opcode::GtF:
+                binaryOp<std::greater<float>>();
+                continue;
+
+            case Opcode::GeF:
+                binaryOp<std::greater_equal<float>>();
                 continue;
         }
 

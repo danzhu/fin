@@ -33,7 +33,7 @@ int main(int argc, const char *argv[])
     Fin::Runtime runtime;
 
     auto &fin = runtime.createModule("fin");
-    fin.addMethod("print(Int)None", Fin::Method{print});
+    fin.addMethod("print(Int)", Fin::Method{print});
     fin.addMethod("input()Int", Fin::Method{input});
 
     runtime.run(src);
