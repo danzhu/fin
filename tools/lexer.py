@@ -123,7 +123,7 @@ class Lexer:
                 start = end
                 state = self.start
 
-            yield Token('EOL', val, ln, len(line) + 1)
+            yield Token('EOL', '\n', ln, len(line) + 1)
 
         if ind_amount > 0:
             for i in range(indent // ind_amount):

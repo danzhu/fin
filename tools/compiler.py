@@ -62,6 +62,7 @@ def main():
     parser.add_argument('-n', dest='name', metavar='<name>', default='main',
             help='name of the module')
     parser.add_argument('-s', dest='stage', metavar='<stage>', default='exec',
+            choices=['lex', 'parse', 'asm', 'exec'],
             help='compilation stage')
     args = parser.parse_args()
 
