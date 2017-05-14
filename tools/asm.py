@@ -61,6 +61,7 @@ class Assembler:
 
     def assemble(self, src, out, name):
         self.refs = set()
+        self.functions = []
         self.self_refs = set()
 
         body = []
@@ -80,7 +81,7 @@ class Assembler:
 
             self.instr(body, segs[0], *segs[1:])
 
-        references = sorted(self.refs) + sorted(self.self_refs)
+        references = sorted(self.refs) + [f for f in self.functions if f in self.self_refs]
         refs = { ref: i for i, ref in enumerate(references) }
 
         head = []
@@ -88,7 +89,8 @@ class Assembler:
         self.instr(head, 'module', name)
 
         module = None
-        for mod, fn in references:
+        for ref in references:
+            [mod, fn] = ref.split(':', 1)
             if mod == '':
                 break
 
@@ -101,6 +103,8 @@ class Assembler:
         tokens = head + body
         syms = {}
         location = 0
+
+        # two-pass approach since labels need to be calculated first
         for token in tokens:
             token.resolve(location, syms)
             location += token.size
@@ -116,16 +120,21 @@ class Assembler:
         if len(args) != len(ins.params):
             raise ValueError('incorrect number of arguments')
 
+        if opname == 'method':
+            # record declared function so that the references are in correct
+            # order
+            self.functions.append(args[0])
+
         for param, arg in zip(ins.params, args):
             if param.type == 's':
                 token = Bytes(encode('H', len(arg)) + arg.encode())
+
             elif param.type == 'r':
-                ref = tuple(arg.split(':', 1))
-                token = Reference(ref)
-                if ref[0] != '':
-                    self.refs.add(ref)
+                token = Reference(arg)
+                if arg[0] != ':':
+                    self.refs.add(arg)
                 else:
-                    self.self_refs.add(ref)
+                    self.self_refs.add(arg)
 
             elif arg[0].isalpha():
                 token = Branch(param.type, arg)

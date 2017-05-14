@@ -3,6 +3,7 @@
 import sys
 from lexer import Lexer
 from parse import Parser
+from data import Location
 
 class Generator:
     def __init__(self):
@@ -163,5 +164,9 @@ class Generator:
         self._write('const_i', node.value)
 
     def VAR(self, node):
-        offset = node.sym.offset
-        self._write('addr_frame', offset)
+        if node.sym.location == Location.Frame:
+            self._write('addr_frame', node.sym.offset)
+        elif node.sym.location == Location.Global:
+            # TODO: globals
+            # self._write('addr_glob', node.sym.offset)
+            raise NotImplementedError()
