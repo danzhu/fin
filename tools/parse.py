@@ -168,7 +168,23 @@ class Parser:
         return Node('ARGS', args)
 
     def _test(self):
-        return self._comp()
+        return self._or_test()
+
+    def _or_test(self):
+        node = self._and_test()
+        while self._lookahead.type == 'OR':
+            self._next()
+            r = self._and_test()
+            node = Node('TEST', (node, r), 'OR')
+        return node
+
+    def _and_test(self):
+        node = self._comp()
+        while self._lookahead.type == 'AND':
+            self._next()
+            r = self._comp()
+            node = Node('TEST', (node, r), 'AND')
+        return node
 
     def _comp(self):
         node = self._expr()

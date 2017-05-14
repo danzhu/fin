@@ -257,6 +257,14 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
+            case Opcode::ConstFalse:
+                opStack.push(false);
+                continue;
+
+            case Opcode::ConstTrue:
+                opStack.push(true);
+                continue;
+
             case Opcode::ConstI:
                 loadConst<uint32_t>();
                 continue;

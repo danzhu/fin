@@ -61,10 +61,13 @@ class Node:
         self.annotated = True
 
         # local variable symbol creation
-        if self.type == 'PARAM':
-            syms.add_param(self.children[0].value, self.children[1]._type(syms, True))
-        elif self.type == 'LET':
-            syms.add_local(self.children[0].value, self.children[1]._type(syms, True))
+        if self.type in ['PARAM', 'LET']:
+            name = self.children[0].value
+            self.sym = self.children[1]._type(syms, True)
+            if self.type == 'PARAM':
+                syms.add_param(name, self.sym)
+            elif self.type == 'LET':
+                syms.add_local(name, self.sym)
 
         # symbol table
         if self.type == 'DEF':
@@ -82,6 +85,12 @@ class Node:
         elif self.type == 'NUM':
             self.expr_type = Type(data.INT)
 
+        elif self.type == 'TEST':
+            self.children[0]._expect_type(Type(data.BOOL))
+            self.children[1]._expect_type(Type(data.BOOL))
+
+            self.expr_type = Type(data.BOOL)
+
         elif self.type == 'BIN':
             # TODO: implicit conversion
             self.children[0]._expect_type(self.children[1].expr_type)
@@ -91,6 +100,7 @@ class Node:
         elif self.type == 'COMP':
             # TODO: comparable type check
             self.children[0]._expect_type(self.children[1].expr_type)
+
             self.expr_type = Type(data.BOOL)
 
         elif self.type == 'CALL':

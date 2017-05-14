@@ -69,6 +69,12 @@ addr_frame offset:h
 return_val size:H
     Return from method with a return value.
 
+const_false
+    Load constant false onto stack.
+
+const_true
+    Load constant true onto stack.
+
 const_i value:i
     Load constant `value` onto stack.
 

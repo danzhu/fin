@@ -65,8 +65,7 @@ class Generator:
             self._write('')
 
     def LET(self, node):
-        tp = node.children[1].expr_type
-        self._write('push', tp.var_size())
+        self._write('push', node.sym.var_size())
 
     def IF(self, node):
         els = self._label('ELSE')
@@ -84,7 +83,7 @@ class Generator:
 
     def WHILE(self, node):
         start = self._label('WHILE')
-        cond = self._label('TEST')
+        cond = self._label('COND')
 
         self._write('br', cond)
         self._write(start + ':')
@@ -102,9 +101,34 @@ class Generator:
             self._gen(node.children[0])
             self._write('return_val', node.children[0].expr_type.size())
 
+    def TEST(self, node):
+        jump = self._label('SHORT_CIRCUIT')
+        end = self._label('END_TEST')
+
+        self._gen(node.children[0])
+
+        if node.value == 'AND':
+            self._write('br_false', jump)
+        else:
+            self._write('br_true', jump)
+
+        self._gen(node.children[1])
+        self._write('br', end)
+        self._write(jump + ':')
+
+        if node.value == 'AND':
+            self._write('const_false')
+        else:
+            self._write('const_true')
+
+        self._write(end + ':')
+
     def EXPR(self, node):
+        size = node.children[0].expr_type.size()
+
         self._gen(node.children[0], 0)
-        self._write('pop', node.children[0].expr_type.size())
+        if size > 0:
+            self._write('pop', size)
 
     def ASSN(self, node):
         self._gen(node.children[1], node.level) # value

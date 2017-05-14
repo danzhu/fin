@@ -38,3 +38,5 @@ keyword if IF
 keyword else ELSE
 keyword while WHILE
 keyword return RETURN
+keyword and AND
+keyword or OR
