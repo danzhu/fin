@@ -14,6 +14,11 @@ void input(Fin::Runtime &rt, Fin::Stack &st)
     st.push(val);
 }
 
+void backtrace(Fin::Runtime &rt, Fin::Stack &st)
+{
+    rt.backtrace(std::cout);
+}
+
 int main(int argc, const char *argv[])
 {
     if (argc < 2)
@@ -35,6 +40,7 @@ int main(int argc, const char *argv[])
     auto &fin = runtime.createModule("fin");
     fin.addFunction("print(Int)", Fin::Function{print});
     fin.addFunction("input()Int", Fin::Function{input});
+    fin.addFunction("backtrace()", Fin::Function{backtrace});
 
     try
     {

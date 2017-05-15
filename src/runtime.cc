@@ -39,22 +39,43 @@ void Fin::Runtime::call(const Function &fn, uint16_t argSize)
 #ifdef DEBUG
     std::cerr << "  calling " << fn.name << std::endl;
 #endif
+    // store current frame
+    auto frame = Frame{execModule, execFunction, pc, fp, argSize};
+    rtStack.emplace_back(frame);
+
+    // update frame
+    execModule = fn.module;
+    execFunction = &fn;
+
     if (fn.native)
     {
-        // TODO: update runtime stack
         fn.native(*this, opStack);
+
+        // emplace and pop even for native functions so that we can get full
+        // backtrace
+        rtStack.pop_back();
+
+        execModule = frame.module;
+        execFunction = frame.function;
     }
     else
     {
-        // store current frame
-        rtStack.emplace_back(Frame{execModule, execFunction, pc, fp, argSize});
-
-        // update frame
-        execModule = fn.module;
-        execFunction = &fn;
         fp = opStack.size();
         jump(fn.location);
     }
+}
+
+void Fin::Runtime::printFrame(std::ostream &out, const Function *fn)
+    const noexcept
+{
+    out << "  in ";
+    if (!fn)
+        out << "<module>";
+    else if (fn->native)
+        out << fn->name << " [native]";
+    else
+        out << fn->name;
+    out << std::endl;
 }
 
 void Fin::Runtime::execute()
@@ -420,13 +441,8 @@ Fin::Module &Fin::Runtime::getModule(const std::string &name)
 void Fin::Runtime::backtrace(std::ostream &out) const noexcept
 {
     out << "Backtrace:" << std::endl;
+
     for (const auto &frame : rtStack)
-    {
-        out << "  in ";
-        if (frame.function)
-            out << frame.function->name;
-        else
-            out << "<module>";
-        out << std::endl;
-    }
+        printFrame(out, frame.function);
+    printFrame(out, execFunction);
 }

@@ -32,6 +32,7 @@ namespace Fin
         void ret();
         void execute();
         void call(const Function &fn, uint16_t argSize);
+        void printFrame(std::ostream &out, const Function *fn) const noexcept;
 
         template<typename T> T readConst()
         {
