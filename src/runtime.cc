@@ -28,32 +28,32 @@ void Fin::Runtime::ret()
     // restore previous frame
     opStack.resize(fp - frame.argSize);
 
-    execModule = frame.method->module;
-    execMethod = frame.method;
+    execModule = frame.function->module;
+    execFunction = frame.function;
     pc = frame.returnAddress;
     fp = frame.framePointer;
 }
 
-void Fin::Runtime::call(const Method &method, uint16_t argSize)
+void Fin::Runtime::call(const Function &fn, uint16_t argSize)
 {
 #ifdef DEBUG
-    std::cerr << "  calling " << method.name << std::endl;
+    std::cerr << "  calling " << fn.name << std::endl;
 #endif
-    if (method.nativeMethod)
+    if (fn.native)
     {
         // TODO: update runtime stack
-        method.nativeMethod(*this, opStack);
+        fn.native(*this, opStack);
     }
     else
     {
         // store current frame
-        rtStack.emplace_back(Frame{execMethod, pc, fp, argSize});
+        rtStack.emplace_back(Frame{execFunction, pc, fp, argSize});
 
         // update frame
-        execModule = method.module;
-        execMethod = &method;
+        execModule = fn.module;
+        execFunction = &fn;
         fp = opStack.size();
-        jump(method.location);
+        jump(fn.location);
     }
 }
 
@@ -93,7 +93,7 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::Method:
+            case Opcode::Function:
                 {
                     if (!declModule)
                         throw std::runtime_error{"no declaring module"};
@@ -102,8 +102,8 @@ void Fin::Runtime::execute()
                     auto skip = readConst<uint32_t>();
                     auto target = pc + skip;
 
-                    Method *method = &declModule->addMethod(name, Method{pc});
-                    declModule->refMethods.emplace_back(method);
+                    Function *fn = &declModule->addFunction(name, Function{pc});
+                    declModule->refFunctions.emplace_back(fn);
                     jump(target);
                 }
                 continue;
@@ -116,7 +116,7 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::RefMethod:
+            case Opcode::RefFunction:
                 {
                     if (!declModule)
                         throw std::runtime_error{"no declaring module"};
@@ -126,12 +126,12 @@ void Fin::Runtime::execute()
 
                     auto name = readStr();
 
-                    auto it = refModule->methods.find(name);
-                    if (it == refModule->methods.end())
-                        throw std::runtime_error{"unable to find method '"
+                    auto it = refModule->functions.find(name);
+                    if (it == refModule->functions.end())
+                        throw std::runtime_error{"unable to find functions '"
                             + name + "'"};
 
-                    declModule->refMethods.emplace_back(&it->second);
+                    declModule->refFunctions.emplace_back(&it->second);
                 }
                 continue;
 
@@ -143,8 +143,8 @@ void Fin::Runtime::execute()
                     auto idx = readConst<uint32_t>();
                     auto argSize = readConst<uint16_t>();
 
-                    auto &method = *execModule->refMethods.at(idx);
-                    call(method, argSize);
+                    auto &fn = *execModule->refFunctions.at(idx);
+                    call(fn, argSize);
                 }
                 continue;
 
@@ -418,8 +418,9 @@ Fin::Module &Fin::Runtime::getModule(const std::string &name)
 
 void Fin::Runtime::backtrace(std::ostream &out) const noexcept
 {
+    out << "Backtrace:" << std::endl;
     for (const auto &frame : rtStack)
     {
-        out << "at " << frame.method->name << std::endl;
+        out << "  in " << frame.function->name << std::endl;
     }
 }

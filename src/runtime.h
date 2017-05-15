@@ -8,7 +8,7 @@
 #include <vector>
 #include "allocator.h"
 #include "frame.h"
-#include "method.h"
+#include "function.h"
 #include "module.h"
 #include "stack.h"
 
@@ -23,7 +23,7 @@ namespace Fin
         std::map<ModuleID, Module *> modulesByID;
         std::vector<char> instrs;
         Module *execModule;
-        const Method *execMethod;
+        const Function *execFunction;
         uint32_t pc;
         uint32_t fp;
 
@@ -31,7 +31,7 @@ namespace Fin
         void jump(int32_t target);
         void ret();
         void execute();
-        void call(const Method &method, uint16_t argSize);
+        void call(const Function &fn, uint16_t argSize);
 
         template<typename T> T readConst()
         {

@@ -98,7 +98,7 @@ class Assembler:
                 self.instr(head, 'ref_module', mod)
                 module = mod
 
-            self.instr(head, 'ref_method', fn)
+            self.instr(head, 'ref_function', fn)
 
         tokens = head + body
         syms = {}
@@ -120,7 +120,7 @@ class Assembler:
         if len(args) != len(ins.params):
             raise ValueError('incorrect number of arguments')
 
-        if opname == 'method':
+        if opname == 'function':
             # record declared function so that the references are in correct
             # order
             self.functions.append(args[0])

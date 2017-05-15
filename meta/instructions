@@ -9,21 +9,21 @@ cookie=35
 module name:s
     Declare new module, and set declaring module to this module.
 
-method name:s skip:I
-    Declare method `name` of declaring module.
+function name:s skip:I
+    Declare function `name` of declaring module.
 
 ref_module name:s
     Set referencing module.
 
-ref_method name:s
-    Add method `name` of referencing module to list of references of declaring
+ref_function name:s
+    Add function `name` of referencing module to list of references of declaring
     module.
 
 call fn:r argSize:H
-    Call method `fn` of references in executing module.
+    Call function `fn` of references in executing module.
 
 return
-    Return from the current method.
+    Return from the current function.
 
 term
     Stop program execution. Automatically added to the end of every module.
@@ -67,7 +67,7 @@ addr_frame offset:h
     Load address of frame at `offset` onto stack.
 
 return_val size:H
-    Return from method with a return value.
+    Return from function with a return value.
 
 const_false
     Load constant false onto stack.

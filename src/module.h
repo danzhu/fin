@@ -5,10 +5,11 @@
 #include <unordered_map>
 #include <vector>
 #include "array.h"
+#include "function.h"
 
 namespace Fin
 {
-    struct Method;
+    struct Function;
 
     struct ModuleID
     {
@@ -24,14 +25,14 @@ namespace Fin
     struct Module
     {
         uint32_t id;
-        std::unordered_map<std::string, Method> methods;
-        std::vector<Method *> refMethods;
+        std::unordered_map<std::string, Function> functions;
+        std::vector<Function *> refFunctions;
 
-        Method &addMethod(const std::string &name, Method &&method)
+        Function &addFunction(const std::string &name, Function &&fn)
         {
-            method.name = name;
-            method.module = this;
-            return methods.emplace(name, std::move(method)).first->second;
+            fn.name = name;
+            fn.module = this;
+            return functions.emplace(name, std::move(fn)).first->second;
         }
     };
 }

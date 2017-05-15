@@ -17,11 +17,11 @@
 - [ ] include paths
 
 ### Generator
-- [ ] globals
 - [ ] implement `while ... else`
 - [ ] module version
 
 ## Runtime
 - [ ] recycle unused ptrs
-- [ ] rename method to function
-- [ ] use `std::function` instead of native function ptr
+- [x] rename method to function
+- [x] use `std::function` instead of native function ptr
+- [ ] globals

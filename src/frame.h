@@ -5,11 +5,11 @@
 
 namespace Fin
 {
-    struct Method;
+    struct Function;
 
     struct Frame
     {
-        const Method *method;
+        const Function *function;
         uint32_t returnAddress;
         uint32_t framePointer;
         uint16_t argSize;

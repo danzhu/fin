@@ -47,9 +47,9 @@ class Generator:
         pass
 
     def DEF(self, node):
-        end = 'END_METHOD_' + node.fn.name
+        end = 'END_FUNCTION_' + node.fn.name
 
-        self._write('method', str(node.fn), end)
+        self._write('function', str(node.fn), end)
         self._gen(node.children[3])
 
         if node.children[3].children[-1].type != 'RETURN':
