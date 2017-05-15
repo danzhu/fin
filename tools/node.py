@@ -65,15 +65,17 @@ class Node:
         # local variable symbol creation
         if self.type in ['PARAM', 'LET']:
             name = self.children[0].value
-            self.sym = self.children[1]._type(syms, True)
+            tp = self.children[1]._type(syms, True)
             if self.type == 'PARAM':
-                syms.add_param(name, self.sym)
+                self.sym = syms.add_param(name, tp)
             elif self.type == 'LET':
-                syms.add_local(name, self.sym)
+                self.sym = syms.add_local(name, tp)
 
         # symbol table
-        if self.type == 'DEF':
+        if self.type == 'BLOCK':
             syms = SymbolTable(Location.Frame, syms)
+
+        self.symbol_table = syms
 
         # process children
         for c in self.children:

@@ -14,13 +14,14 @@
 - [x] unary operations
 - [ ] `continue` / `break`
 - [ ] expression statements
+- [ ] `let ... =`
 
 ### Analyzer
 - [ ] implicit conversion
 - [ ] type checks
 - [ ] include paths
 - [ ] prevent calls to functions defined later
-- [ ] indent scope
+- [x] indent scope
 - [ ] function overloads
 
 ### Generator

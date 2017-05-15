@@ -47,39 +47,42 @@ endif()
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
+# files
+file(GLOB SOURCES "src/*.cc")
+file(GLOB TOOLS "tools/*.py")
+
 # custom commands
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_custom_command(
     OUTPUT opcode.h
-    DEPENDS meta/instructions
+    DEPENDS meta/instructions tools/opcode.py
     COMMAND tools/opcode.py > "${CMAKE_CURRENT_BINARY_DIR}/opcode.h"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 
 add_custom_command(
     OUTPUT opcode.cc
-    DEPENDS meta/instructions
+    DEPENDS meta/instructions tools/opcode.py tools/opname.py
     COMMAND tools/opname.py > "${CMAKE_CURRENT_BINARY_DIR}/opcode.cc"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 
 add_custom_command(
     OUTPUT instructions.md
-    DEPENDS meta/instructions
+    DEPENDS meta/instructions tools/instr.py
     COMMAND tools/instr.py > "${CMAKE_CURRENT_BINARY_DIR}/instructions.md"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 
 add_custom_command(
     OUTPUT test.fm
-    DEPENDS test.fin
+    DEPENDS test.fin ${TOOLS}
     COMMAND tools/compiler.py test.fin -o "${CMAKE_CURRENT_BINARY_DIR}/test.fm"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     )
 
 # targets
-file(GLOB SOURCES "src/*.cc")
 add_executable(fin ${SOURCES} opcode.h opcode.cc)
 
 add_custom_target(doc DEPENDS instructions.md)

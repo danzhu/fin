@@ -54,19 +54,27 @@ class Generator:
 
         if node.children[3].children[-1].type != 'RETURN':
             if not node.fn.ret.none():
+                # TODO: control flow analysis
                 raise TypeError('no return statement')
             self._write('return')
 
         self._write(end + ':')
         self._write('')
 
-    def STMTS(self, node):
+    def BLOCK(self, node):
         for c in node.children:
             self._gen(c)
             self._write('')
 
+        # pop variables declared in block
+        # TODO: RAII
+        size = node.symbol_table.local_offset
+        if size > 0:
+            self._write('pop', size)
+
     def LET(self, node):
-        self._write('push', node.sym.var_size())
+        self._write('# let {}'.format(node.sym.name))
+        self._write('push', node.sym.type.var_size())
 
     def IF(self, node):
         els = self._label('ELSE')
@@ -174,6 +182,6 @@ class Generator:
         if node.sym.location == Location.Frame:
             self._write('addr_frame', node.sym.offset)
         elif node.sym.location == Location.Global:
-            # TODO: globals
-            # self._write('addr_glob', node.sym.offset)
-            raise NotImplementedError()
+            self._write('addr_glob', node.sym.offset)
+        else:
+            assert False

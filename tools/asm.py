@@ -81,18 +81,18 @@ class Assembler:
 
             self.instr(body, segs[0], *segs[1:])
 
-        references = sorted(self.refs) + [f for f in self.functions if f in self.self_refs]
-        refs = { ref: i for i, ref in enumerate(references) }
+        ref_list = sorted(self.refs)
+        ref_enum = enumerate(ref_list
+                + [f for f in self.functions if f in self.self_refs])
+        refs = { ref: i for i, ref in ref_enum }
 
         head = []
         head.append(Bytes(b'#!/usr/bin/env fin\n'))
         self.instr(head, 'module', name)
 
         module = None
-        for ref in references:
+        for ref in ref_list:
             [mod, fn] = ref.split(':', 1)
-            if mod == '':
-                break
 
             if module != mod:
                 self.instr(head, 'ref_module', mod)
@@ -131,9 +131,11 @@ class Assembler:
 
             elif param.type == 'r':
                 token = Reference(arg)
-                if arg[0] != ':':
+                if ':' in arg:
+                    # external reference
                     self.refs.add(arg)
                 else:
+                    # self reference
                     self.self_refs.add(arg)
 
             elif arg[0].isalpha():

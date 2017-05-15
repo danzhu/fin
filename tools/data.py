@@ -13,8 +13,16 @@ class SymbolTable:
         self.parent = parent
 
         self.symbols = {}
+
         self.local_offset = 0
         self.param_offset = 0
+
+        if parent is not None and parent.location == loc:
+            self.parent_local_offset = parent.local_offset
+            self.parent_param_offset = parent.param_offset
+        else:
+            self.parent_local_offset = 0
+            self.parent_param_offset = 0
 
     def _check_exists(self, name):
         if name in self.symbols:
@@ -31,16 +39,23 @@ class SymbolTable:
         self.symbols[fn.name] = fn
 
     def add_param(self, name, tp):
+        assert self.location == Frame
         self._check_exists(name)
 
         self.param_offset -= tp.var_size()
-        self.symbols[name] = Variable(name, self.location, self.param_offset, tp)
+        offset = self.parent_param_offset + self.param_offset
+        var = Variable(name, self.location, offset, tp)
+        self.symbols[name] = var
+        return var
 
     def add_local(self, name, tp):
         self._check_exists(name)
 
-        self.symbols[name] = Variable(name, self.location, self.local_offset, tp)
+        offset = self.parent_local_offset + self.local_offset
+        var = Variable(name, self.location, offset, tp)
+        self.symbols[name] = var
         self.local_offset += tp.var_size()
+        return var
 
     def get(self, name, tp=None):
         if name in self.symbols:
@@ -48,11 +63,12 @@ class SymbolTable:
             if tp is None or sym.TYPE == tp:
                 return sym
 
-            raise LookupError('expected {}, but got {} "{}"'.format(tp, sym.TYPE, name))
+            raise LookupError('expected {}, but got {} "{}"'.format(
+                tp, sym.TYPE, name))
         elif self.parent:
             return self.parent.get(name, tp)
         else:
-            raise KeyError(name)
+            raise KeyError('cannot find symbol "{}"'.format(name))
 
 
 class Variable:
@@ -119,8 +135,8 @@ class Function:
         self.ret = ret
 
     def __str__(self):
-        return '{}:{}({}){}'.format(
-                self.module.name,
+        return '{}{}({}){}'.format(
+                self.module.name + ':' if self.module.name else '',
                 self.name,
                 ','.join(str(param) for param in self.params),
                 self.ret if not self.ret.none() else '')
