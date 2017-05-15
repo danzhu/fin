@@ -1,8 +1,9 @@
 # Fin Project Todo List
 
 ## Language
-- [ ] `continue` / `break`
 - [ ] namespace
+- [ ] dynamic allocation
+- [ ] exception handling
 
 ## Compiler
 
@@ -10,12 +11,16 @@
 - [ ] line continuation
 
 ### Parser
+- [ ] unary operations
+- [ ] `continue` / `break`
+- [ ] expression statements
 
 ### Analyzer
 - [ ] implicit conversion
 - [ ] type checks
 - [ ] include paths
 - [ ] prevent calls to functions defined later
+- [ ] indent scope
 
 ### Generator
 - [ ] implement `while ... else`
