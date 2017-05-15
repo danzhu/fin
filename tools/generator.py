@@ -188,6 +188,7 @@ class Generator:
         if node.sym.location == Location.Frame:
             self._write('addr_frame', node.sym.offset)
         elif node.sym.location == Location.Global:
-            self._write('addr_glob', node.sym.offset)
+            # self._write('addr_glob', node.sym.offset)
+            raise NotImplementedError()
         else:
             assert False

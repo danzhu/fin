@@ -273,14 +273,6 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::AddrGlob:
-                {
-                    auto offset = readConst<uint16_t>();
-                    opStack.push(static_cast<Ptr>(execModule->globalOffset
-                                + offset));
-                }
-                continue;
-
             case Opcode::ReturnVal:
                 {
                     auto size = readConst<uint16_t>();
@@ -438,9 +430,6 @@ Fin::Module &Fin::Runtime::createModule(const std::string &name)
 
     auto module = std::make_unique<Module>();
     module->id = static_cast<decltype(Module::id)>(modules.size());
-    // FIXME: this doesn't work if loading modules before globals
-    module->globalOffset = static_cast<decltype(Module::globalOffset)>(
-            opStack.size());
 
     auto p = module.get();
     modules.emplace_back(std::move(module));

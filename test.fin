@@ -1,14 +1,12 @@
-let a Int
-
-test()
-print(a)
-
 def test()
     let i Int
     i = -2
     if -i > 0
-        a = 2
+        let j Int
+        j = 2
     else
         let j Int
         j = 3
         print(j)
+
+test()
