@@ -25,6 +25,7 @@ namespace Fin
     struct Module
     {
         uint32_t id;
+        uint16_t globalOffset;
         std::unordered_map<std::string, Function> functions;
         std::vector<Function *> refFunctions;
 

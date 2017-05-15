@@ -66,6 +66,9 @@ store_ptr offset:I size:H
 addr_frame offset:h
     Load address of frame at `offset` onto stack.
 
+addr_glob offset:H
+    Load address of global at `offset` onto stack.
+
 return_val size:H
     Return from function with a return value.
 

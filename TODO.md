@@ -20,16 +20,18 @@
 - [ ] implicit conversion
 - [ ] type checks
 - [ ] include paths
-- [ ] prevent calls to functions defined later
+- [x] ~~prevent calls to functions defined later~~
 - [x] indent scope
 - [ ] function overloads
 
 ### Generator
 - [ ] implement `while ... else`
 - [ ] module version
+- [ ] generate global code after function defs
 
 ## Runtime
 - [ ] recycle unused ptrs
 - [x] rename method to function
 - [x] use `std::function` instead of native function ptr
-- [ ] globals
+- [x] globals
+- [ ] remove module index
