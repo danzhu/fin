@@ -22,7 +22,7 @@ namespace Fin
         std::vector<std::unique_ptr<Module>> modules;
         std::map<ModuleID, Module *> modulesByID;
         std::vector<char> instrs;
-        Module *execModule;
+        const Module *execModule;
         const Function *execFunction;
         uint32_t pc;
         uint32_t fp;

@@ -22,8 +22,8 @@ namespace Fin
         uint32_t location;
 
         Function() {}
-        Function(NativeFunction fn): native{fn} {}
-        Function(uint32_t loc): location{loc} {}
+        explicit Function(NativeFunction fn): native{fn} {}
+        explicit Function(uint32_t loc): location{loc} {}
     };
 }
 

@@ -13,7 +13,7 @@ namespace Fin
         uint32_t _cap;
         uint32_t _size = 0;
     public:
-        Stack(uint32_t cap = 256);
+        explicit Stack(uint32_t cap = 256);
         Stack(const Stack &other) = delete;
         ~Stack();
 

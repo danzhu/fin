@@ -6,9 +6,11 @@
 namespace Fin
 {
     struct Function;
+    struct Module;
 
     struct Frame
     {
+        const Module *module;
         const Function *function;
         uint32_t returnAddress;
         uint32_t framePointer;

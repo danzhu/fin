@@ -28,7 +28,7 @@ void Fin::Runtime::ret()
     // restore previous frame
     opStack.resize(fp - frame.argSize);
 
-    execModule = frame.function->module;
+    execModule = frame.module;
     execFunction = frame.function;
     pc = frame.returnAddress;
     fp = frame.framePointer;
@@ -47,7 +47,7 @@ void Fin::Runtime::call(const Function &fn, uint16_t argSize)
     else
     {
         // store current frame
-        rtStack.emplace_back(Frame{execFunction, pc, fp, argSize});
+        rtStack.emplace_back(Frame{execModule, execFunction, pc, fp, argSize});
 
         // update frame
         execModule = fn.module;
@@ -65,6 +65,7 @@ void Fin::Runtime::execute()
     Module *declModule = nullptr;
     Module *refModule = nullptr;
     execModule = nullptr;
+    execFunction = nullptr;
 
     while (true)
     {
@@ -89,7 +90,7 @@ void Fin::Runtime::execute()
                     auto name = readStr();
 
                     auto module = &createModule(name);
-                    declModule = refModule = execModule = module;
+                    execModule = refModule = declModule = module;
                 }
                 continue;
 
@@ -421,6 +422,11 @@ void Fin::Runtime::backtrace(std::ostream &out) const noexcept
     out << "Backtrace:" << std::endl;
     for (const auto &frame : rtStack)
     {
-        out << "  in " << frame.function->name << std::endl;
+        out << "  in ";
+        if (frame.function)
+            out << frame.function->name;
+        else
+            out << "<module>";
+        out << std::endl;
     }
 }

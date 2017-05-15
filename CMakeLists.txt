@@ -9,10 +9,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # build config
 set(CMAKE_BUILD_TYPE Debug)
-option(LOG_OPNAME "Log opnames for instructions" OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(LOG_OPNAME)
+option(DEBUG "Enable debug messages" OFF)
+
+if(DEBUG)
     add_definitions(-DDEBUG)
 endif()
 
