@@ -22,13 +22,14 @@ std::string Fin::Runtime::readStr()
 
 void Fin::Runtime::ret()
 {
-    auto frame = rtStack.top();
-    rtStack.pop();
+    auto frame = rtStack.back();
+    rtStack.pop_back();
 
     // restore previous frame
     opStack.resize(fp - frame.argSize);
 
-    execModule = &frame.module;
+    execModule = frame.method->module;
+    execMethod = frame.method;
     pc = frame.returnAddress;
     fp = frame.framePointer;
 }
@@ -46,9 +47,11 @@ void Fin::Runtime::call(const Method &method, uint16_t argSize)
     else
     {
         // store current frame
-        rtStack.emplace(Frame{*method.module, pc, fp, argSize});
+        rtStack.emplace_back(Frame{execMethod, pc, fp, argSize});
 
         // update frame
+        execModule = method.module;
+        execMethod = &method;
         fp = opStack.size();
         jump(method.location);
     }
@@ -411,4 +414,12 @@ Fin::Module &Fin::Runtime::getModule(const std::string &name)
 
     // TODO: load module if not available
     return *modulesByID.at(id);
+}
+
+void Fin::Runtime::backtrace(std::ostream &out) const noexcept
+{
+    for (const auto &frame : rtStack)
+    {
+        out << "at " << frame.method->name << std::endl;
+    }
 }

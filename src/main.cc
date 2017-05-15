@@ -36,7 +36,16 @@ int main(int argc, const char *argv[])
     fin.addMethod("print(Int)", Fin::Method{print});
     fin.addMethod("input()Int", Fin::Method{input});
 
-    runtime.run(src);
+    try
+    {
+        runtime.run(src);
+    }
+    catch (const std::runtime_error &ex)
+    {
+        std::cerr << "Error: " << ex.what() << std::endl;
+        runtime.backtrace(std::cerr);
+        return 1;
+    }
 
     return 0;
 }

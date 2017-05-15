@@ -18,11 +18,12 @@ namespace Fin
     {
         Stack opStack;
         Allocator alloc;
-        std::stack<Frame> rtStack;
+        std::deque<Frame> rtStack;
         std::vector<std::unique_ptr<Module>> modules;
         std::map<ModuleID, Module *> modulesByID;
         std::vector<char> instrs;
         Module *execModule;
+        const Method *execMethod;
         uint32_t pc;
         uint32_t fp;
 
@@ -59,6 +60,7 @@ namespace Fin
         void run(std::istream &src);
         Module &createModule(const std::string &name);
         Module &getModule(const std::string &name);
+        void backtrace(std::ostream &out) const noexcept;
         uint32_t programCounter() const noexcept;
     };
 }

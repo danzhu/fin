@@ -26,6 +26,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     -Wno-padded \
     -Wno-sign-conversion \
     -Wno-unused-parameter \
+    -Wno-unused-exception-parameter \
     -pedantic")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
