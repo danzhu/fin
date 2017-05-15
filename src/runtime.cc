@@ -438,6 +438,7 @@ Fin::Module &Fin::Runtime::createModule(const std::string &name)
 
     auto module = std::make_unique<Module>();
     module->id = static_cast<decltype(Module::id)>(modules.size());
+    // FIXME: this doesn't work if loading modules before globals
     module->globalOffset = static_cast<decltype(Module::globalOffset)>(
             opStack.size());
 

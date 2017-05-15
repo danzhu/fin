@@ -1,5 +1,8 @@
 let a Int
 
+test()
+print(a)
+
 def test()
     let i Int
     i = -2
@@ -9,6 +12,3 @@ def test()
         let j Int
         j = 3
         print(j)
-
-test()
-print(a)

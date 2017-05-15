@@ -39,8 +39,14 @@ class Generator:
 
     def FILE(self, node):
         for c in node.children:
-            self._gen(c)
-            self._write('')
+            if c.type == 'DEF':
+                self._gen(c)
+                self._write('')
+
+        for c in node.children:
+            if c.type != 'DEF':
+                self._gen(c)
+                self._write('')
 
     def IMPORT(self, node):
         # TODO

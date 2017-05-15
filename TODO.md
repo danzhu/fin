@@ -27,7 +27,7 @@
 ### Generator
 - [ ] implement `while ... else`
 - [ ] module version
-- [ ] generate global code after function defs
+- [x] generate global code after function defs
 
 ## Runtime
 - [ ] recycle unused ptrs
