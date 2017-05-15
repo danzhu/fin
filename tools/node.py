@@ -106,6 +106,11 @@ class Node:
 
             self.expr_type = Type(self.children[0].expr_type.cls)
 
+        elif self.type == 'UNARY':
+            self.children[0]._expect_type(data.INT, data.FLOAT)
+
+            self.expr_type = Type(self.children[0].expr_type.cls)
+
         elif self.type == 'COMP':
             # TODO: comparable type check
             self.children[0]._expect_type(data.INT, data.FLOAT)

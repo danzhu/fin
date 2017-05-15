@@ -11,7 +11,7 @@
 - [ ] line continuation
 
 ### Parser
-- [ ] unary operations
+- [x] unary operations
 - [ ] `continue` / `break`
 - [ ] expression statements
 
@@ -21,6 +21,7 @@
 - [ ] include paths
 - [ ] prevent calls to functions defined later
 - [ ] indent scope
+- [ ] function overloads
 
 ### Generator
 - [ ] implement `while ... else`

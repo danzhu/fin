@@ -157,6 +157,13 @@ class Generator:
         tp = node.children[0].expr_type.cls.name[0].lower()
         self._write('{}_{}'.format(op, tp))
 
+    def UNARY(self, node):
+        self._gen(node.children[0], 0)
+
+        if node.value == 'SUB':
+            tp = node.children[0].expr_type.cls.name[0].lower()
+            self._write('neg_{}'.format(tp))
+
     def NUM(self, node):
         self._write('const_i', node.value)
 

@@ -93,6 +93,9 @@ div_i
 mod_i
     Pop two values from stack and push the modulo.
 
+neg_i
+    Pop a value from stack and push the negation.
+
 eq_i
     Pop two values from stack and push the boolean representing if they are
     equal.
@@ -132,6 +135,9 @@ div_f
 
 mod_f
     Pop two values from stack and push the modulo.
+
+neg_f
+    Pop a value from stack and push the negation.
 
 eq_f
     Pop two values from stack and push the boolean representing if they are

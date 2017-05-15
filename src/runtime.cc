@@ -315,6 +315,10 @@ void Fin::Runtime::execute()
                 binaryOp<std::modulus<int32_t>>();
                 continue;
 
+            case Opcode::NegI:
+                opStack.push(-opStack.pop<int32_t>());
+                continue;
+
             case Opcode::EqI:
                 binaryOp<std::equal_to<int32_t>>();
                 continue;
@@ -365,6 +369,10 @@ void Fin::Runtime::execute()
                     auto op1 = opStack.pop<float>();
                     opStack.push(std::fmod(op1, op2));
                 }
+                continue;
+
+            case Opcode::NegF:
+                opStack.push(-opStack.pop<int32_t>());
                 continue;
 
             case Opcode::EqF:

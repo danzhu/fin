@@ -214,6 +214,15 @@ class Parser:
         return node
 
     def _factor(self):
+        if self._lookahead.type in ['ADD', 'SUB']:
+            op = self._lookahead.type
+            self._next()
+            val = self._factor()
+            return Node('UNARY', (val,), op)
+        else:
+            return self._atom()
+
+    def _atom(self):
         if self._lookahead.type == 'ID':
             name = self._lookahead.value
             self._expect('ID')
