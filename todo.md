@@ -15,6 +15,7 @@
 - [ ] implicit conversion
 - [ ] type checks
 - [ ] include paths
+- [ ] prevent calls to functions defined later
 
 ### Generator
 - [ ] implement `while ... else`

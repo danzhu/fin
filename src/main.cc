@@ -46,7 +46,7 @@ int main(int argc, const char *argv[])
     {
         runtime.run(src);
     }
-    catch (const std::runtime_error &ex)
+    catch (const std::exception &ex)
     {
         std::cerr << "Error: " << ex.what() << std::endl;
         runtime.backtrace(std::cerr);
