@@ -50,14 +50,14 @@ class Node:
 
     def _type(self, syms, var=False):
         if len(self.children) == 0:
-            tp = 'None'
+            tp = data.NONE
             lvl = 0
         else:
-            tp = self.children[0].value
-            lvl = len(self.children) - 1
+            tp = syms.get(self.children[0].value, 'CLASS')
+            lvl = self.level
         if var:
             lvl += 1
-        return Type(syms.get(tp, 'CLASS'), lvl)
+        return Type(tp, lvl)
 
     def _annotate(self, syms):
         self.annotated = True

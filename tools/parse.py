@@ -149,11 +149,12 @@ class Parser:
         return Node('PARAM', (name, tp))
 
     def _type(self):
-        children = [self._id()]
+        name = self._id()
+        lvl = 0
         while self._lookahead.type == 'AMP':
             self._next()
-            children.append(Node('AMP', ()))
-        return Node('TYPE', children)
+            lvl += 1
+        return Node('TYPE', (name,), None, lvl)
 
     def _block(self):
         stmts = []
