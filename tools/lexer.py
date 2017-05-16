@@ -13,14 +13,20 @@ class State:
 
 
 class Token:
-    def __init__(self, tp, val, line, col):
+    def __init__(self, tp, line, col, val = None, var = None):
         self.type = tp
-        self.value = val
         self.line = line
         self.column = col
+        self.value = val
+        self.variant = var
 
     def __str__(self):
-        return '{0.type} {0.value}'.format(self)
+        s = self.type
+        if self.variant:
+            s += ' [' + self.variant + ']'
+        if self.value:
+            s += ' ' + self.value
+        return s
 
 
 class Lexer:
@@ -78,13 +84,13 @@ class Lexer:
                 if (new_indent - indent) % ind_amount != 0:
                     raise Exception('wrong indent')
                 for i in range((new_indent - indent) // ind_amount):
-                    yield Token('INDENT', None, ln, 0)
+                    yield Token('INDENT', ln, 0)
 
             elif new_indent < indent:
                 if (indent - new_indent) % ind_amount != 0:
                     raise Exception('wrong dedent')
                 for i in range((indent - new_indent) // ind_amount):
-                    yield Token('DEDENT', None, ln, 0)
+                    yield Token('DEDENT', ln, 0)
 
             indent = new_indent
 
@@ -113,20 +119,23 @@ class Lexer:
 
                 if val in self.keywords:
                     tp = self.keywords[val]
+                    var = None
                 elif state.name in self.types:
                     tp = self.types[state.name]
+                    var = state.name
                 else:
                     tp = state.name
+                    var = tp
 
-                yield Token(tp, val, ln, start + 1)
+                yield Token(tp, ln, start + 1, val, var)
 
                 start = end
                 state = self.start
 
-            yield Token('EOL', '\n', ln, len(line) + 1)
+            yield Token('EOL', ln, len(line) + 1, '\n')
 
         if ind_amount > 0:
             for i in range(indent // ind_amount):
-                yield Token('DEDENT', None, ln, 0)
+                yield Token('DEDENT', ln, 0)
 
-        yield Token('EOF', None, ln, 0)
+        yield Token('EOF', ln, 0)

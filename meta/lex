@@ -38,6 +38,17 @@
 > comment [ANY] comment
 > comment [LF] start
 type ZERO NUM
+type ADD_ASSN ASSN
+type SUB_ASSN ASSN
+type MULT_ASSN ASSN
+type DIV_ASSN ASSN
+type MOD_ASSN ASSN
+type EQ COMP
+type NE COMP
+type GT COMP
+type GE Comp
+type LT COMP
+type LE COMP
 keyword import IMPORT
 keyword def DEF
 keyword let LET

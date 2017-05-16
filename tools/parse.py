@@ -87,13 +87,12 @@ class Parser:
             return self._return()
         else:
             node = self._test()
-            if self._lookahead.type in ['ASSN', 'ADD_ASSN', 'SUB_ASSN',
-                    'MULT_ASSN', 'DIV_ASSN', 'MOD_ASSN', 'COLON']:
+            if self._lookahead.type in ['ASSN', 'COLON']:
                 lvl = 0
                 while self._lookahead.type == 'COLON':
                     self._next()
                     lvl += 1
-                op = self._lookahead.type
+                op = self._lookahead.variant
                 self._next()
                 r = self._test()
                 node = Node('ASSN', (node, r), op, lvl)
@@ -188,8 +187,8 @@ class Parser:
 
     def _comp(self):
         node = self._expr()
-        if self._lookahead.type in ['EQ', 'NE', 'LT', 'GT', 'LE', 'GE']:
-            op = self._lookahead.type
+        if self._lookahead.type == 'COMP':
+            op = self._lookahead.variant
             self._next()
             r = self._expr()
             node = Node('COMP', (node, r), op)

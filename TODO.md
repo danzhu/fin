@@ -1,14 +1,29 @@
 # Fin Project Todo List
 
+## Prototype
+- [ ] tuple parameter
+- [ ] static (stack) allocation
+- [ ] invariant validation
+- [ ] function call with blocks
+
 ## Language
+- [ ] reference assignment
+  - [x] ~~assign / rebind~~
+  - [x] level-based assignment
+  - [ ] tuple assignment
 - [ ] namespace
-- [ ] dynamic allocation
-- [ ] exception handling
+- [ ] dynamic (heap) allocation
+  - [ ] array allocation
+  - [ ] class instance allocation
+- [ ] exception / error handling
+- [ ] owner assignment
+  - [ ] copying / moving
 
 ## Compiler
 
 ### Lexer
 - [ ] line continuation
+- [x] token variant
 
 ### Parser
 - [x] unary operations
