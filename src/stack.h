@@ -2,8 +2,10 @@
 #define FIN_STACK_H
 
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
+#include "log.h"
 
 namespace Fin
 {
@@ -42,6 +44,8 @@ namespace Fin
             for (uint32_t i = 0; i < size; ++i)
                 _content[_size + i] = val[i];
             _size += size;
+
+            LOG(std::endl << "  < size " << size);
         }
 
         void pop(char *val, uint32_t size)
@@ -52,6 +56,8 @@ namespace Fin
             _size -= size;
             for (uint32_t i = 0; i < size; ++i)
                 val[i] = _content[_size + i];
+
+            LOG(std::endl << "  > size " << size);
         }
 
         template<typename T> T &at(uint32_t idx)
@@ -67,7 +73,7 @@ namespace Fin
             val = at<T>(_size - sizeof(T));
             _size -= sizeof(T);
 
-            LOG(std::endl << "  >> " << val);
+            LOG(std::endl << "  > " << val);
         }
 
         template<typename T> T pop()
@@ -86,7 +92,7 @@ namespace Fin
             _size += sizeof(T);
             at<T>(addr) = val;
 
-            LOG(std::endl << "  << " << val);
+            LOG(std::endl << "  < " << val);
         }
     };
 }

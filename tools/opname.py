@@ -4,6 +4,8 @@ import instr
 
 FORMAT = """#include "opcode.h"
 
+#include <iostream>
+
 std::array<const char *, 256> Fin::Opnames
 {{{{
 {opnames}

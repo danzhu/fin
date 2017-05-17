@@ -2,9 +2,11 @@
 #define FIN_ALLOCATOR_H
 
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include "log.h"
 
 namespace Fin
 {
@@ -40,6 +42,8 @@ namespace Fin
 
         char *deref(Ptr ptr, uint32_t size) const
         {
+            LOG(std::endl << "  * " << ptr);
+
             auto block = heap.at(static_cast<uint32_t>(ptr >> OFFSET_WIDTH));
             auto offset = ptr & ((1l << OFFSET_WIDTH) - 1);
             if (block.state == State::Freed || offset + size > block.size)

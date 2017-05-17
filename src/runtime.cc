@@ -99,9 +99,11 @@ void Fin::Runtime::execute()
     execModule = nullptr;
     execFunction = nullptr;
 
-    for (; ; LOG(std::endl))
+    LOG("Logging execution...");
+
+    while (true)
     {
-        LOG("=");
+        LOG(std::endl << '-');
 
         auto op = readConst<Opcode>();
 
@@ -183,6 +185,7 @@ void Fin::Runtime::execute()
                 continue;
 
             case Opcode::Term:
+                LOG(std::endl);
                 return;
 
             case Opcode::Br:
