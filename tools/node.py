@@ -4,7 +4,7 @@ import data
 from data import Location, SymbolTable, Type, Module, Function
 
 class Node:
-    def __init__(self, tp, children, val=None, lvl=0):
+    def __init__(self, tp, children, val=None, lvl=None):
         self.type = tp
         self.children = children
         self.value = val
@@ -35,11 +35,16 @@ class Node:
         self._annotate(syms)
 
     def _expect_type(self, *tps):
-        if self.expr_type.cls in tps:
-            return
-        raise TypeError('expected {}, but got {}'.format(
-            ' or '.join(tp),
-            self.expr_type))
+        if self.expr_type.cls not in tps:
+            raise TypeError('expecting {}, but got {}'.format(
+                ' or '.join(tp.name for tp in tps),
+                self.expr_type))
+
+    def _expect_level(self, lvl):
+        if self.expr_type.level < lvl:
+            raise TypeError('expecting level {}, but got level {}'.format(
+                lvl,
+                self.expr_type.level))
 
     def _decl(self, syms, mod):
         name = self.children[0].value
@@ -99,12 +104,8 @@ class Node:
             self.expr_type = Type(data.BOOL)
 
         elif self.type == 'BIN':
-            # TODO: custom operator overload
             self.children[0]._expect_type(data.INT, data.FLOAT)
-
-            # TODO: implicit conversion
-            if self.children[0].expr_type.cls != self.children[1].expr_type.cls:
-                raise TypeError('unmatched type')
+            self.children[1]._expect_type(self.children[0].expr_type.cls)
 
             self.expr_type = Type(self.children[0].expr_type.cls)
 
@@ -114,11 +115,8 @@ class Node:
             self.expr_type = Type(self.children[0].expr_type.cls)
 
         elif self.type == 'COMP':
-            # TODO: comparable type check
             self.children[0]._expect_type(data.INT, data.FLOAT)
-
-            if self.children[0].expr_type.cls != self.children[1].expr_type.cls:
-                raise TypeError('unmatched type')
+            self.children[1]._expect_type(self.children[0].expr_type.cls)
 
             self.expr_type = Type(data.BOOL)
 
@@ -133,3 +131,10 @@ class Node:
         # type checks
         if self.type in ['IF', 'WHILE']:
             self.children[0]._expect_type(data.BOOL)
+
+        elif self.type == 'LET':
+            if self.children[2].type != 'EMPTY':
+                if self.sym.type.level != self.level + 1:
+                    raise TypeError('initialization level mismatch')
+                self.children[2]._expect_type(self.sym.type.cls)
+                self.children[2]._expect_level(self.level)

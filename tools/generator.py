@@ -80,12 +80,15 @@ class Generator:
 
     def LET(self, node):
         self._write('# let {}'.format(node.sym.name))
-        self._write('push', node.sym.type.var_size())
+        if node.children[2].type == 'EMPTY':
+            self._write('push', node.sym.type.var_size())
+        else:
+            self._gen(node.children[2], node.level)
 
     def IF(self, node):
         els = self._label('ELSE')
         end = self._label('END_IF')
-        has_else = len(node.children[2].children) > 0
+        has_else = node.children[2].type != 'EMPTY'
 
         self._gen(node.children[0], 0) # comp
         self._write('br_false', els if has_else else end)

@@ -29,7 +29,7 @@
 - [x] unary operations
 - [ ] `continue` / `break`
 - [ ] expression statements
-- [ ] `let ... =`
+- [x] `let ... =`
 
 ### Analyzer
 - [ ] implicit conversion

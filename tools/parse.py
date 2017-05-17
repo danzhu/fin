@@ -15,7 +15,7 @@ class Parser:
 
     def _expect(self, *types):
         if self._lookahead.type not in types:
-            self._error('expected {}, but got {}'.format(
+            self._error('expecting {}, but got {}'.format(
                 ' or '.join(types),
                 self._lookahead.type))
         self._next()
@@ -25,7 +25,7 @@ class Parser:
                 + '\nat line {0.line}, col {0.column}'.format(self._lookahead))
 
     def _empty(self):
-        return Node('STMTS', ())
+        return Node('EMPTY', ())
 
     def _file(self):
         children = []
@@ -79,12 +79,16 @@ class Parser:
     def _stmt(self):
         if self._lookahead.type == 'LET':
             return self._let()
+
         elif self._lookahead.type == 'IF':
             return self._if()
+
         elif self._lookahead.type == 'WHILE':
             return self._while()
+
         elif self._lookahead.type == 'RETURN':
             return self._return()
+
         else:
             node = self._test()
             if self._lookahead.type in ['ASSN', 'COLON']:
@@ -93,11 +97,16 @@ class Parser:
                     self._next()
                     lvl += 1
                 op = self._lookahead.variant
-                self._next()
+                self._expect('ASSN')
                 r = self._test()
                 node = Node('ASSN', (node, r), op, lvl)
-            else:
+
+            elif self._lookahead.type == 'EOL':
                 node = Node('EXPR', (node,))
+
+            else:
+                self._expect('ASSN', 'COLON', 'EOL')
+
             self._expect('EOL')
             return node
 
@@ -105,8 +114,25 @@ class Parser:
         self._expect('LET')
         name = self._id()
         tp = self._type()
+
+        lvl = 0
+        if self._lookahead.type in ['ASSN', 'COLON']:
+            while self._lookahead.type == 'COLON':
+                self._next()
+                lvl += 1
+            if self._lookahead.type != 'ASSN':
+                self._error('expecting assignment')
+            self._next()
+            val = self._test()
+
+        elif self._lookahead.type == 'EOL':
+            val = self._empty()
+
+        else:
+            self._expect('ASSN', 'COLON', 'EOL')
+
         self._expect('EOL')
-        return Node('LET', (name, tp))
+        return Node('LET', (name, tp, val), None, lvl)
 
     def _if(self):
         self._expect('IF')
