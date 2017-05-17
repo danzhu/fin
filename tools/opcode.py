@@ -15,6 +15,8 @@ namespace Fin
     }};
 
     extern std::array<const char *, 256> Opnames;
+
+    std::ostream &operator<<(std::ostream &out, Opcode op);
 }}
 
 #endif"""

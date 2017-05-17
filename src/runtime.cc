@@ -17,8 +17,21 @@ std::string Fin::Runtime::readStr()
 {
     auto len = readConst<uint16_t>();
     auto val = std::string{&instrs.at(pc), len};
+
+    LOG(" '" << val << "'");
+
     jump(pc + len);
     return val;
+}
+
+Fin::Function &Fin::Runtime::readFn()
+{
+    auto idx = readConst<uint32_t>();
+    auto &fn = *execModule->refFunctions.at(idx);
+
+    LOG(" [" << fn.name << "]");
+
+    return fn;
 }
 
 void Fin::Runtime::ret()
@@ -37,9 +50,6 @@ void Fin::Runtime::ret()
 
 void Fin::Runtime::call(const Function &fn, uint16_t argSize)
 {
-#ifdef DEBUG
-    std::cerr << "  calling " << fn.name << std::endl;
-#endif
     // store current frame
     auto frame = Frame{execModule, execFunction, pc, fp, argSize};
     rtStack.emplace_back(frame);
@@ -89,13 +99,11 @@ void Fin::Runtime::execute()
     execModule = nullptr;
     execFunction = nullptr;
 
-    while (true)
+    for (; ; LOG(std::endl))
     {
-        auto op = readConst<Opcode>();
+        LOG("=");
 
-#ifdef DEBUG
-        std::cerr << "> " << Opnames.at(static_cast<uint8_t>(op)) << std::endl;
-#endif
+        auto op = readConst<Opcode>();
 
         switch (op)
         {
@@ -104,7 +112,7 @@ void Fin::Runtime::execute()
 
             case Opcode::Cookie:
                 // skip shebang
-                while (readConst<char>() != '\n');
+                while (instrs.at(pc++) != '\n');
                 continue;
 
             case Opcode::Module:
@@ -163,10 +171,9 @@ void Fin::Runtime::execute()
                     if (!execModule)
                         throw std::runtime_error{"no executing module"};
 
-                    auto idx = readConst<uint32_t>();
+                    auto &fn = readFn();
                     auto argSize = readConst<uint16_t>();
 
-                    auto &fn = *execModule->refFunctions.at(idx);
                     call(fn, argSize);
                 }
                 continue;
@@ -293,7 +300,7 @@ void Fin::Runtime::execute()
                 continue;
 
             case Opcode::ConstI:
-                loadConst<uint32_t>();
+                loadConst<int32_t>();
                 continue;
 
             case Opcode::AddI:

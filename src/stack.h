@@ -66,6 +66,8 @@ namespace Fin
 
             val = at<T>(_size - sizeof(T));
             _size -= sizeof(T);
+
+            LOG(std::endl << "  >> " << val);
         }
 
         template<typename T> T pop()
@@ -83,6 +85,8 @@ namespace Fin
             auto addr = _size;
             _size += sizeof(T);
             at<T>(addr) = val;
+
+            LOG(std::endl << "  << " << val);
         }
     };
 }

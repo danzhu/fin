@@ -9,6 +9,7 @@
 #include "allocator.h"
 #include "frame.h"
 #include "function.h"
+#include "log.h"
 #include "module.h"
 #include "stack.h"
 
@@ -28,6 +29,7 @@ namespace Fin
         uint32_t fp;
 
         std::string readStr();
+        Function &readFn();
         void jump(uint32_t target);
         void ret();
         void execute();
@@ -37,6 +39,9 @@ namespace Fin
         template<typename T> T readConst()
         {
             T val = *reinterpret_cast<T*>(&instrs.at(pc));
+
+            LOG(' ' << val);
+
             jump(pc + sizeof(T));
             return val;
         }
