@@ -16,13 +16,19 @@ class Generator:
 
     def generate(self, tree, out):
         self.out = out
+        self.indent = 0
         self._gen(tree)
 
     def _write(self, *args):
-        self.out.write(' '.join(str(a) for a in args) + '\n')
+        self.out.write('  ' * self.indent
+                + ' '.join(str(a) for a in args)
+                + '\n')
 
     def _gen(self, node, level=None):
+        self._write('# {}'.format(node.type))
+        self.indent += 1
         self._gens[node.type](node)
+        self.indent -= 1
         if level is not None:
             self._level(node.expr_type, level)
 
@@ -79,7 +85,7 @@ class Generator:
             self._write('pop', size)
 
     def LET(self, node):
-        self._write('# let {}'.format(node.sym.name))
+        # self._write('# let {}'.format(node.sym.name))
         if node.children[2].type == 'EMPTY':
             self._write('push', node.sym.type.var_size())
         else:
@@ -142,16 +148,28 @@ class Generator:
         self._write(end + ':')
 
     def EXPR(self, node):
-        size = node.children[0].expr_type.size()
+        self._gen(node.children[0])
 
-        self._gen(node.children[0], 0)
+        size = node.children[0].expr_type.size()
         if size > 0:
             self._write('pop', size)
 
     def ASSN(self, node):
         self._gen(node.children[1], node.level) # value
         self._gen(node.children[0], node.level + 1) # id
-        self._write('store_ptr', 0, node.children[1].expr_type.size(node.level))
+        self._write('store_ptr', 0, node.children[0].expr_type.size(node.level))
+
+    def INC_ASSN(self, node):
+        self._gen(node.children[0], 0)
+        self._gen(node.children[1], 0)
+
+        op = node.value.split('_', 1)[0].lower()
+        tp = node.children[0].expr_type.cls.name[0].lower()
+        self._write('{}_{}'.format(op, tp))
+
+        # FIXME: re-evaluation of children is problematic
+        self._gen(node.children[0], 1)
+        self._write('store_ptr', 0, node.children[0].expr_type.size(0))
 
     def CALL(self, node):
         for c in node.children[1:]:

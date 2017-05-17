@@ -27,7 +27,7 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    std::ifstream src{argv[1]};
+    std::ifstream src{argv[1], std::ios::binary};
 
     if (!src)
     {

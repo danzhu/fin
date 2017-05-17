@@ -28,7 +28,7 @@ namespace Fin
         uint32_t fp;
 
         std::string readStr();
-        void jump(int32_t target);
+        void jump(uint32_t target);
         void ret();
         void execute();
         void call(const Function &fn, uint16_t argSize);

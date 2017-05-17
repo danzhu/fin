@@ -19,7 +19,7 @@ class Node:
             content += ' {}'.format(self.value)
         if self.expr_type:
             content += ' [{}]'.format(self.expr_type)
-        if self.level > 0:
+        if self.level:
             content += ' {}'.format(self.level)
         print(content)
         for c in self.children:

@@ -5,11 +5,12 @@
 #include <iostream>
 #include "opcode.h"
 
-void Fin::Runtime::jump(int32_t target)
+void Fin::Runtime::jump(uint32_t target)
 {
+    if (target > instrs.size())
+        throw std::out_of_range{"jump target " + std::to_string(target)
+            + " out of range " + std::to_string(instrs.size())};
     pc = target;
-    if (pc > instrs.size())
-        throw std::out_of_range{"pc out of range"};
 }
 
 std::string Fin::Runtime::readStr()

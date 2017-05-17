@@ -38,11 +38,11 @@
 > comment [ANY] comment
 > comment [LF] start
 type ZERO NUM
-type ADD_ASSN ASSN
-type SUB_ASSN ASSN
-type MULT_ASSN ASSN
-type DIV_ASSN ASSN
-type MOD_ASSN ASSN
+type ADD_ASSN INC_ASSN
+type SUB_ASSN INC_ASSN
+type MULT_ASSN INC_ASSN
+type DIV_ASSN INC_ASSN
+type MOD_ASSN INC_ASSN
 type EQ COMP
 type NE COMP
 type GT COMP

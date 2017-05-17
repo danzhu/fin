@@ -91,15 +91,24 @@ class Parser:
 
         else:
             node = self._test()
-            if self._lookahead.type in ['ASSN', 'COLON']:
+            if self._lookahead.type in ['ASSN', 'INC_ASSN', 'COLON']:
                 lvl = 0
-                while self._lookahead.type == 'COLON':
+
+                tp = self._lookahead.type
+                if tp == 'INC_ASSN':
+                    op = self._lookahead.variant
                     self._next()
-                    lvl += 1
-                op = self._lookahead.variant
-                self._expect('ASSN')
-                r = self._test()
-                node = Node('ASSN', (node, r), op, lvl)
+
+                else:
+                    tp = 'ASSN'
+                    while self._lookahead.type == 'COLON':
+                        self._next()
+                        lvl += 1
+                    op = None
+                    self._expect('ASSN')
+
+                val = self._test()
+                node = Node(tp, (node, val), op, lvl)
 
             elif self._lookahead.type == 'EOL':
                 node = Node('EXPR', (node,))
@@ -120,9 +129,7 @@ class Parser:
             while self._lookahead.type == 'COLON':
                 self._next()
                 lvl += 1
-            if self._lookahead.type != 'ASSN':
-                self._error('expecting assignment')
-            self._next()
+            self._expect('ASSN')
             val = self._test()
 
         elif self._lookahead.type == 'EOL':

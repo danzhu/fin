@@ -1,9 +1,10 @@
 def test()
-    1 + 2
-    let i Int = 1
-    let p Int& := i
-    let j Int = i
-    if i - 1 > 0
-        print(i)
+    let i Int
+    i = -1
+    let j Int&
+    j := i
+    if i < 0
+        j += 2
+    print(i)
 
 test()
