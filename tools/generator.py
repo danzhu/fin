@@ -80,7 +80,7 @@ class Generator:
 
         # pop variables declared in block
         # TODO: RAII
-        size = node.symbol_table.local_offset
+        size = node.symbol_table.offset
         if size > 0:
             self._write('pop', size)
 
@@ -206,10 +206,13 @@ class Generator:
         self._write('const_f', node.value)
 
     def VAR(self, node):
-        if node.sym.location == Location.Frame:
-            self._write('addr_frame', node.sym.offset)
-        elif node.sym.location == Location.Global:
+        if node.sym.location == Location.Global:
             # self._write('addr_glob', node.sym.offset)
             raise NotImplementedError()
+        elif node.sym.location == Location.Param:
+            self._write('addr_frame',
+                    node.sym.offset - node.sym.symbol_table.offset)
+        elif node.sym.location == Location.Local:
+            self._write('addr_frame', node.sym.offset)
         else:
             assert False

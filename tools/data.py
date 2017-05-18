@@ -3,8 +3,9 @@
 from enum import Enum
 
 class Location(Enum):
-    Frame = 0
-    Global = 1
+    Global = 0
+    Param = 1
+    Local = 2
 
 
 class SymbolTable:
@@ -14,15 +15,11 @@ class SymbolTable:
 
         self.symbols = {}
 
-        self.local_offset = 0
-        self.param_offset = 0
+        self.offset = 0
+        self.parent_offset = 0
 
-        if parent is not None and parent.location == loc:
-            self.parent_local_offset = parent.local_offset
-            self.parent_param_offset = parent.param_offset
-        else:
-            self.parent_local_offset = 0
-            self.parent_param_offset = 0
+        if parent and parent.location == loc:
+            self.parent_offset = parent.offset
 
     def _check_exists(self, name):
         if name in self.symbols:
@@ -38,23 +35,13 @@ class SymbolTable:
 
         self.symbols[fn.name] = fn
 
-    def add_param(self, name, tp):
-        assert self.location == Frame
+    def add_variable(self, name, tp):
         self._check_exists(name)
 
-        self.param_offset -= tp.var_size()
-        offset = self.parent_param_offset + self.param_offset
-        var = Variable(name, self.location, offset, tp)
+        offset = self.parent_offset + self.offset
+        var = Variable(name, self.location, offset, tp, self)
         self.symbols[name] = var
-        return var
-
-    def add_local(self, name, tp):
-        self._check_exists(name)
-
-        offset = self.parent_local_offset + self.local_offset
-        var = Variable(name, self.location, offset, tp)
-        self.symbols[name] = var
-        self.local_offset += tp.var_size()
+        self.offset += tp.var_size()
         return var
 
     def get(self, name, tp=None):
@@ -74,11 +61,12 @@ class SymbolTable:
 class Variable:
     TYPE = 'VARIABLE'
 
-    def __init__(self, name, loc, off, tp):
+    def __init__(self, name, loc, off, tp, syms):
         self.name = name
         self.location = loc
         self.offset = off
         self.type = tp
+        self.symbol_table = syms
 
 
 class Class:

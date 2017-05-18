@@ -62,7 +62,6 @@ class Assembler:
     def assemble(self, src, out, name):
         self.refs = set()
         self.functions = []
-        self.self_refs = set()
 
         body = []
         for line in src:
@@ -82,8 +81,7 @@ class Assembler:
             self.instr(body, segs[0], *segs[1:])
 
         ref_list = sorted(self.refs)
-        ref_enum = enumerate(ref_list
-                + [f for f in self.functions if f in self.self_refs])
+        ref_enum = enumerate(ref_list + self.functions)
         refs = { ref: i for i, ref in ref_enum }
 
         head = []
@@ -134,9 +132,7 @@ class Assembler:
                 if ':' in arg:
                     # external reference
                     self.refs.add(arg)
-                else:
-                    # self reference
-                    self.self_refs.add(arg)
+                # else, self reference which we don't need to record
 
             elif arg[0].isalpha():
                 token = Branch(param.type, arg)

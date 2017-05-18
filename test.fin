@@ -7,4 +7,11 @@ def test()
         j += 2
     print(i)
 
-test()
+def fib(n Int) Int
+    if n == 0
+        return 0
+    if n == 1
+        return 1
+    return fib(n - 2) + fib(n - 1)
+
+print(fib(30))

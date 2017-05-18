@@ -67,20 +67,21 @@ class Node:
     def _annotate(self, syms):
         self.annotated = True
 
+        # symbol table
+        if self.type in ['DEF', 'BLOCK']:
+            if self.type == 'DEF':
+                loc = Location.Param
+            elif self.type == 'BLOCK':
+                loc = Location.Local
+
+            syms = SymbolTable(loc, syms)
+            self.symbol_table = syms
+
         # local variable symbol creation
         if self.type in ['PARAM', 'LET']:
             name = self.children[0].value
             tp = self.children[1]._type(syms, True)
-            if self.type == 'PARAM':
-                self.sym = syms.add_param(name, tp)
-            elif self.type == 'LET':
-                self.sym = syms.add_local(name, tp)
-
-        # symbol table
-        if self.type == 'BLOCK':
-            syms = SymbolTable(Location.Frame, syms)
-
-        self.symbol_table = syms
+            self.sym = syms.add_variable(name, tp)
 
         # process children
         for c in self.children:
