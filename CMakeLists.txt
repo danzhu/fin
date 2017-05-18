@@ -14,7 +14,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(DEBUG "Enable debug messages" OFF)
 
 if(DEBUG)
-    add_definitions(-DDEBUG)
+    add_definitions(-DDEBUG=${DEBUG})
 endif()
 
 # warnings

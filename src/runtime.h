@@ -40,7 +40,7 @@ namespace Fin
         {
             T val = *reinterpret_cast<T*>(&instrs.at(pc));
 
-            LOG(' ' << val);
+            LOG(1) << ' ' << val;
 
             jump(pc + sizeof(T));
             return val;

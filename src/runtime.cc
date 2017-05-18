@@ -18,7 +18,7 @@ std::string Fin::Runtime::readStr()
     auto len = readConst<uint16_t>();
     auto val = std::string{&instrs.at(pc), len};
 
-    LOG(" '" << val << "'");
+    LOG(1) << " '" << val << "'";
 
     jump(pc + len);
     return val;
@@ -29,7 +29,7 @@ Fin::Function &Fin::Runtime::readFn()
     auto idx = readConst<uint32_t>();
     auto &fn = *execModule->refFunctions.at(idx);
 
-    LOG(" [" << fn.name << "]");
+    LOG(1) << " [" << fn.name << "]";
 
     return fn;
 }
@@ -99,11 +99,11 @@ void Fin::Runtime::execute()
     execModule = nullptr;
     execFunction = nullptr;
 
-    LOG("Logging execution...");
+    LOG(1) << "Logging at level " << DEBUG << "...";
 
     while (true)
     {
-        LOG(std::endl << '-');
+        LOG(1) << std::endl << '-';
 
         auto op = readConst<Opcode>();
 
@@ -185,7 +185,7 @@ void Fin::Runtime::execute()
                 continue;
 
             case Opcode::Term:
-                LOG(std::endl);
+                LOG(1) << std::endl;
                 return;
 
             case Opcode::Br:

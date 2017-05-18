@@ -45,7 +45,7 @@ namespace Fin
             auto id = static_cast<uint32_t>(ptr >> OFFSET_WIDTH);
             auto offset = ptr & ((UINT64_C(1) << OFFSET_WIDTH) - 1);
 
-            LOG(std::endl << "  * " << id << ':' << offset);
+            LOG(2) << std::endl << "  * " << id << ':' << offset;
 
             auto block = heap.at(id);
             if (block.state == State::Freed || offset + size > block.size)

@@ -45,9 +45,9 @@ namespace Fin
             if (_size + size > _cap)
                 throw std::overflow_error{"stack overflow"};
 
-            LOG(std::endl << "  < ");
-            LOG_HEX(val, size);
-            LOG(" [" << _size << "]");
+            LOG(2) << std::endl << "  < ";
+            LOG_HEX(2, val, size);
+            LOG(2) << " [" << _size << "]";
 
             for (uint32_t i = 0; i < size; ++i)
             {
@@ -65,9 +65,9 @@ namespace Fin
             for (uint32_t i = 0; i < size; ++i)
                 val[i] = _content[_size + i];
 
-            LOG(std::endl << "  > ");
-            LOG_HEX(val, size);
-            LOG(" [" << _size << "]");
+            LOG(2) << std::endl << "  > ";
+            LOG_HEX(2, val, size);
+            LOG(2) << " [" << _size << "]";
         }
 
         template<typename T> T &at(uint32_t idx)
@@ -83,8 +83,8 @@ namespace Fin
             val = at<T>(_size - sizeof(T));
             _size -= sizeof(T);
 
-            LOG(std::endl << "  > " << val);
-            LOG(" [" << _size << "]");
+            LOG(2) << std::endl << "  > " << val;
+            LOG(2) << " [" << _size << "]";
         }
 
         template<typename T> T pop()
@@ -99,8 +99,8 @@ namespace Fin
             if (_size + sizeof(T) > _cap)
                 throw std::overflow_error{"stack overflow"};
 
-            LOG(std::endl << "  < " << val);
-            LOG(" [" << _size << "]");
+            LOG(2) << std::endl << "  < " << val;
+            LOG(2) << " [" << _size << "]";
 
             auto addr = _size;
             _size += sizeof(T);
