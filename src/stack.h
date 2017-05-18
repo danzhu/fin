@@ -41,11 +41,14 @@ namespace Fin
             if (_size + size > _cap)
                 throw std::overflow_error{"stack overflow"};
 
-            for (uint32_t i = 0; i < size; ++i)
-                _content[_size + i] = val[i];
-            _size += size;
+            LOG(std::endl << "  < ");
+            LOG_HEX(val, size);
 
-            LOG(std::endl << "  < size " << size);
+            for (uint32_t i = 0; i < size; ++i)
+            {
+                _content[_size + i] = val[i];
+            }
+            _size += size;
         }
 
         void pop(char *val, uint32_t size)
@@ -57,7 +60,8 @@ namespace Fin
             for (uint32_t i = 0; i < size; ++i)
                 val[i] = _content[_size + i];
 
-            LOG(std::endl << "  > size " << size);
+            LOG(std::endl << "  > ");
+            LOG_HEX(val, size);
         }
 
         template<typename T> T &at(uint32_t idx)
