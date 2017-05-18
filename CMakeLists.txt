@@ -49,6 +49,7 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
 # files
 file(GLOB SOURCES "src/*.cc")
+file(GLOB HEADERS "src/*.h")
 file(GLOB TOOLS "tools/*.py")
 
 # custom commands
@@ -83,7 +84,7 @@ add_custom_command(
     )
 
 # targets
-add_executable(fin ${SOURCES} opcode.h opcode.cc)
+add_executable(fin ${SOURCES} ${HEADERS} opcode.h opcode.cc)
 
 add_custom_target(doc DEPENDS instructions.md)
 

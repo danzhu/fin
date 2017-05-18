@@ -15,9 +15,13 @@ namespace Fin
         uint32_t _cap;
         uint32_t _size = 0;
     public:
-        explicit Stack(uint32_t cap = 256);
+        explicit Stack(uint32_t cap = 256): _content{new char[cap]}, _cap{cap}
+        {}
         Stack(const Stack &other) = delete;
-        ~Stack();
+        ~Stack()
+        {
+            delete[] _content;
+        }
 
         Stack &operator=(const Stack &other) = delete;
 
@@ -43,6 +47,7 @@ namespace Fin
 
             LOG(std::endl << "  < ");
             LOG_HEX(val, size);
+            LOG(" [" << _size << "]");
 
             for (uint32_t i = 0; i < size; ++i)
             {
@@ -62,6 +67,7 @@ namespace Fin
 
             LOG(std::endl << "  > ");
             LOG_HEX(val, size);
+            LOG(" [" << _size << "]");
         }
 
         template<typename T> T &at(uint32_t idx)
@@ -78,6 +84,7 @@ namespace Fin
             _size -= sizeof(T);
 
             LOG(std::endl << "  > " << val);
+            LOG(" [" << _size << "]");
         }
 
         template<typename T> T pop()
@@ -92,11 +99,12 @@ namespace Fin
             if (_size + sizeof(T) > _cap)
                 throw std::overflow_error{"stack overflow"};
 
+            LOG(std::endl << "  < " << val);
+            LOG(" [" << _size << "]");
+
             auto addr = _size;
             _size += sizeof(T);
             at<T>(addr) = val;
-
-            LOG(std::endl << "  < " << val);
         }
     };
 }

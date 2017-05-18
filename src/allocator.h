@@ -14,7 +14,7 @@ namespace Fin
 
     class Allocator
     {
-        const int OFFSET_WIDTH = 32;
+        const uint32_t OFFSET_WIDTH = 32;
 
         enum class State
         {
@@ -42,10 +42,12 @@ namespace Fin
 
         char *deref(Ptr ptr, uint32_t size) const
         {
-            LOG(std::endl << "  * " << ptr);
+            auto id = static_cast<uint32_t>(ptr >> OFFSET_WIDTH);
+            auto offset = ptr & ((UINT64_C(1) << OFFSET_WIDTH) - 1);
 
-            auto block = heap.at(static_cast<uint32_t>(ptr >> OFFSET_WIDTH));
-            auto offset = ptr & ((1l << OFFSET_WIDTH) - 1);
+            LOG(std::endl << "  * " << id << ':' << offset);
+
+            auto block = heap.at(id);
             if (block.state == State::Freed || offset + size > block.size)
                 throw std::runtime_error{"invalid memory access at "
                     + std::to_string(offset + size) + " out of "
