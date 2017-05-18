@@ -5,6 +5,7 @@
 - [ ] static (stack) allocation
 - [ ] invariant validation
 - [ ] function call with blocks
+- [ ] cast operator
 
 ## Language
 - [ ] reference assignment
@@ -18,6 +19,7 @@
 - [ ] exception / error handling
 - [ ] owner assignment
   - [ ] copying / moving
+- [ ] class
 
 ## Compiler
 
