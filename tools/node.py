@@ -174,6 +174,11 @@ class Node:
             for i in range(len(self.fn.params)):
                 self.children[i + 1]._expect_type(self.fn.params[i])
 
+        elif self.type == 'FILE':
+            for c in self.children:
+                if c.expr_type:
+                    c._expect_type(Type(data.NONE))
+
         elif self.type == 'DEF':
             self.children[3]._expect_type(self.fn.ret)
 
@@ -182,6 +187,8 @@ class Node:
 
             for c in self.children[:-1]:
                 c._expect_type(Type(data.NONE))
+
+            self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
             tps = [c.expr_type for c in self.children[1:]]
