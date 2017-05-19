@@ -1,13 +1,11 @@
 # Fin Project Todo List
 
-## Prototype
+## Language
 - [ ] tuple parameter
 - [ ] static (stack) allocation
 - [ ] invariant validation
 - [ ] function call with blocks
 - [ ] cast operator
-
-## Language
 - [ ] reference assignment
   - [x] ~~assign / rebind~~
   - [x] level-based assignment
@@ -17,38 +15,35 @@
   - [ ] array allocation
   - [ ] class instance allocation
 - [ ] exception / error handling
-- [ ] owner assignment
-  - [ ] copying / moving
+- [ ] owner
+  - [ ] copy / move assignment
+  - [ ] optional ownership
 - [ ] class
+- [ ] module
+  - [ ] module version
 
 ## Compiler
 
-### Lexer
 - [ ] line continuation
 - [x] token variant
-
-### Parser
 - [x] unary operations
-- [ ] `continue` / `break`
 - [x] expression statements
 - [x] `let ... =`
-
-### Analyzer
 - [ ] implicit conversion
-- [ ] type checks
+- [x] type checks
 - [ ] include paths
 - [x] ~~prevent calls to functions defined later~~
 - [x] indent scope
 - [ ] function overloads
-
-### Generator
-- [ ] implement `while ... else`
-- [ ] module version
 - [x] generate global code after function defs
+- [ ] loop control
+  - [ ] `continue` / `break`
+  - [ ] `else`
+  - [ ] `redo`
 
 ## Runtime
 - [ ] recycle unused ptrs
 - [x] rename method to function
 - [x] use `std::function` instead of native function ptr
-- [x] globals
+- [ ] globals
 - [ ] remove module index
