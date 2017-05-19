@@ -22,7 +22,8 @@ Make-based configurations this is
 make run
 ```
 
-To enable debug logging in runtime, pass `-DDEBUG` to CMake when configuring.
+To enable debug logging in runtime, pass `-DDEBUG=[level]` to CMake when
+configuring, where `[level]` is the level of details for the log messages.
 
 ## Inspiration
 

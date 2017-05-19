@@ -53,6 +53,7 @@ keyword import IMPORT
 keyword def DEF
 keyword let LET
 keyword if IF
+keyword elif ELIF
 keyword else ELSE
 keyword while WHILE
 keyword return RETURN

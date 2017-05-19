@@ -114,13 +114,25 @@ class Parser:
         cond = self._test()
         self._expect('EOL')
         succ = self._block()
-        if self._lookahead.type == 'ELSE':
+        fail = self._else()
+        return Node('IF', (cond, succ, fail))
+
+    def _else(self):
+        if self._lookahead.type == 'ELIF':
+            self._next()
+            cond = self._test()
+            self._expect('EOL')
+            succ = self._block()
+            fail = self._else()
+            return Node('IF', (cond, succ, fail))
+
+        elif self._lookahead.type == 'ELSE':
             self._next()
             self._expect('EOL')
-            fail = self._block()
+            return self._block()
+
         else:
-            fail = self._empty()
-        return Node('IF', (cond, succ, fail))
+            return self._empty()
 
     def _while(self):
         self._expect('WHILE')
