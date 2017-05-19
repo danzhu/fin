@@ -26,7 +26,7 @@ class Generator:
                 + '\n')
 
     def _gen(self, node):
-        self._write('# {}'.format(node.type))
+        self._write('# {}'.format(node))
 
         self.indent += 1
         self._gens[node.type](node)

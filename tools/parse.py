@@ -127,13 +127,7 @@ class Parser:
         cond = self._test()
         self._expect('EOL')
         cont = self._block()
-        if self._lookahead.type == 'ELSE':
-            self._next()
-            self._expect('EOL')
-            fail = self._block()
-        else:
-            fail = self._empty()
-        return Node('WHILE', (cond, cont, fail))
+        return Node('WHILE', (cond, cont))
 
     def _return(self):
         self._expect('RETURN')
@@ -162,7 +156,10 @@ class Parser:
         while self._lookahead.type != 'DEDENT':
             stmts.append(self._stmt())
         self._next()
-        return Node('BLOCK', stmts)
+        if len(stmts) == 1:
+            return stmts[0]
+        else:
+            return Node('BLOCK', stmts)
 
     def _args(self):
         return Node('ARGS', args)

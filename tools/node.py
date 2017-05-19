@@ -14,8 +14,8 @@ class Node:
         self.expr_type = None
         self.target_type = None
 
-    def print(self, indent=0):
-        content = ' ' * indent + self.type
+    def __str__(self):
+        content = self.type
         if self.value:
             content += ' {}'.format(self.value)
         if self.expr_type:
@@ -24,7 +24,10 @@ class Node:
             content += ' -> [{}]'.format(self.target_type)
         if self.level:
             content += ' {}'.format(self.level)
-        print(content)
+        return content
+
+    def print(self, indent=0):
+        print(' ' * indent + str(self))
         for c in self.children:
             c.print(indent + 2)
 
@@ -41,13 +44,14 @@ class Node:
         assert self.expr_type, '{} does not have an expr type'.format(self.type)
         assert tp
 
-        if self.expr_type.cls != tp.cls:
-            raise TypeError('expecting {}, but got {}'.format(
-                tp,
-                self.expr_type))
+        if not tp.none():
+            if self.expr_type.cls != tp.cls:
+                raise TypeError('expecting {}, but got {}'.format(
+                    tp,
+                    self.expr_type))
 
-        if self.expr_type.level < tp.level:
-            raise TypeError('not enough levels')
+            if self.expr_type.level < tp.level:
+                raise TypeError('not enough levels')
 
         self.target_type = tp
 
@@ -175,6 +179,9 @@ class Node:
 
         elif self.type == 'BLOCK':
             self.expr_type = self.children[-1].expr_type
+
+            for c in self.children[:-1]:
+                c._expect_type(Type(data.NONE))
 
         elif self.type == 'IF':
             tps = [c.expr_type for c in self.children[1:]]
