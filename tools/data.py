@@ -9,9 +9,14 @@ class Location(Enum):
 
 
 class SymbolTable:
-    def __init__(self, loc, parent=None):
+    def __init__(self, loc, parent=None, fn=None):
         self.location = loc
         self.parent = parent
+
+        if fn or not parent:
+            self.function = fn
+        else:
+            self.function = parent.function
 
         self.symbols = {}
 
@@ -135,6 +140,8 @@ BOOL = Class('Bool', 1)
 INT = Class('Int', 4)
 FLOAT = Class('Float', 4)
 
+NUM_TYPES = [INT, FLOAT]
+
 def load_builtins(syms):
     for tp in { NONE, BOOL, INT, FLOAT }:
         syms.add_class(tp)
@@ -143,6 +150,15 @@ def to_type(tp, syms):
     name = tp.rstrip('&')
     lvl = len(tp) - len(name)
     return Type(syms.get(name, 'CLASS'), lvl)
+
+def interpolate_types(tps):
+    cls = tps[0].cls
+    lvl = tps[0].level
+    for tp in tps:
+        if tp.cls != cls:
+            return Type(NONE)
+        lvl = min(lvl, tp.level)
+    return Type(cls, lvl)
 
 def load_module(mod_name, syms):
     # TODO: a better way to locate

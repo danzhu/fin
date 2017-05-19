@@ -1,17 +1,19 @@
-def test()
-    let i Int
-    i = -1
-    let j Int&
-    j := i
-    if i < 0
-        j += 2
-    print(i)
+def test(i Int) Int
+    let j Int
+    j = if i > 0
+        i
+    else
+        0
+    + 1
+    j
 
 def fib(n Int) Int
     if n == 0
-        return 0
-    if n == 1
-        return 1
-    return fib(n - 2) + fib(n - 1)
+        0
+    else
+        if n == 1
+            1
+        else
+            fib(n - 2) + fib(n - 1)
 
-print(fib(30))
+print(fib(20))

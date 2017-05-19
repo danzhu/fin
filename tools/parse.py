@@ -14,10 +14,14 @@ class Parser:
         self._lookahead = next(self._src)
 
     def _expect(self, *types):
+        if len(types) == 0:
+            self._error('unexpected token {}'.format(self._lookahead.type))
+
         if self._lookahead.type not in types:
             self._error('expecting {}, but got {}'.format(
                 ' or '.join(types),
                 self._lookahead.type))
+
         self._next()
 
     def _error(self, msg):
@@ -51,7 +55,6 @@ class Parser:
         params = self._params()
 
         if self._lookahead.type == 'EOL':
-            # TODO: should we create this in _type()?
             ret = Node('TYPE', ())
         else:
             ret = self._type()
@@ -59,6 +62,7 @@ class Parser:
         self._expect('EOL')
 
         cont = self._block()
+        self._expect('EOL')
         return Node('DEF', (name, params, ret, cont))
 
     def _params(self):
@@ -78,46 +82,11 @@ class Parser:
 
     def _stmt(self):
         if self._lookahead.type == 'LET':
-            return self._let()
-
-        elif self._lookahead.type == 'IF':
-            return self._if()
-
-        elif self._lookahead.type == 'WHILE':
-            return self._while()
-
-        elif self._lookahead.type == 'RETURN':
-            return self._return()
-
+            node = self._let()
         else:
             node = self._test()
-            if self._lookahead.type in ['ASSN', 'INC_ASSN', 'COLON']:
-                lvl = 0
-
-                tp = self._lookahead.type
-                if tp == 'INC_ASSN':
-                    op = self._lookahead.variant
-                    self._next()
-
-                else:
-                    tp = 'ASSN'
-                    while self._lookahead.type == 'COLON':
-                        self._next()
-                        lvl += 1
-                    op = None
-                    self._expect('ASSN')
-
-                val = self._test()
-                node = Node(tp, (node, val), op, lvl)
-
-            elif self._lookahead.type == 'EOL':
-                node = Node('EXPR', (node,))
-
-            else:
-                self._expect('ASSN', 'COLON', 'EOL')
-
-            self._expect('EOL')
-            return node
+        self._expect('EOL')
+        return node
 
     def _let(self):
         self._expect('LET')
@@ -136,9 +105,8 @@ class Parser:
             val = self._empty()
 
         else:
-            self._expect('ASSN', 'COLON', 'EOL')
+            self._expect()
 
-        self._expect('EOL')
         return Node('LET', (name, tp, val), None, lvl)
 
     def _if(self):
@@ -173,7 +141,6 @@ class Parser:
             children = ()
         else:
             children = (self._test(),)
-        self._expect('EOL')
         return Node('RETURN', children)
 
     def _param(self):
@@ -201,7 +168,28 @@ class Parser:
         return Node('ARGS', args)
 
     def _test(self):
-        return self._or_test()
+        node = self._or_test()
+
+        if self._lookahead.type not in ['ASSN', 'INC_ASSN', 'COLON']:
+            return node
+
+        lvl = 0
+
+        tp = self._lookahead.type
+        if tp == 'INC_ASSN':
+            op = self._lookahead.variant
+            self._next()
+
+        else:
+            tp = 'ASSN'
+            while self._lookahead.type == 'COLON':
+                self._next()
+                lvl += 1
+            op = None
+            self._expect('ASSN')
+
+        val = self._test()
+        return Node(tp, (node, val), op, lvl)
 
     def _or_test(self):
         node = self._and_test()
@@ -263,9 +251,9 @@ class Parser:
                 return Node('VAR', (), name)
 
             children = [Node('ID', (), name)]
-            self._next()
+            self._next() # LPAREN
             if self._lookahead.type == 'RPAREN':
-                self._next()
+                self._next() # RPAREN
             else:
                 while True:
                     children.append(self._test())
@@ -292,9 +280,17 @@ class Parser:
             self._expect('RPAREN')
             return test
 
+        elif self._lookahead.type == 'IF':
+            return self._if()
+
+        elif self._lookahead.type == 'WHILE':
+            return self._while()
+
+        elif self._lookahead.type == 'RETURN':
+            return self._return()
+
         else:
-            # this will always raise an error
-            self._expect('ID', 'NUM', 'LPAREN')
+            self._expect()
 
     def _id(self):
         name = self._lookahead.value

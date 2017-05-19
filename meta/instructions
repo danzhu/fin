@@ -22,21 +22,18 @@ ref_function name:s
 call fn:r argSize:H
     Call function `fn` of references in executing module.
 
+reduce size:H amount:H
+    Pop value of size `size`, pop `amount` bytes from stack, and then push the
+    value.
+
 return
     Return from the current function.
 
+return_val size:H
+    Return from function with a return value.
+
 term
     Stop program execution. Automatically added to the end of every module.
-
-br offset:h
-    Unconditionally branch to `pc + offset`, where pc is at the end of the
-    instruction.
-
-br_false offset:h
-    Pop boolean from stack and branch if false.
-
-br_true offset:h
-    Pop boolean from stack and branch if true.
 
 alloc
     Pop int from stack, allocate that many bytes of heap memory, and push
@@ -66,8 +63,15 @@ store_ptr offset:I size:H
 addr_frame offset:h
     Load address of frame at `offset` onto stack.
 
-return_val size:H
-    Return from function with a return value.
+br offset:h
+    Unconditionally branch to `pc + offset`, where pc is at the end of the
+    instruction.
+
+br_false offset:h
+    Pop boolean from stack and branch if false.
+
+br_true offset:h
+    Pop boolean from stack and branch if true.
 
 const_false
     Load constant false onto stack.

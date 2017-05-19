@@ -66,13 +66,18 @@ class Lexer:
         ind_amount = 0
         indent = 0
         ln = 0
+        prevEmpty = False
         # TODO: line continuation
         for line in src:
             ln += 1
 
             stripped = line.strip()
-            # TODO: remove this hack
-            if len(stripped) == 0 or stripped[0] == '#':
+
+            if len(stripped) == 0:
+                prevEmpty = True
+                continue
+
+            if stripped[0] == '#':
                 continue
 
             new_indent = len(line) - len(line.lstrip())
@@ -89,10 +94,14 @@ class Lexer:
             elif new_indent < indent:
                 if (indent - new_indent) % ind_amount != 0:
                     raise Exception('wrong dedent')
+
                 for i in range((indent - new_indent) // ind_amount):
                     yield Token('DEDENT', ln, 0)
+                    if prevEmpty:
+                        yield Token('EOL', ln, 0)
 
             indent = new_indent
+            prevEmpty = False
 
             start = 0
             end = 0
@@ -137,5 +146,6 @@ class Lexer:
         if ind_amount > 0:
             for i in range(indent // ind_amount):
                 yield Token('DEDENT', ln, 0)
+                yield Token('EOL', ln, 0)
 
         yield Token('EOF', ln, 0)

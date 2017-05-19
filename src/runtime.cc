@@ -180,42 +180,34 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
+            case Opcode::Reduce:
+                {
+                    auto size = readConst<uint16_t>();
+                    auto amount = readConst<uint16_t>();
+
+                    auto idx = opStack.size() - (amount + size);
+                    opStack.pop(opStack.at(idx, size), size);
+                    opStack.resize(opStack.size() - amount + size);
+                }
+                continue;
+
             case Opcode::Return:
                 ret();
                 continue;
 
+            case Opcode::ReturnVal:
+                {
+                    auto size = readConst<uint16_t>();
+                    std::unique_ptr<char[]> val{new char[size]};
+                    opStack.pop(val.get(), size);
+                    ret();
+                    opStack.push(val.get(), size);
+                }
+                continue;
+
             case Opcode::Term:
-                LOG(1) << std::endl;
+                LOG(1) << std::endl << "Terminating..." << std::endl;
                 return;
-
-            case Opcode::Br:
-                {
-                    auto offset = readConst<int16_t>();
-                    auto target = pc + offset;
-
-                    jump(target);
-                }
-                continue;
-
-            case Opcode::BrFalse:
-                {
-                    auto offset = readConst<int16_t>();
-                    auto target = pc + offset;
-
-                    if (!opStack.pop<bool>())
-                        jump(target);
-                }
-                continue;
-
-            case Opcode::BrTrue:
-                {
-                    auto offset = readConst<int16_t>();
-                    auto target = pc + offset;
-
-                    if (opStack.pop<bool>())
-                        jump(target);
-                }
-                continue;
 
             case Opcode::Alloc:
                 opStack.push(alloc.alloc(opStack.pop<int32_t>()));
@@ -284,13 +276,32 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
-            case Opcode::ReturnVal:
+            case Opcode::Br:
                 {
-                    auto size = readConst<uint16_t>();
-                    std::unique_ptr<char[]> val{new char[size]};
-                    opStack.pop(val.get(), size);
-                    ret();
-                    opStack.push(val.get(), size);
+                    auto offset = readConst<int16_t>();
+                    auto target = pc + offset;
+
+                    jump(target);
+                }
+                continue;
+
+            case Opcode::BrFalse:
+                {
+                    auto offset = readConst<int16_t>();
+                    auto target = pc + offset;
+
+                    if (!opStack.pop<bool>())
+                        jump(target);
+                }
+                continue;
+
+            case Opcode::BrTrue:
+                {
+                    auto offset = readConst<int16_t>();
+                    auto target = pc + offset;
+
+                    if (opStack.pop<bool>())
+                        jump(target);
                 }
                 continue;
 

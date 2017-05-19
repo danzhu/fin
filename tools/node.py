@@ -12,6 +12,7 @@ class Node:
         self.level = lvl
 
         self.expr_type = None
+        self.target_type = None
 
     def print(self, indent=0):
         content = ' ' * indent + self.type
@@ -19,6 +20,8 @@ class Node:
             content += ' {}'.format(self.value)
         if self.expr_type:
             content += ' [{}]'.format(self.expr_type)
+        if self.target_type:
+            content += ' -> [{}]'.format(self.target_type)
         if self.level:
             content += ' {}'.format(self.level)
         print(content)
@@ -34,7 +37,18 @@ class Node:
 
         self._annotate(syms)
 
-    def _expect_type(self, *tps):
+    def _expect_type(self, tp):
+        if self.expr_type.cls != tp.cls:
+            raise TypeError('expecting {}, but got {}'.format(
+                tp.name,
+                self.expr_type))
+
+        if self.expr_type.level < tp.level:
+            raise TypeError('not enough levels')
+
+        self.target_type = tp
+
+    def _expect_types(self, *tps):
         if self.expr_type.cls not in tps:
             raise TypeError('expecting {}, but got {}'.format(
                 ' or '.join(tp.name for tp in tps),
@@ -47,6 +61,8 @@ class Node:
                 self.expr_type.level))
 
     def _decl(self, syms, mod):
+        assert self.type == 'DEF'
+
         name = self.children[0].value
         params = [p.children[1]._type(syms) for p in self.children[1].children]
         ret = self.children[2]._type(syms)
@@ -68,13 +84,11 @@ class Node:
         self.annotated = True
 
         # symbol table
-        if self.type in ['DEF', 'BLOCK']:
-            if self.type == 'DEF':
-                loc = Location.Param
-            elif self.type == 'BLOCK':
-                loc = Location.Local
-
-            syms = SymbolTable(loc, syms)
+        if self.type == 'DEF':
+            syms = SymbolTable(Location.Param, syms, self.fn)
+            self.symbol_table = syms
+        elif self.type == 'BLOCK':
+            syms = SymbolTable(Location.Local, syms)
             self.symbol_table = syms
 
         # local variable symbol creation
@@ -99,27 +113,42 @@ class Node:
             self.expr_type = Type(data.FLOAT)
 
         elif self.type == 'TEST':
-            self.children[0]._expect_type(data.BOOL)
-            self.children[1]._expect_type(data.BOOL)
+            self.children[0]._expect_type(Type(data.BOOL))
+            self.children[1]._expect_type(Type(data.BOOL))
 
             self.expr_type = Type(data.BOOL)
 
         elif self.type == 'BIN':
-            self.children[0]._expect_type(data.INT, data.FLOAT)
-            self.children[1]._expect_type(self.children[0].expr_type.cls)
+            self.children[0]._expect_types(*data.NUM_TYPES)
 
-            self.expr_type = Type(self.children[0].expr_type.cls)
+            tp = Type(self.children[0].expr_type.cls)
+            self.children[0]._expect_type(tp)
+            self.children[1]._expect_type(tp)
+
+            self.expr_type = tp
 
         elif self.type == 'UNARY':
-            self.children[0]._expect_type(data.INT, data.FLOAT)
+            self.children[0]._expect_types(*data.NUM_TYPES)
 
             self.expr_type = Type(self.children[0].expr_type.cls)
 
         elif self.type == 'COMP':
-            self.children[0]._expect_type(data.INT, data.FLOAT)
-            self.children[1]._expect_type(self.children[0].expr_type.cls)
+            self.children[0]._expect_types(*data.NUM_TYPES)
+
+            tp = Type(self.children[0].expr_type.cls)
+            self.children[0]._expect_type(tp)
+            self.children[1]._expect_type(tp)
 
             self.expr_type = Type(data.BOOL)
+
+        elif self.type == 'ASSN':
+            tp = Type(self.children[0].expr_type.cls, self.level + 1)
+            self.children[0]._expect_type(tp)
+
+            tp = Type(self.children[0].expr_type.cls, self.level)
+            self.children[1]._expect_type(tp)
+
+            self.expr_type = Type(data.NONE)
 
         elif self.type == 'CALL':
             self.fn = syms.get(self.children[0].value, 'FUNCTION')
@@ -127,11 +156,35 @@ class Node:
             self.arg_size = sum(c.size() for c in self.fn.params)
 
             for i in range(len(self.fn.params)):
-                self.children[i + 1]._expect_type(self.fn.params[i].cls)
+                self.children[i + 1]._expect_type(self.fn.params[i])
+
+        elif self.type == 'DEF':
+            self.children[3]._expect_type(self.fn.ret)
+
+        elif self.type == 'BLOCK':
+            self.expr_type = self.children[-1].expr_type
+
+        elif self.type == 'IF':
+            tps = [c.expr_type for c in self.children[1:]]
+            self.expr_type = data.interpolate_types(tps)
+            # update children as well
+            self.children[1]._expect_type(self.expr_type)
+            self.children[2]._expect_type(self.expr_type)
+
+        elif self.type == 'WHILE':
+            self.expr_type = Type(data.NONE)
+            self.children[1]._expect_type(self.expr_type)
+
+        elif self.type == 'RETURN':
+            self.expr_type = Type(data.NONE)
+            self.children[0]._expect_type(syms.function.ret)
+
+        elif self.type == 'EMPTY':
+            self.expr_type = Type(data.NONE)
 
         # type checks
         if self.type in ['IF', 'WHILE']:
-            self.children[0]._expect_type(data.BOOL)
+            self.children[0]._expect_type(Type(data.BOOL))
 
         elif self.type == 'LET':
             if self.children[2].type != 'EMPTY':

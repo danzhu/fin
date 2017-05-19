@@ -30,7 +30,7 @@
 ### Parser
 - [x] unary operations
 - [ ] `continue` / `break`
-- [ ] expression statements
+- [x] expression statements
 - [x] `let ... =`
 
 ### Analyzer
