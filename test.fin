@@ -1,11 +1,12 @@
 def test(i Int) Int
-    let j Int
-    j = if i > 0
-        i
-    else
+    while if i < 0
         0
-    + 1
-    j
+    else
+        i
+    < 5
+        i += 1
+
+    i
 
 def fib(n Int) Int
     if n == 0
@@ -16,4 +17,4 @@ def fib(n Int) Int
         else
             fib(n - 2) + fib(n - 1)
 
-print(fib(20))
+print(test(-2))

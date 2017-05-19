@@ -38,9 +38,12 @@ class Node:
         self._annotate(syms)
 
     def _expect_type(self, tp):
+        assert self.expr_type, '{} does not have an expr type'.format(self.type)
+        assert tp
+
         if self.expr_type.cls != tp.cls:
             raise TypeError('expecting {}, but got {}'.format(
-                tp.name,
+                tp,
                 self.expr_type))
 
         if self.expr_type.level < tp.level:
@@ -146,6 +149,15 @@ class Node:
             self.children[0]._expect_type(tp)
 
             tp = Type(self.children[0].expr_type.cls, self.level)
+            self.children[1]._expect_type(tp)
+
+            self.expr_type = Type(data.NONE)
+
+        elif self.type == 'INC_ASSN':
+            tp = Type(self.children[0].expr_type.cls, 1)
+            self.children[0]._expect_type(tp)
+
+            tp = Type(self.children[0].expr_type.cls)
             self.children[1]._expect_type(tp)
 
             self.expr_type = Type(data.NONE)

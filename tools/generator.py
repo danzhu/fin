@@ -179,7 +179,10 @@ class Generator:
         self._cast(node)
 
     def INC_ASSN(self, node):
+        size = node.children[0].expr_type.size(0)
+
         self._gen(node.children[0])
+        self._write('load_ptr', 0, size)
         self._gen(node.children[1])
 
         op = node.value.split('_', 1)[0].lower()
@@ -188,7 +191,7 @@ class Generator:
 
         # FIXME: re-evaluation of children is problematic
         self._gen(node.children[0])
-        self._write('store_ptr', 0, node.children[0].expr_type.size(0))
+        self._write('store_ptr', 0, size)
 
         self._cast(node)
 
