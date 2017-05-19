@@ -95,10 +95,15 @@ class Lexer:
                 if (indent - new_indent) % ind_amount != 0:
                     raise Exception('wrong dedent')
 
-                for i in range((indent - new_indent) // ind_amount):
+                # end all blocks except the last one
+                for i in range((indent - new_indent) // ind_amount - 1):
                     yield Token('DEDENT', ln, 0)
-                    if prevEmpty:
-                        yield Token('EOL', ln, 0)
+                    yield Token('EOL', ln, 0)
+
+                # also end the last block is followed by an empty line
+                yield Token('DEDENT', ln, 0)
+                if prevEmpty:
+                    yield Token('EOL', ln, 0)
 
             indent = new_indent
             prevEmpty = False
