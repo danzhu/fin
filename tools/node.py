@@ -186,19 +186,21 @@ class Node:
             self.expr_type = self.children[-1].expr_type
 
             for c in self.children[:-1]:
-                c._expect_type(Type(data.NONE))
+                if c.expr_type:
+                    c._expect_type(Type(data.NONE))
 
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
             tps = [c.expr_type for c in self.children[1:]]
             self.expr_type = data.interpolate_types(tps)
-            # update children as well
+            self.children[0]._expect_type(Type(data.BOOL))
             self.children[1]._expect_type(self.expr_type)
             self.children[2]._expect_type(self.expr_type)
 
         elif self.type == 'WHILE':
             self.expr_type = Type(data.NONE)
+            self.children[0]._expect_type(Type(data.BOOL))
             self.children[1]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
@@ -208,13 +210,10 @@ class Node:
         elif self.type == 'EMPTY':
             self.expr_type = Type(data.NONE)
 
-        # type checks
-        if self.type in ['IF', 'WHILE']:
-            self.children[0]._expect_type(Type(data.BOOL))
-
         elif self.type == 'LET':
             if self.children[2].type != 'EMPTY':
                 if self.sym.type.level != self.level + 1:
                     raise TypeError('initialization level mismatch')
-                self.children[2]._expect_type(self.sym.type.cls)
+                tp = Type(self.sym.type.cls, self.level)
+                self.children[2]._expect_type(tp)
                 self.children[2]._expect_level(self.level)

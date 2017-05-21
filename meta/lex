@@ -46,7 +46,7 @@ type MOD_ASSN INC_ASSN
 type EQ COMP
 type NE COMP
 type GT COMP
-type GE Comp
+type GE COMP
 type LT COMP
 type LE COMP
 keyword import IMPORT
