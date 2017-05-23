@@ -141,6 +141,11 @@ class Parser:
         cont = self._block()
         return Node('WHILE', (cond, cont))
 
+    def _begin(self):
+        self._expect('BEGIN')
+        self._expect('EOL')
+        return self._block()
+
     def _return(self):
         self._expect('RETURN')
         if self._lookahead.type == 'EOL':
@@ -294,6 +299,9 @@ class Parser:
 
         elif self._lookahead.type == 'WHILE':
             return self._while()
+
+        elif self._lookahead.type == 'BEGIN':
+            return self._begin()
 
         elif self._lookahead.type == 'RETURN':
             return self._return()

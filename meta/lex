@@ -56,6 +56,7 @@ keyword if IF
 keyword elif ELIF
 keyword else ELSE
 keyword while WHILE
+keyword begin BEGIN
 keyword return RETURN
 keyword and AND
 keyword or OR

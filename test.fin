@@ -1,14 +1,10 @@
-def test(i Int) Int
-    while (if i < 0
-        0 != 0
-    else
-        i < 5
-    )
-        i += 1
-
-    inc(i)
-
-    i
+def test()
+    let i Int
+    while begin
+        i = input()
+        i
+    > 0
+        print(i)
 
 def fib(n Int) Int
     if n == 0
@@ -27,4 +23,4 @@ def fib(n Int) Int
 def inc(i Int&)
     i = i + 1
 
-print(test(5))
+test()
