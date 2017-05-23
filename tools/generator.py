@@ -261,14 +261,26 @@ class Generator:
         self._cast(node)
 
     def VAR(self, node):
-        if node.sym.location in [Location.Global, Location.Module]:
+        if node.sym.TYPE == 'CONSTANT':
+            if node.sym.cls == data.BOOL:
+                if node.sym.value:
+                    self._write('const_true')
+                else:
+                    self._write('const_false')
+            else:
+                raise NotImplementedError()
+
+        elif node.sym.location in [Location.Global, Location.Module]:
             # self._write('addr_glob', node.sym.offset)
             raise NotImplementedError()
+
         elif node.sym.location == Location.Param:
             self._write('addr_frame',
                     node.sym.offset - node.sym.symbol_table.offset)
+
         elif node.sym.location == Location.Local:
             self._write('addr_frame', node.sym.offset)
+
         else:
             assert False
 

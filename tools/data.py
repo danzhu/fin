@@ -52,13 +52,18 @@ class SymbolTable:
         self.offset += tp.var_size()
         return var
 
-    def get(self, name, tp=None):
+    def add_constant(self, const):
+        self._check_exists(const.name)
+
+        self.symbols[const.name] = const
+
+    def get(self, name, *tps):
         if name in self.symbols:
             sym = self.symbols[name]
 
-            if tp is not None and sym.TYPE != tp:
-                raise LookupError('expected {}, but got {} "{}"'.format(
-                    tp, sym.TYPE, name))
+            if sym.TYPE not in tps:
+                raise TypeError('expected {}, but got {} "{}"'.format(
+                    ' or '.join(tps), sym.TYPE, name))
 
             if self.location == Location.Global:
                 self.references.add(sym)
@@ -66,7 +71,7 @@ class SymbolTable:
             return sym
 
         elif self.parent:
-            return self.parent.get(name, tp)
+            return self.parent.get(name, *tps)
         else:
             raise KeyError('cannot find symbol "{}"'.format(name))
 
@@ -80,6 +85,17 @@ class Variable:
         self.offset = off
         self.type = tp
         self.symbol_table = syms
+
+
+class Constant:
+    TYPE = 'CONSTANT'
+
+    def __init__(self, name, cls, val):
+        self.name = name
+        self.cls = cls
+        self.value = val
+
+        self.type = Type(cls)
 
 
 class Class:
@@ -148,11 +164,16 @@ BOOL = Class('Bool', 1)
 INT = Class('Int', 4)
 FLOAT = Class('Float', 4)
 
+TRUE = Constant('TRUE', BOOL, True)
+FALSE = Constant('FALSE', BOOL, False)
+
 NUM_TYPES = [INT, FLOAT]
 
 def load_builtins(syms):
     for tp in { NONE, BOOL, INT, FLOAT }:
         syms.add_class(tp)
+    for const in { TRUE, FALSE }:
+        syms.add_constant(const)
 
 def to_type(tp, syms):
     name = tp.rstrip('&')

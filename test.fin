@@ -1,10 +1,10 @@
 def test()
-    let i Int
-    while begin
-        i = input()
-        i
-    > 0
-        print(i)
+    let b Bool = FALSE
+    if b
+        print(0)
+
+    if TRUE
+        print(1)
 
 def fib(n Int) Int
     if n == 0

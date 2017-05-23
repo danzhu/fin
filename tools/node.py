@@ -115,7 +115,7 @@ class Node:
 
         # expr type
         if self.type == 'VAR':
-            self.sym = syms.get(self.value)
+            self.sym = syms.get(self.value, 'VARIABLE', 'CONSTANT')
             self.expr_type = self.sym.type
 
         elif self.type == 'NUM':
