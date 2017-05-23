@@ -32,12 +32,6 @@ class Node:
             c.print(indent + 2)
 
     def analyze(self, syms):
-        mod = Module('')
-
-        for c in self.children:
-            if c.type == 'DEF':
-                c._decl(syms, mod)
-
         self._annotate(syms)
 
     def _expect_type(self, tp):
@@ -91,9 +85,20 @@ class Node:
         self.annotated = True
 
         # symbol table
-        if self.type == 'DEF':
+        if self.type == 'FILE':
+            syms = SymbolTable(Location.Module, syms)
+
+            mod = Module('')
+            for c in self.children:
+                if c.type == 'DEF':
+                    c._decl(syms, mod)
+
+            self.symbol_table = syms
+
+        elif self.type == 'DEF':
             syms = SymbolTable(Location.Param, syms, self.fn)
             self.symbol_table = syms
+
         elif self.type == 'BLOCK':
             syms = SymbolTable(Location.Local, syms)
             self.symbol_table = syms

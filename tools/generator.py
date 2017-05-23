@@ -15,8 +15,9 @@ class Generator:
 
         self._labels = {}
 
-    def generate(self, tree, out):
+    def generate(self, tree, name, out):
         self.out = out
+        self.module_name = name
         self.indent = 0
         self._gen(tree)
 
@@ -55,6 +56,24 @@ class Generator:
         return '{}_{}'.format(name, count)
 
     def FILE(self, node):
+        # external scope
+        ext = node.symbol_table.parent
+        assert ext.location == Location.Global
+        ref_list = sorted(str(ref) for ref in ext.references if ref.TYPE ==
+                'FUNCTION')
+
+        self._write('module', self.module_name)
+
+        module = None
+        for ref in ref_list:
+            [mod, fn] = ref.split(':', 1)
+
+            if module != mod:
+                self._write('ref_module', mod)
+                module = mod
+
+            self._write('ref_function', fn)
+
         for c in node.children:
             if c.type == 'DEF':
                 self._gen(c)
@@ -67,10 +86,10 @@ class Generator:
 
     def IMPORT(self, node):
         # TODO
+        assert False
         pass
 
     def DEF(self, node):
-        # TODO: share variable across AFTER
         end = 'END_FN_' + str(node.fn)
 
         self._write('function', str(node.fn), end)
@@ -242,7 +261,7 @@ class Generator:
         self._cast(node)
 
     def VAR(self, node):
-        if node.sym.location == Location.Global:
+        if node.sym.location in [Location.Global, Location.Module]:
             # self._write('addr_glob', node.sym.offset)
             raise NotImplementedError()
         elif node.sym.location == Location.Param:

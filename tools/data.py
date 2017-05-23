@@ -4,8 +4,9 @@ from enum import Enum
 
 class Location(Enum):
     Global = 0
-    Param = 1
-    Local = 2
+    Module = 1
+    Param = 2
+    Local = 3
 
 
 class SymbolTable:
@@ -13,12 +14,14 @@ class SymbolTable:
         self.location = loc
         self.parent = parent
 
+        # for checking return type
         if fn or not parent:
             self.function = fn
         else:
             self.function = parent.function
 
         self.symbols = {}
+        self.references = set()
 
         self.offset = 0
         self.parent_offset = 0
@@ -52,11 +55,16 @@ class SymbolTable:
     def get(self, name, tp=None):
         if name in self.symbols:
             sym = self.symbols[name]
-            if tp is None or sym.TYPE == tp:
-                return sym
 
-            raise LookupError('expected {}, but got {} "{}"'.format(
-                tp, sym.TYPE, name))
+            if tp is not None and sym.TYPE != tp:
+                raise LookupError('expected {}, but got {} "{}"'.format(
+                    tp, sym.TYPE, name))
+
+            if self.location == Location.Global:
+                self.references.add(sym)
+
+            return sym
+
         elif self.parent:
             return self.parent.get(name, tp)
         else:

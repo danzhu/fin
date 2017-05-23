@@ -42,14 +42,14 @@ class Compiler:
             return
 
         with io.StringIO() as assembly:
-            self.generator.generate(root, assembly)
+            self.generator.generate(root, name, assembly)
 
             if stage == 'asm':
                 print(assembly.getvalue())
                 return
 
             assembly.seek(0)
-            self.assembler.assemble(assembly, out.buffer, name)
+            self.assembler.assemble(assembly, out.buffer)
 
             if stage == 'exec':
                 return

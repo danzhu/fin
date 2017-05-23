@@ -40,6 +40,7 @@
   - [ ] `continue` / `break`
   - [ ] `else`
   - [ ] `redo`
+- [ ] levelled equality comparison
 
 ## Runtime
 - [ ] recycle unused ptrs

@@ -59,11 +59,13 @@ class Assembler:
     def __init__(self):
         self.instrs = {ins.opname: ins for ins in instr.load()}
 
-    def assemble(self, src, out, name):
-        self.refs = set()
-        self.functions = []
+    def assemble(self, src, out):
+        self.tokens = []
+        self.references = []
 
-        body = []
+        # shebang
+        self.tokens.append(Bytes(b'#!/usr/bin/env fin\n'))
+
         for line in src:
             line = line.strip()
             if line == '':
@@ -72,56 +74,43 @@ class Assembler:
             segs = line.split(' ')
 
             while len(segs) > 0 and segs[0][-1] == ':':
-                body.append(Label(segs[0][:-1]))
+                self.tokens.append(Label(segs[0][:-1]))
                 segs = segs[1:]
 
             if segs == [] or segs[0] == '#':
                 continue
 
-            self.instr(body, segs[0], *segs[1:])
+            self.instr(segs[0], *segs[1:])
 
-        ref_list = sorted(self.refs)
-        ref_enum = enumerate(ref_list + self.functions)
-        refs = { ref: i for i, ref in ref_enum }
+        refs = { ref: i for i, ref in enumerate(self.references) }
 
-        head = []
-        head.append(Bytes(b'#!/usr/bin/env fin\n'))
-        self.instr(head, 'module', name)
-
-        module = None
-        for ref in ref_list:
-            [mod, fn] = ref.split(':', 1)
-
-            if module != mod:
-                self.instr(head, 'ref_module', mod)
-                module = mod
-
-            self.instr(head, 'ref_function', fn)
-
-        tokens = head + body
         syms = {}
         location = 0
 
         # two-pass approach since labels need to be calculated first
-        for token in tokens:
+        for token in self.tokens:
             token.resolve(location, syms)
             location += token.size
 
-        for token in tokens:
+        for token in self.tokens:
             token.write(out, syms, refs)
 
-    def instr(self, tokens, opname, *args):
+    def instr(self, opname, *args):
         ins = self.instrs[opname]
         token = Bytes(encode('B', ins.opcode))
-        tokens.append(token)
+        self.tokens.append(token)
 
         if len(args) != len(ins.params):
             raise ValueError('incorrect number of arguments')
 
-        if opname == 'function':
-            # record declared function so that the references are in correct
-            # order
-            self.functions.append(args[0])
+        if opname == 'ref_module':
+            self.ref_module = args[0]
+
+        elif opname == 'ref_function':
+            self.references.append('{}:{}'.format(self.ref_module, args[0]))
+
+        elif opname == 'function':
+            self.references.append(args[0])
 
         for param, arg in zip(ins.params, args):
             if param.type == 's':
@@ -129,10 +118,6 @@ class Assembler:
 
             elif param.type == 'r':
                 token = Reference(arg)
-                if ':' in arg:
-                    # external reference
-                    self.refs.add(arg)
-                # else, self reference which we don't need to record
 
             elif arg[0].isalpha():
                 token = Branch(param.type, arg)
@@ -143,7 +128,7 @@ class Assembler:
             else:
                 token = Bytes(encode(param.type, int(arg, 0)))
 
-            tokens.append(token)
+            self.tokens.append(token)
 
 
 def encode(fmt, val):
