@@ -30,19 +30,20 @@ class Compiler:
         syms = SymbolTable(Location.Global)
         data.load_builtins(syms)
         data.load_module('fin', syms)
+        refs = set()
 
         if stage == 'parse':
             root.print()
             return
 
-        root.analyze(syms)
+        root.analyze(name, syms, refs)
 
         if stage == 'ast':
             root.print()
             return
 
         with io.StringIO() as assembly:
-            self.generator.generate(root, name, assembly)
+            self.generator.generate(root, name, refs, assembly)
 
             if stage == 'asm':
                 print(assembly.getvalue())

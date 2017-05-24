@@ -31,9 +31,9 @@ class Node:
         for c in self.children:
             c.print(indent + 2)
 
-    def analyze(self, syms):
-        self._analyze_acquire(syms)
-        self._analyze_expect()
+    def analyze(self, mod_name, syms, refs):
+        self._analyze_acquire(mod_name, syms, refs)
+        self._analyze_expect(refs)
 
     def _expect_type(self, tp):
         if tp.match(self.expr_type) == 0:
@@ -68,7 +68,7 @@ class Node:
             lvl += 1
         return Type(tp, lvl)
 
-    def _resolve_overload(self, required=False):
+    def _resolve_overload(self, refs, required=False):
         if self.fn is not None:
             return
 
@@ -80,6 +80,9 @@ class Node:
             self.expr_type = self.fn.ret
             self.arg_size = sum(c.size() for c in self.fn.params)
 
+            # record usage for ref generation
+            refs.add(self.fn)
+
         elif not required:
             pass
 
@@ -90,17 +93,17 @@ class Node:
             raise LookupError('cannot resolve function overload between'
                     + ''.join('\n  ' + str(fn) for fn in fns))
 
-    def _analyze_acquire(self, syms):
+    def _analyze_acquire(self, mod_name, syms, refs):
         self.annotated = True
 
         # symbol table
         if self.type == 'FILE':
             syms = SymbolTable(Location.Module, syms)
 
-            mod = Module('')
+            self.module = Module(mod_name)
             for c in self.children:
                 if c.type == 'DEF':
-                    c._decl(syms, mod)
+                    c._decl(syms, self.module)
 
             self.symbol_table = syms
 
@@ -120,7 +123,7 @@ class Node:
 
         # process children
         for c in self.children:
-            c._analyze_acquire(syms)
+            c._analyze_acquire(mod_name, syms, refs)
 
         # expr type
         if self.type == 'VAR':
@@ -154,7 +157,7 @@ class Node:
         elif self.type == 'CALL':
             self.fn_group = syms.get(self.children[0].value, 'FN_GROUP')
             self.fn = None
-            self._resolve_overload()
+            self._resolve_overload(refs)
 
         elif self.type == 'BLOCK':
             self.expr_type = self.children[-1].expr_type
@@ -172,7 +175,7 @@ class Node:
         elif self.type == 'EMPTY':
             self.expr_type = Type(data.NONE)
 
-    def _analyze_expect(self):
+    def _analyze_expect(self, refs):
         if self.type == 'TEST':
             self.children[0]._expect_type(Type(data.BOOL))
             self.children[1]._expect_type(Type(data.BOOL))
@@ -209,7 +212,7 @@ class Node:
             self.children[1]._expect_type(tp)
 
         elif self.type == 'CALL':
-            self._resolve_overload(True)
+            self._resolve_overload(refs, True)
             for i in range(len(self.fn.params)):
                 self.children[i + 1]._expect_type(self.fn.params[i])
 
@@ -250,4 +253,4 @@ class Node:
 
         # recurse
         for c in self.children:
-            c._analyze_expect()
+            c._analyze_expect(refs)

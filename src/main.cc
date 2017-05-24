@@ -2,14 +2,16 @@
 #include <iostream>
 #include "runtime.h"
 
+template<typename T>
 void print(Fin::Runtime &rt, Fin::Stack &st)
 {
-    std::cout << st.pop<int32_t>() << std::endl;
+    std::cout << st.pop<T>() << std::endl;
 }
 
+template<typename T>
 void input(Fin::Runtime &rt, Fin::Stack &st)
 {
-    int32_t val;
+    T val;
     std::cin >> val;
     st.push(val);
 }
@@ -38,8 +40,12 @@ int main(int argc, const char *argv[])
     Fin::Runtime runtime;
 
     auto &fin = runtime.createModule("fin");
-    fin.addFunction("print(Int)", Fin::Function{print});
-    fin.addFunction("input()Int", Fin::Function{input});
+    fin.addFunction("print(Int)", Fin::Function{print<int32_t>});
+    fin.addFunction("print(Float)", Fin::Function{print<float>});
+    fin.addFunction("print(Bool)", Fin::Function{print<bool>});
+    fin.addFunction("input()Int", Fin::Function{input<int32_t>});
+    fin.addFunction("input()Float", Fin::Function{input<float>});
+    fin.addFunction("input()Bool", Fin::Function{input<bool>});
     fin.addFunction("backtrace()", Fin::Function{backtrace});
 
     try

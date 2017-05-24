@@ -15,9 +15,11 @@ class Generator:
 
         self._labels = {}
 
-    def generate(self, tree, name, out):
-        self.out = out
+    def generate(self, tree, name, refs, out):
         self.module_name = name
+        self.refs = refs
+        self.out = out
+
         self.indent = 0
         self._gen(tree)
 
@@ -56,11 +58,8 @@ class Generator:
         return '{}_{}'.format(name, count)
 
     def FILE(self, node):
-        # external scope
-        ext = node.symbol_table.parent
-        assert ext.location == Location.Global
-        ref_list = sorted(str(ref) for ref in ext.references if ref.TYPE ==
-                'FUNCTION')
+        ref_list = sorted(str(ref) for ref in self.refs if ref.module !=
+                node.module)
 
         self._write('module', self.module_name)
 

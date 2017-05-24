@@ -1,6 +1,7 @@
 def test()
-    let i Int = input()
-    i = input()
+    sum(1, input())
+    let j Float = sum(2., input())
+    print(j)
 
 def sum(a Int, b Int) Int
     a + b
@@ -11,5 +12,4 @@ def sum(a Int, b Int)
 def sum(a Float, b Float) Float
     a + b
 
-sum(1, input())
-let j Int = sum(2, input())
+test()

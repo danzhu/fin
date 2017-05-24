@@ -21,7 +21,6 @@ class SymbolTable:
             self.function = parent.function
 
         self.symbols = {}
-        self.references = set()
 
         self.offset = 0
         self.parent_offset = 0
@@ -70,9 +69,6 @@ class SymbolTable:
             if sym.TYPE not in tps:
                 raise TypeError('expected {}, but got {} "{}"'.format(
                     ' or '.join(tps), sym.TYPE, name))
-
-            if self.location == Location.Global:
-                self.references.add(sym)
 
             return sym
 
@@ -225,7 +221,7 @@ class Function:
         if ret is not None:
             lvl = ret.match(self.ret)
         else:
-            lvl = 1
+            lvl = 4
 
         for i in range(len(params)):
             lvl = min(lvl, self.params[i].match(params[i]))
