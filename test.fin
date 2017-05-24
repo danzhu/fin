@@ -1,26 +1,14 @@
 def test()
-    let b Bool = FALSE
-    if b
-        print(0)
+    let i Int = input()
+    i = input()
 
-    if TRUE
-        print(1)
+def sum(a Int, b Int) Int
+    a + b
 
-def fib(n Int) Int
-    if n == 0
-        0
-    elif n == 1
-        1
-    else
-        fib(n - 2) + fib(n - 1)
+def sum(a Int, b Int)
+    a
 
-# def list()
-#     l.map |e|
-#         e->Str
-#     .filter |e|
-#         e.length > 0
+def sum(a Float, b Float) Float
+    a + b
 
-def inc(i Int&)
-    i = i + 1
-
-test()
+sum(1, input())

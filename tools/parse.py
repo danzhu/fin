@@ -173,10 +173,7 @@ class Parser:
         while self._lookahead.type != 'DEDENT':
             stmts.append(self._stmt())
         self._next()
-        if len(stmts) == 1:
-            return stmts[0]
-        else:
-            return Node('BLOCK', stmts)
+        return Node('BLOCK', stmts)
 
     def _args(self):
         return Node('ARGS', args)

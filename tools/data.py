@@ -39,9 +39,15 @@ class SymbolTable:
         self.symbols[cls.name] = cls
 
     def add_function(self, fn):
-        self._check_exists(fn.name)
+        if fn.name in self.symbols:
+            group = self.symbols[fn.name]
+            if group.TYPE != 'FN_GROUP':
+                raise KeyError('redefining non-function as function')
+        else:
+            group = FunctionGroup(fn.name)
+            self.symbols[group.name] = group
 
-        self.symbols[fn.name] = fn
+        group.add(fn)
 
     def add_variable(self, name, tp):
         self._check_exists(name)
@@ -129,6 +135,23 @@ class Type:
     def none(self):
         return self.cls.size == 0 and self.level == 0
 
+    def accept(self, tp):
+        # everything can be cast to None
+        if self.none():
+            return True
+
+        # (Python's) None value denotes unknown type
+        if tp is None or tp.none():
+            return True
+
+        if self.cls != tp.cls:
+            return False
+
+        if self.level > tp.level:
+            return False
+
+        return True
+
 
 class Module:
     TYPE = 'MODULE'
@@ -142,9 +165,26 @@ class Module:
         self.functions[fn.name] = fn
 
 
-class Function:
-    TYPE = 'FUNCTION'
+class FunctionGroup:
+    TYPE = 'FN_GROUP'
 
+    def __init__(self, name):
+        self.name = name
+        self.functions = set()
+
+    def add(self, fn):
+        self.functions.add(fn)
+
+    def resolve(self, params, ret):
+        fns = set()
+        for fn in self.functions:
+            if fn.match(params, ret):
+                fns.add(fn)
+
+        return fns
+
+
+class Function:
     def __init__(self, mod, name, params, ret):
         self.module = mod
         self.name = name
@@ -157,6 +197,19 @@ class Function:
                 self.name,
                 ','.join(str(param) for param in self.params),
                 self.ret if not self.ret.none() else '')
+
+    def match(self, params, ret):
+        if len(self.params) != len(params):
+            return False
+
+        for i in range(len(params)):
+            if not self.params[i].accept(params[i]):
+                return False
+
+        if not self.ret.accept(ret):
+            return False
+
+        return True
 
 
 NONE = Class('None', 0)

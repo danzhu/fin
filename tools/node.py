@@ -32,20 +32,13 @@ class Node:
             c.print(indent + 2)
 
     def analyze(self, syms):
-        self._annotate(syms)
+        self._analyze_acquire(syms)
+        self._analyze_expect()
 
     def _expect_type(self, tp):
-        assert self.expr_type, '{} does not have an expr type'.format(self.type)
-        assert tp
-
-        if not tp.none():
-            if self.expr_type.cls != tp.cls:
-                raise TypeError('expecting {}, but got {}'.format(
-                    tp,
-                    self.expr_type))
-
-            if self.expr_type.level < tp.level:
-                raise TypeError('not enough levels')
+        if not tp.accept(self.expr_type):
+            raise TypeError('{} cannot be converted to {}'.format(
+                self.expr_type, tp))
 
         self.target_type = tp
 
@@ -54,12 +47,6 @@ class Node:
             raise TypeError('expecting {}, but got {}'.format(
                 ' or '.join(tp.name for tp in tps),
                 self.expr_type))
-
-    def _expect_level(self, lvl):
-        if self.expr_type.level < lvl:
-            raise TypeError('expecting level {}, but got level {}'.format(
-                lvl,
-                self.expr_type.level))
 
     def _decl(self, syms, mod):
         assert self.type == 'DEF'
@@ -81,7 +68,21 @@ class Node:
             lvl += 1
         return Type(tp, lvl)
 
-    def _annotate(self, syms):
+    def _resolve_overload(self, required=False):
+        params = [c.expr_type for c in self.children[1:]]
+        fns = self.fn_group.resolve(params, self.target_type)
+
+        if len(fns) == 1:
+            self.fn = fns.pop()
+            self.expr_type = self.fn.ret
+            self.arg_size = sum(c.size() for c in self.fn.params)
+        elif required:
+            msg = 'cannot resolve function overload'
+            if len(fns) > 0:
+                msg += ' between' + ''.join('\n  ' + str(fn) for fn in fns)
+            raise LookupError(msg)
+
+    def _analyze_acquire(self, syms):
         self.annotated = True
 
         # symbol table
@@ -111,7 +112,7 @@ class Node:
 
         # process children
         for c in self.children:
-            c._annotate(syms)
+            c._analyze_acquire(syms)
 
         # expr type
         if self.type == 'VAR':
@@ -125,10 +126,47 @@ class Node:
             self.expr_type = Type(data.FLOAT)
 
         elif self.type == 'TEST':
+            self.expr_type = Type(data.BOOL)
+
+        elif self.type == 'BIN':
+            self.expr_type = Type(self.children[0].expr_type.cls)
+
+        elif self.type == 'UNARY':
+            self.expr_type = Type(self.children[0].expr_type.cls)
+
+        elif self.type == 'COMP':
+            self.expr_type = Type(data.BOOL)
+
+        elif self.type == 'ASSN':
+            self.expr_type = Type(data.NONE)
+
+        elif self.type == 'INC_ASSN':
+            self.expr_type = Type(data.NONE)
+
+        elif self.type == 'CALL':
+            self.fn_group = syms.get(self.children[0].value, 'FN_GROUP')
+            self._resolve_overload()
+
+        elif self.type == 'BLOCK':
+            self.expr_type = self.children[-1].expr_type
+
+        elif self.type == 'IF':
+            tps = [c.expr_type for c in self.children[1:]]
+            self.expr_type = data.interpolate_types(tps)
+
+        elif self.type == 'WHILE':
+            self.expr_type = Type(data.NONE)
+
+        elif self.type == 'RETURN':
+            self.expr_type = Type(data.NONE)
+
+        elif self.type == 'EMPTY':
+            self.expr_type = Type(data.NONE)
+
+    def _analyze_expect(self):
+        if self.type == 'TEST':
             self.children[0]._expect_type(Type(data.BOOL))
             self.children[1]._expect_type(Type(data.BOOL))
-
-            self.expr_type = Type(data.BOOL)
 
         elif self.type == 'BIN':
             self.children[0]._expect_types(*data.NUM_TYPES)
@@ -137,12 +175,8 @@ class Node:
             self.children[0]._expect_type(tp)
             self.children[1]._expect_type(tp)
 
-            self.expr_type = tp
-
         elif self.type == 'UNARY':
             self.children[0]._expect_types(*data.NUM_TYPES)
-
-            self.expr_type = Type(self.children[0].expr_type.cls)
 
         elif self.type == 'COMP':
             self.children[0]._expect_types(*data.NUM_TYPES)
@@ -151,16 +185,12 @@ class Node:
             self.children[0]._expect_type(tp)
             self.children[1]._expect_type(tp)
 
-            self.expr_type = Type(data.BOOL)
-
         elif self.type == 'ASSN':
             tp = Type(self.children[0].expr_type.cls, self.level + 1)
             self.children[0]._expect_type(tp)
 
             tp = Type(self.children[0].expr_type.cls, self.level)
             self.children[1]._expect_type(tp)
-
-            self.expr_type = Type(data.NONE)
 
         elif self.type == 'INC_ASSN':
             tp = Type(self.children[0].expr_type.cls, 1)
@@ -169,51 +199,40 @@ class Node:
             tp = Type(self.children[0].expr_type.cls)
             self.children[1]._expect_type(tp)
 
-            self.expr_type = Type(data.NONE)
-
         elif self.type == 'CALL':
-            self.fn = syms.get(self.children[0].value, 'FUNCTION')
-            self.expr_type = self.fn.ret
-            self.arg_size = sum(c.size() for c in self.fn.params)
-
+            self._resolve_overload(True)
             for i in range(len(self.fn.params)):
                 self.children[i + 1]._expect_type(self.fn.params[i])
 
         elif self.type == 'FILE':
             for c in self.children:
-                if c.expr_type:
+                if c.expr_type is not None:
                     c._expect_type(Type(data.NONE))
 
         elif self.type == 'DEF':
             self.children[3]._expect_type(self.fn.ret)
 
         elif self.type == 'BLOCK':
-            self.expr_type = self.children[-1].expr_type
-
             for c in self.children[:-1]:
-                if c.expr_type:
+                if c.expr_type is not None:
                     c._expect_type(Type(data.NONE))
 
-            self.children[-1]._expect_type(self.expr_type)
+            self.expr_type = self.target_type
+
+            if self.children[-1].expr_type is not None:
+                self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
-            tps = [c.expr_type for c in self.children[1:]]
-            self.expr_type = data.interpolate_types(tps)
             self.children[0]._expect_type(Type(data.BOOL))
             self.children[1]._expect_type(self.expr_type)
             self.children[2]._expect_type(self.expr_type)
 
         elif self.type == 'WHILE':
-            self.expr_type = Type(data.NONE)
             self.children[0]._expect_type(Type(data.BOOL))
             self.children[1]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
-            self.expr_type = Type(data.NONE)
             self.children[0]._expect_type(syms.function.ret)
-
-        elif self.type == 'EMPTY':
-            self.expr_type = Type(data.NONE)
 
         elif self.type == 'LET':
             if self.children[2].type != 'EMPTY':
@@ -221,4 +240,7 @@ class Node:
                     raise TypeError('initialization level mismatch')
                 tp = Type(self.sym.type.cls, self.level)
                 self.children[2]._expect_type(tp)
-                self.children[2]._expect_level(self.level)
+
+        # recurse
+        for c in self.children:
+            c._analyze_expect()
