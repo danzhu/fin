@@ -135,22 +135,32 @@ class Type:
     def none(self):
         return self.cls.size == 0 and self.level == 0
 
-    def accept(self, tp):
-        # everything can be cast to None
-        if self.none():
-            return True
+    def match(self, tp):
+        # 0: type mismatch
+        # 1: casting to none
+        # 2: level reduction
+        # 3: exact match
+        # 4: unknown
 
         # (Python's) None value denotes unknown type
-        if tp is None or tp.none():
-            return True
+        if tp is None:
+            return 4
 
         if self.cls != tp.cls:
-            return False
+            if self.none():
+                # everything can be cast to None
+                return 1
+            else:
+                # otherwise, type mismatch
+                return 0
 
         if self.level > tp.level:
-            return False
+            return 0
 
-        return True
+        if self.level < tp.level:
+            return 2
+
+        return 3
 
 
 class Module:
@@ -177,9 +187,19 @@ class FunctionGroup:
 
     def resolve(self, params, ret):
         fns = set()
+        max_lvl = 1
+
         for fn in self.functions:
-            if fn.match(params, ret):
-                fns.add(fn)
+            lvl = fn.match(params, ret)
+
+            if lvl < max_lvl:
+                continue
+
+            if lvl > max_lvl:
+                max_lvl = lvl
+                fns = set()
+
+            fns.add(fn)
 
         return fns
 
@@ -200,16 +220,17 @@ class Function:
 
     def match(self, params, ret):
         if len(self.params) != len(params):
-            return False
+            return 0
+
+        if ret is not None:
+            lvl = ret.match(self.ret)
+        else:
+            lvl = 1
 
         for i in range(len(params)):
-            if not self.params[i].accept(params[i]):
-                return False
+            lvl = min(lvl, self.params[i].match(params[i]))
 
-        if not self.ret.accept(ret):
-            return False
-
-        return True
+        return lvl
 
 
 NONE = Class('None', 0)

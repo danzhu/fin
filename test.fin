@@ -12,3 +12,4 @@ def sum(a Float, b Float) Float
     a + b
 
 sum(1, input())
+let j Int = sum(2, input())

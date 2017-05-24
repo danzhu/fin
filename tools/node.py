@@ -36,7 +36,7 @@ class Node:
         self._analyze_expect()
 
     def _expect_type(self, tp):
-        if not tp.accept(self.expr_type):
+        if tp.match(self.expr_type) == 0:
             raise TypeError('{} cannot be converted to {}'.format(
                 self.expr_type, tp))
 
@@ -69,6 +69,9 @@ class Node:
         return Type(tp, lvl)
 
     def _resolve_overload(self, required=False):
+        if self.fn is not None:
+            return
+
         params = [c.expr_type for c in self.children[1:]]
         fns = self.fn_group.resolve(params, self.target_type)
 
@@ -76,11 +79,16 @@ class Node:
             self.fn = fns.pop()
             self.expr_type = self.fn.ret
             self.arg_size = sum(c.size() for c in self.fn.params)
-        elif required:
-            msg = 'cannot resolve function overload'
-            if len(fns) > 0:
-                msg += ' between' + ''.join('\n  ' + str(fn) for fn in fns)
-            raise LookupError(msg)
+
+        elif not required:
+            pass
+
+        elif len(fns) == 0:
+            raise LookupError('no viable function overload')
+
+        else:
+            raise LookupError('cannot resolve function overload between'
+                    + ''.join('\n  ' + str(fn) for fn in fns))
 
     def _analyze_acquire(self, syms):
         self.annotated = True
@@ -145,6 +153,7 @@ class Node:
 
         elif self.type == 'CALL':
             self.fn_group = syms.get(self.children[0].value, 'FN_GROUP')
+            self.fn = None
             self._resolve_overload()
 
         elif self.type == 'BLOCK':
@@ -206,16 +215,14 @@ class Node:
 
         elif self.type == 'FILE':
             for c in self.children:
-                if c.expr_type is not None:
-                    c._expect_type(Type(data.NONE))
+                c._expect_type(Type(data.NONE))
 
         elif self.type == 'DEF':
             self.children[3]._expect_type(self.fn.ret)
 
         elif self.type == 'BLOCK':
             for c in self.children[:-1]:
-                if c.expr_type is not None:
-                    c._expect_type(Type(data.NONE))
+                c._expect_type(Type(data.NONE))
 
             self.expr_type = self.target_type
 
