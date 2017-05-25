@@ -129,6 +129,9 @@ class Type:
         return self.size(self.level - 1)
 
     def none(self):
+        return self.cls == NONE and self.level == 0
+
+    def empty(self):
         return self.cls.size == 0 and self.level == 0
 
     def match(self, tp):
@@ -166,6 +169,9 @@ class Module:
         # TODO: version
         self.name = name
         self.functions = {}
+
+    def __lt__(self, other):
+        return self.name < other.name
 
     def add_function(self, fn):
         self.functions[fn.name] = fn
@@ -208,8 +214,7 @@ class Function:
         self.ret = ret
 
     def __str__(self):
-        return '{}{}({}){}'.format(
-                self.module.name + ':' if self.module.name else '',
+        return '{}({}){}'.format(
                 self.name,
                 ','.join(str(param) for param in self.params),
                 self.ret if not self.ret.none() else '')

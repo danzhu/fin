@@ -49,7 +49,7 @@ class Generator:
                 l -= 1
                 self._write('load_ptr', 0, tp.size(l))
 
-        elif not tp.none():
+        elif not tp.empty():
             self._write('pop', tp.size())
 
     def _label(self, name):
@@ -58,17 +58,15 @@ class Generator:
         return '{}_{}'.format(name, count)
 
     def FILE(self, node):
-        ref_list = sorted(str(ref) for ref in self.refs if ref.module !=
-                node.module)
+        ref_list = sorted((ref.module, str(ref)) for ref in self.refs
+                if ref.module != node.module)
 
         self._write('module', self.module_name)
 
         module = None
-        for ref in ref_list:
-            [mod, fn] = ref.split(':', 1)
-
+        for mod, fn in ref_list:
             if module != mod:
-                self._write('ref_module', mod)
+                self._write('ref_module', mod.name)
                 module = mod
 
             self._write('ref_function', fn)
@@ -216,7 +214,8 @@ class Generator:
         for c in node.children[1:]:
             self._gen(c)
 
-        self._write('call', str(node.fn), node.arg_size)
+        fn = '{}:{}'.format(node.fn.module.name, node.fn)
+        self._write('call', fn, node.arg_size)
 
         self._cast(node)
 

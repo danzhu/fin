@@ -109,8 +109,11 @@ class Assembler:
         elif opname == 'ref_function':
             self.references.append('{}:{}'.format(self.ref_module, args[0]))
 
+        elif opname == 'module':
+            self.module = args[0]
+
         elif opname == 'function':
-            self.references.append(args[0])
+            self.references.append('{}:{}'.format(self.module, args[0]))
 
         for param, arg in zip(ins.params, args):
             if param.type == 's':
