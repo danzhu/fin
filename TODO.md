@@ -34,7 +34,8 @@
 - [ ] include paths
 - [x] ~~prevent calls to functions defined later~~
 - [x] indent scope
-- [ ] function overloads
+- [x] function overloads
+  - [ ] operator overloads
 - [x] generate global code after function defs
 - [ ] loop control
   - [ ] `continue` / `break`

@@ -11,6 +11,7 @@ class Node:
         # TODO: maybe this should be stored somewhere else?
         self.level = lvl
 
+        self.fn = None
         self.expr_type = None
         self.target_type = None
 
@@ -18,6 +19,8 @@ class Node:
         content = self.type
         if self.value:
             content += ' {}'.format(self.value)
+        if self.fn:
+            content += ' {}'.format(self.fn)
         if self.expr_type:
             content += ' [{}]'.format(self.expr_type)
         if self.target_type:
@@ -27,9 +30,9 @@ class Node:
         return content
 
     def print(self, indent=0):
-        print(' ' * indent + str(self))
+        print('  ' * indent + str(self))
         for c in self.children:
-            c.print(indent + 2)
+            c.print(indent + 1)
 
     def analyze(self, mod_name, syms, refs):
         self._analyze_acquire(mod_name, syms, refs)
@@ -82,6 +85,9 @@ class Node:
 
             # record usage for ref generation
             refs.add(self.fn)
+
+            for i in range(len(self.fn.params)):
+                self.children[i + 1]._expect_type(self.fn.params[i])
 
         elif not required:
             pass
@@ -156,8 +162,6 @@ class Node:
 
         elif self.type == 'CALL':
             self.fn_group = syms.get(self.children[0].value, 'FN_GROUP')
-            self.fn = None
-            self._resolve_overload(refs)
 
         elif self.type == 'BLOCK':
             self.expr_type = self.children[-1].expr_type
@@ -212,9 +216,7 @@ class Node:
             self.children[1]._expect_type(tp)
 
         elif self.type == 'CALL':
-            self._resolve_overload(refs, True)
-            for i in range(len(self.fn.params)):
-                self.children[i + 1]._expect_type(self.fn.params[i])
+            self._resolve_overload(refs)
 
         elif self.type == 'FILE':
             for c in self.children:
@@ -224,13 +226,12 @@ class Node:
             self.children[3]._expect_type(self.fn.ret)
 
         elif self.type == 'BLOCK':
+            self.expr_type = self.target_type
+
             for c in self.children[:-1]:
                 c._expect_type(Type(data.NONE))
 
-            self.expr_type = self.target_type
-
-            if self.children[-1].expr_type is not None:
-                self.children[-1]._expect_type(self.expr_type)
+            self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
             self.children[0]._expect_type(Type(data.BOOL))
@@ -254,3 +255,6 @@ class Node:
         # recurse
         for c in self.children:
             c._analyze_expect(refs)
+
+        if self.type == 'CALL':
+            self._resolve_overload(refs, True)
