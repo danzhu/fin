@@ -11,12 +11,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(DEBUG "Enable debug messages" OFF)
-
-if(DEBUG)
-    add_definitions(-DDEBUG=${DEBUG})
-endif()
-
 # warnings
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
@@ -91,3 +85,10 @@ add_custom_target(doc DEPENDS instructions.md)
 add_custom_target(run
     COMMAND fin ${CMAKE_CURRENT_BINARY_DIR}/test.fm
     DEPENDS test.fm)
+
+# options
+option(DEBUG "Enable debug messages" OFF)
+
+if(DEBUG)
+    target_compile_definitions(fin PRIVATE DEBUG=${DEBUG})
+endif()
