@@ -47,7 +47,7 @@ class Generator:
             l = tp.level
             while l > tar.level:
                 l -= 1
-                self._write('load_ptr', 0, tp.size(l))
+                self._write('load', tp.size(l))
 
         elif not tp.empty():
             self._write('pop', tp.size())
@@ -58,8 +58,13 @@ class Generator:
         return '{}_{}'.format(name, count)
 
     def FILE(self, node):
-        ref_list = sorted((ref.module, str(ref)) for ref in self.refs
-                if ref.module != node.module)
+        ref_list = []
+        for ref in self.refs:
+            mod = ref.ancestor(Location.Module)
+            if mod != node.module:
+                ref_list.append((mod, str(ref)))
+
+        ref_list.sort()
 
         self._write('module', self.module_name)
 
@@ -77,7 +82,7 @@ class Generator:
                 self._write('')
 
         for c in node.children:
-            if c.type != 'DEF':
+            if c.type not in ['STRUCT', 'DEF']:
                 self._gen(c)
                 self._write('')
 
@@ -87,15 +92,15 @@ class Generator:
         pass
 
     def DEF(self, node):
-        end = 'END_FN_' + str(node.fn)
+        end = 'END_FN_' + str(node.function)
 
-        self._write('function', str(node.fn), end)
+        self._write('function', str(node.function), end)
         self._gen(node.children[3])
 
-        if node.fn.ret.none():
+        if node.function.ret.none():
             self._write('return')
         else:
-            self._write('return_val', node.fn.ret.size())
+            self._write('return_val', node.function.ret.size())
 
         self._write(end + ':')
         self._write('')
@@ -109,7 +114,7 @@ class Generator:
 
         # pop variables declared in block
         # TODO: RAII
-        size = node.symbol_table.offset
+        size = node.block.offset
         if size > 0:
             if node.expr_type.none():
                 self._write('pop', size)
@@ -119,7 +124,7 @@ class Generator:
     def LET(self, node):
         # self._write('# let {}'.format(node.sym.name))
         if node.children[2].type == 'EMPTY':
-            self._write('push', node.sym.type.var_size())
+            self._write('push', node.sym.type.size())
         else:
             self._gen(node.children[2])
 
@@ -189,7 +194,7 @@ class Generator:
         self._gen(node.children[1]) # value
         self._gen(node.children[0]) # id
 
-        self._write('store_ptr', 0, node.children[0].expr_type.size(node.level))
+        self._write('store', node.children[0].expr_type.size(node.level))
 
         self._cast(node)
 
@@ -197,7 +202,7 @@ class Generator:
         size = node.children[0].expr_type.size(0)
 
         self._gen(node.children[0])
-        self._write('load_ptr', 0, size)
+        self._write('load', size)
         self._gen(node.children[1])
 
         op = node.value.split('_', 1)[0].lower()
@@ -206,7 +211,7 @@ class Generator:
 
         # FIXME: re-evaluation of children is problematic
         self._gen(node.children[0])
-        self._write('store_ptr', 0, size)
+        self._write('store', size)
 
         self._cast(node)
 
@@ -214,8 +219,14 @@ class Generator:
         for c in node.children[1:]:
             self._gen(c)
 
-        fn = '{}:{}'.format(node.fn.module.name, node.fn)
-        self._write('call', fn, node.arg_size)
+        self._write('call', node.function.fullname(), node.arg_size)
+
+        self._cast(node)
+
+    def MEMBER(self, node):
+        self._gen(node.children[0])
+
+        self._write('offset', node.field.offset)
 
         self._cast(node)
 
@@ -268,13 +279,13 @@ class Generator:
             else:
                 raise NotImplementedError()
 
-        elif node.sym.location in [Location.Global, Location.Module]:
+        elif node.sym.location == Location.Module:
             # self._write('addr_glob', node.sym.offset)
             raise NotImplementedError()
 
         elif node.sym.location == Location.Param:
             self._write('addr_frame',
-                    node.sym.offset - node.sym.symbol_table.offset)
+                    node.sym.offset)
 
         elif node.sym.location == Location.Local:
             self._write('addr_frame', node.sym.offset)

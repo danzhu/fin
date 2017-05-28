@@ -15,6 +15,7 @@
 > start < LT
 > start > GT
 > start \ BACKSLASH
+> start . DOT
 > start , COMMA
 > start [SPACE] start
 > start # comment
@@ -50,6 +51,7 @@ type GE COMP
 type LT COMP
 type LE COMP
 keyword import IMPORT
+keyword struct STRUCT
 keyword def DEF
 keyword let LET
 keyword if IF

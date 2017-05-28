@@ -7,7 +7,7 @@ from parse import Parser
 from generator import Generator
 from asm import Assembler
 import data
-from data import Location, SymbolTable
+from data import Location, Module
 
 class Compiler:
     def __init__(self, lex):
@@ -27,9 +27,8 @@ class Compiler:
 
         root = self.parser.parse(tokens)
 
-        syms = SymbolTable(Location.Global)
-        data.load_builtins(syms)
-        data.load_module('fin', syms)
+        glob = data.load_builtins()
+        syms = data.load_module('fin', glob)
         refs = set()
 
         if stage == 'parse':

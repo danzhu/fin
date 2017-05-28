@@ -38,6 +38,8 @@ class Parser:
                 children.append(self._import())
             elif self._lookahead.type == 'DEF':
                 children.append(self._def())
+            elif self._lookahead.type == 'STRUCT':
+                children.append(self._struct())
             else:
                 children.append(self._stmt())
         return Node('FILE', children)
@@ -47,6 +49,28 @@ class Parser:
         name = self._id()
         self._expect('EOL')
         return Node('IMPORT', (name,))
+
+    def _struct(self):
+        self._expect('STRUCT')
+        name = self._id()
+        self._expect('EOL')
+        fields = self._fields()
+        return Node('STRUCT', (name, fields))
+
+    def _fields(self):
+        self._expect('INDENT')
+        children = []
+        while self._lookahead.type != 'DEDENT':
+            children.append(self._field())
+        self._next() # DEDENT
+        self._expect('EOL')
+        return Node('FIELDS', children)
+
+    def _field(self):
+        name = self._id()
+        tp = self._type()
+        self._expect('EOL')
+        return Node('FIELD', (name, tp))
 
     def _def(self):
         self._expect('DEF')
@@ -257,33 +281,36 @@ class Parser:
     def _atom(self):
         if self._lookahead.type == 'ID':
             name = self._lookahead.value
-            self._expect('ID')
-            if self._lookahead.type != 'LPAREN':
-                return Node('VAR', (), name)
+            self._next() # ID
 
-            children = [Node('ID', (), name)]
-            self._next() # LPAREN
-            if self._lookahead.type == 'RPAREN':
-                self._next() # RPAREN
-            else:
-                while True:
-                    children.append(self._test())
+            if self._lookahead.type == 'LPAREN':
+                children = [Node('ID', (), name)]
+                self._next() # LPAREN
+                if self._lookahead.type == 'RPAREN':
+                    self._next() # RPAREN
+                else:
+                    while True:
+                        children.append(self._test())
 
-                    tp = self._lookahead.type
-                    self._expect('COMMA', 'RPAREN')
-                    if tp == 'RPAREN':
-                        break
-            return Node('CALL', children)
+                        tp = self._lookahead.type
+                        self._expect('COMMA', 'RPAREN')
+                        if tp == 'RPAREN':
+                            break
+                return Node('CALL', children)
 
-        elif self._lookahead.type == 'NUM':
+            node = Node('VAR', (), name)
+            while self._lookahead.type == 'DOT':
+                self._next() # DOT
+                field = self._id()
+                node = Node('MEMBER', (node, field))
+
+            return node
+
+        elif self._lookahead.type in ['NUM', 'FLOAT']:
+            tp = self._lookahead.type
             val = self._lookahead.value
             self._next()
-            return Node('NUM', (), val)
-
-        elif self._lookahead.type == 'FLOAT':
-            val = self._lookahead.value
-            self._next()
-            return Node('FLOAT', (), val)
+            return Node(tp, (), val)
 
         elif self._lookahead.type == 'LPAREN':
             self._next()

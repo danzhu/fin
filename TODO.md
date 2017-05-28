@@ -18,7 +18,6 @@
 - [ ] owner
   - [ ] copy / move assignment
   - [ ] optional ownership
-- [ ] class
 - [ ] module
   - [ ] module version
 
@@ -36,12 +35,21 @@
 - [x] indent scope
 - [x] function overloads
   - [ ] operator overloads
+  - [ ] level promotion
 - [x] generate global code after function defs
 - [ ] loop control
   - [ ] `continue` / `break`
   - [ ] `else`
   - [ ] `redo`
 - [ ] levelled equality comparison
+- [x] unify module / struct / function to symbol table
+  - [x] remove context in symbol table
+- [ ] struct
+  - [x] declaration
+  - [x] field access
+  - [ ] initialization
+  - [ ] member function
+  - [ ] destructor
 
 ## Runtime
 - [ ] recycle unused ptrs

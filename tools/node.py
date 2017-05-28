@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import data
-from data import Location, SymbolTable, Type, Module, Function
+from data import Location, Symbol, Type, Module, Function, Class, Block
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=None):
@@ -11,7 +11,7 @@ class Node:
         # TODO: maybe this should be stored somewhere else?
         self.level = lvl
 
-        self.fn = None
+        self.function = None
         self.expr_type = None
         self.target_type = None
 
@@ -19,8 +19,8 @@ class Node:
         content = self.type
         if self.value:
             content += ' {}'.format(self.value)
-        if self.fn:
-            content += ' {}'.format(self.fn)
+        if self.function:
+            content += ' {}'.format(self.function)
         if self.expr_type:
             content += ' [{}]'.format(self.expr_type)
         if self.target_type:
@@ -38,56 +38,72 @@ class Node:
         self._analyze_acquire(mod_name, syms, refs)
         self._analyze_expect(refs)
 
+    def _error(self, msg, *args):
+        msg = msg.format(*args)
+        raise RuntimeError(msg)
+
     def _expect_type(self, tp):
         if tp.match(self.expr_type) == 0:
-            raise TypeError('{} cannot be converted to {}'.format(
-                self.expr_type, tp))
+            self._error('{} cannot be converted to {}', self.expr_type, tp)
 
         self.target_type = tp
 
     def _expect_types(self, *tps):
         if self.expr_type.cls not in tps:
-            raise TypeError('expecting {}, but got {}'.format(
+            self._error('expecting {}, but got {}',
                 ' or '.join(tp.name for tp in tps),
-                self.expr_type))
+                self.expr_type)
 
-    def _decl(self, syms, mod):
-        assert self.type == 'DEF'
+    def _decl(self, mod):
+        if self.type == 'DEF':
+            name = self.children[0].value
+            ret = self.children[2]._type(mod)
+            self.function = Function(name, ret)
+            for p in self.children[1].children:
+                name = p.children[0].value
+                tp = p.children[1]._type(mod)
+                self.function.add_variable(name, tp)
+            mod.add_function(self.function)
 
-        name = self.children[0].value
-        params = [p.children[1]._type(syms) for p in self.children[1].children]
-        ret = self.children[2]._type(syms)
-        self.fn = Function(mod, name, params, ret)
-        syms.add_function(self.fn)
+        elif self.type == 'STRUCT':
+            name = self.children[0].value
+            self.struct = Class(name)
+            for f in self.children[1].children:
+                name = f.children[0].value
+                tp = f.children[1]._type(mod)
+                self.struct.add_variable(name, tp)
+            mod.add_class(self.struct)
 
-    def _type(self, syms, var=False):
+        else:
+            assert False, 'unknown declaration'
+
+    def _type(self, syms):
         if len(self.children) == 0:
             tp = data.NONE
             lvl = 0
         else:
-            tp = syms.get(self.children[0].value, 'CLASS')
+            tp = syms.get(self.children[0].value, Symbol.Class)
             lvl = self.level
-        if var:
-            lvl += 1
+
         return Type(tp, lvl)
 
     def _resolve_overload(self, refs, required=False):
-        if self.fn is not None:
+        if self.function is not None:
             return
 
         params = [c.expr_type for c in self.children[1:]]
         fns = self.fn_group.resolve(params, self.target_type)
 
         if len(fns) == 1:
-            self.fn = fns.pop()
-            self.expr_type = self.fn.ret
-            self.arg_size = sum(c.size() for c in self.fn.params)
+            self.function = fns.pop()
+            self.expr_type = self.function.ret
+            self.arg_size = sum(c.type.size() for c in self.function.params)
 
             # record usage for ref generation
-            refs.add(self.fn)
+            refs.add(self.function)
 
-            for i in range(len(self.fn.params)):
-                self.children[i + 1]._expect_type(self.fn.params[i])
+            for i in range(len(self.function.params)):
+                self.children[i + 1]._expect_type(self.function.params[i].type)
 
         elif not required:
             pass
@@ -104,27 +120,28 @@ class Node:
 
         # symbol table
         if self.type == 'FILE':
-            syms = SymbolTable(Location.Module, syms)
-
             self.module = Module(mod_name)
-            for c in self.children:
-                if c.type == 'DEF':
-                    c._decl(syms, self.module)
+            syms.add_module(self.module)
+            syms = self.module
 
-            self.symbol_table = syms
+            for c in self.children:
+                if c.type in ['DEF', 'STRUCT']:
+                    c._decl(syms)
 
         elif self.type == 'DEF':
-            syms = SymbolTable(Location.Param, syms, self.fn)
-            self.symbol_table = syms
+            syms = self.function
+
+        elif self.type == 'STRUCT':
+            syms = self.struct
 
         elif self.type == 'BLOCK':
-            syms = SymbolTable(Location.Local, syms)
-            self.symbol_table = syms
+            syms = Block(syms)
+            self.block = syms
 
         # local variable symbol creation
-        if self.type in ['PARAM', 'LET']:
+        if self.type == 'LET':
             name = self.children[0].value
-            tp = self.children[1]._type(syms, True)
+            tp = self.children[1]._type(syms)
             self.sym = syms.add_variable(name, tp)
 
         # process children
@@ -133,8 +150,8 @@ class Node:
 
         # expr type
         if self.type == 'VAR':
-            self.sym = syms.get(self.value, 'VARIABLE', 'CONSTANT')
-            self.expr_type = self.sym.type
+            self.sym = syms.get(self.value, Symbol.Variable)
+            self.expr_type = self.sym.var_type()
 
         elif self.type == 'NUM':
             self.expr_type = Type(data.INT)
@@ -161,7 +178,12 @@ class Node:
             self.expr_type = Type(data.NONE)
 
         elif self.type == 'CALL':
-            self.fn_group = syms.get(self.children[0].value, 'FN_GROUP')
+            self.fn_group = syms.get(self.children[0].value, Symbol.FnGroup)
+
+        elif self.type == 'MEMBER':
+            cls = self.children[0].expr_type.cls
+            self.field = cls.get(self.children[1].value, Symbol.Variable)
+            self.expr_type = self.field.var_type()
 
         elif self.type == 'BLOCK':
             self.expr_type = self.children[-1].expr_type
@@ -218,12 +240,16 @@ class Node:
         elif self.type == 'CALL':
             self._resolve_overload(refs)
 
+        elif self.type == 'MEMBER':
+            tp = Type(self.children[0].expr_type.cls, 1)
+            self.children[0]._expect_type(tp)
+
         elif self.type == 'FILE':
             for c in self.children:
                 c._expect_type(Type(data.NONE))
 
         elif self.type == 'DEF':
-            self.children[3]._expect_type(self.fn.ret)
+            self.children[3]._expect_type(self.function.ret)
 
         elif self.type == 'BLOCK':
             self.expr_type = self.target_type
@@ -243,7 +269,7 @@ class Node:
             self.children[1]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
-            self.children[0]._expect_type(syms.function.ret)
+            self.children[0]._expect_type(syms.context.ret)
 
         elif self.type == 'LET':
             if self.children[2].type != 'EMPTY':

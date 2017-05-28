@@ -40,34 +40,29 @@ namespace Fin
             return _content + idx;
         }
 
-        void push(char *val, uint32_t size)
+        char *push(uint16_t size)
         {
             if (_size + size > _cap)
                 throw std::overflow_error{"stack overflow"};
 
-            LOG(2) << std::endl << "  < ";
-            LOG_HEX(2, val, size);
-            LOG(2) << " [" << _size << "]";
-
-            for (uint32_t i = 0; i < size; ++i)
-            {
-                _content[_size + i] = val[i];
-            }
+            auto val = &_content[_size];
             _size += size;
+
+            LOG(2) << std::endl << "  < [" << _size << ", " << size << "]";
+
+            return val;
         }
 
-        void pop(char *val, uint32_t size)
+        char *pop(uint16_t size)
         {
             if (_size < size)
                 throw std::overflow_error{"negative stack size"};
 
             _size -= size;
-            for (uint32_t i = 0; i < size; ++i)
-                val[i] = _content[_size + i];
 
-            LOG(2) << std::endl << "  > ";
-            LOG_HEX(2, val, size);
-            LOG(2) << " [" << _size << "]";
+            LOG(2) << std::endl << "  > [" << _size << ", " << size << "]";
+
+            return &_content[_size];
         }
 
         template<typename T> T &at(uint32_t idx)
@@ -84,7 +79,7 @@ namespace Fin
             _size -= sizeof(T);
 
             LOG(2) << std::endl << "  > " << val;
-            LOG(2) << " [" << _size << "]";
+            LOG(2) << " [" << _size << ", " << sizeof(T) << "]";
         }
 
         template<typename T> T pop()
@@ -100,7 +95,7 @@ namespace Fin
                 throw std::overflow_error{"stack overflow"};
 
             LOG(2) << std::endl << "  < " << val;
-            LOG(2) << " [" << _size << "]";
+            LOG(2) << " [" << _size << ", " << sizeof(T) << "]";
 
             auto addr = _size;
             _size += sizeof(T);

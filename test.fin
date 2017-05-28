@@ -1,15 +1,14 @@
-def test()
-    sum(1, input())
-    let j Float = sum(2., input())
-    print(j)
+struct Vec
+    x Int
+    y Int
 
-def sum(a Int, b Int) Int
-    a + b
+def distance(v Vec) Int
+    v.x * v.x + v.y * v.y
 
-def sum(a Int, b Int)
-    a
+def main()
+    let v Vec
+    v.x = 3
+    v.y = 4
+    print(distance(v))
 
-def sum(a Float, b Float) Float
-    a + b
-
-test()
+main()

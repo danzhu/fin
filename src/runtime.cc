@@ -5,6 +5,15 @@
 #include <iostream>
 #include "opcode.h"
 
+void move(const char *src, char *dest, uint16_t size)
+{
+    LOG(2) << std::endl << "  = ";
+    LOG_HEX(2, src, size);
+
+    for (uint16_t i = 0; i < size; ++i)
+        dest[i] = src[i];
+}
+
 void Fin::Runtime::jump(uint32_t target)
 {
     if (target > instrs.size())
@@ -103,6 +112,7 @@ void Fin::Runtime::execute()
 
     while (true)
     {
+        LOG(2) << std::endl;
         LOG(1) << std::endl << '-';
 
         auto op = readConst<Opcode>();
@@ -185,9 +195,11 @@ void Fin::Runtime::execute()
                     auto size = readConst<uint16_t>();
                     auto amount = readConst<uint16_t>();
 
-                    auto idx = opStack.size() - (amount + size);
-                    opStack.pop(opStack.at(idx, size), size);
-                    opStack.resize(opStack.size() - amount + size);
+                    auto loc = opStack.size() - size;
+                    auto src = opStack.at(loc, size);
+                    auto dest = opStack.at(loc - amount, size);
+                    move(src, dest, size);
+                    opStack.resize(opStack.size() - amount);
                 }
                 continue;
 
@@ -198,10 +210,11 @@ void Fin::Runtime::execute()
             case Opcode::ReturnVal:
                 {
                     auto size = readConst<uint16_t>();
-                    std::unique_ptr<char[]> val{new char[size]};
-                    opStack.pop(val.get(), size);
+
+                    auto src = opStack.pop(size);
                     ret();
-                    opStack.push(val.get(), size);
+                    auto dest = opStack.push(size);
+                    move(src, dest, size);
                 }
                 continue;
 
@@ -220,6 +233,7 @@ void Fin::Runtime::execute()
             case Opcode::Push:
                 {
                     auto size = readConst<uint16_t>();
+
                     opStack.resize(opStack.size() + size);
                 }
                 continue;
@@ -227,45 +241,32 @@ void Fin::Runtime::execute()
             case Opcode::Pop:
                 {
                     auto size = readConst<uint16_t>();
+
                     opStack.resize(opStack.size() - size);
                 }
                 continue;
 
-            case Opcode::LoadArg:
+            case Opcode::Load:
                 {
-                    auto offset = readConst<int16_t>();
-                    auto target = fp + offset;
                     auto size = readConst<uint16_t>();
 
-                    opStack.push(opStack.at(target, size), size);
-                }
-                continue;
-
-            case Opcode::StoreArg:
-                {
-                    auto offset = readConst<int16_t>();
-                    auto target = fp + offset;
-                    auto size = readConst<uint16_t>();
-
-                    opStack.pop(opStack.at(target, size), size);
-                }
-                continue;
-
-            case Opcode::LoadPtr:
-                {
-                    auto offset = readConst<uint32_t>();
-                    auto size = readConst<uint16_t>();
                     auto ptr = opStack.pop<Ptr>();
-                    opStack.push(alloc.deref(ptr + offset, size), size);
+
+                    auto src = alloc.read(ptr, size);
+                    auto dest = opStack.push(size);
+                    move(src, dest, size);
                 }
                 continue;
 
-            case Opcode::StorePtr:
+            case Opcode::Store:
                 {
-                    auto offset = readConst<uint32_t>();
                     auto size = readConst<uint16_t>();
+
                     auto ptr = opStack.pop<Ptr>();
-                    opStack.pop(alloc.deref(ptr + offset, size), size);
+
+                    auto src = opStack.pop(size);
+                    auto dest = alloc.write(ptr, size);
+                    move(src, dest, size);
                 }
                 continue;
 
@@ -273,6 +274,13 @@ void Fin::Runtime::execute()
                 {
                     auto offset = readConst<int16_t>();
                     opStack.push(static_cast<Ptr>(fp + offset));
+                }
+                continue;
+
+            case Opcode::Offset:
+                {
+                    auto offset = readConst<uint32_t>();
+                    opStack.push(opStack.pop<uint64_t>() + offset);
                 }
                 continue;
 

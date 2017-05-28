@@ -48,20 +48,17 @@ push amount:H
 pop amount:H
     Pop `amount` bytes from stack.
 
-load_arg offset:h size:H
-    Load value on frame at `offset` onto stack.
-
-store_arg offset:h size:H
-    Store value to frame at `offset` from stack.
-
-load_ptr offset:I size:H
+load size:H
     Load value of pointer onto stack.
 
-store_ptr offset:I size:H
+store size:H
     Store value from stack to pointer.
 
 addr_frame offset:h
     Load address of frame at `offset` onto stack.
+
+offset offset:I
+    Increment the value on stack by `offset`.
 
 br offset:h
     Unconditionally branch to `pc + offset`, where pc is at the end of the
