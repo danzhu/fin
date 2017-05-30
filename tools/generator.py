@@ -3,7 +3,7 @@
 import sys
 from lexer import Lexer
 from parse import Parser
-from data import Location
+from data import Location, Symbol
 import data
 
 class Generator:
@@ -60,9 +60,9 @@ class Generator:
     def FILE(self, node):
         ref_list = []
         for ref in self.refs:
-            mod = ref.ancestor(Location.Module)
+            mod = ref.ancestor(Symbol.Module)
             if mod != node.module:
-                ref_list.append((mod, str(ref)))
+                ref_list.append((mod, ref.fullname()))
 
         ref_list.sort()
 
@@ -92,9 +92,9 @@ class Generator:
         pass
 
     def DEF(self, node):
-        end = 'END_FN_' + str(node.function)
+        end = 'END_FN_' + node.function.fullname()
 
-        self._write('function', str(node.function), end)
+        self._write('function', node.function.fullname(), end)
         self._gen(node.children[3])
 
         if node.function.ret.none():
@@ -219,7 +219,7 @@ class Generator:
         for c in node.children[1:]:
             self._gen(c)
 
-        self._write('call', node.function.fullname(), node.arg_size)
+        self._write('call', node.function.fullpath(), node.arg_size)
 
         self._cast(node)
 
@@ -279,7 +279,7 @@ class Generator:
             else:
                 raise NotImplementedError()
 
-        elif node.sym.location == Location.Module:
+        elif node.sym.location == Location.Global:
             # self._write('addr_glob', node.sym.offset)
             raise NotImplementedError()
 

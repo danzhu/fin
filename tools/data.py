@@ -3,7 +3,7 @@
 from enum import Enum
 
 class Location(Enum):
-    Module = 0
+    Global = 0
     Struct = 1
     Param  = 2
     Local  = 3
@@ -13,8 +13,9 @@ class Symbol(Enum):
     Module   = 0
     Class    = 1
     FnGroup  = 2
-    Variable = 3
-    Constant = 4
+    Function = 3
+    Variable = 4
+    Constant = 5
 
 
 class Type:
@@ -23,8 +24,13 @@ class Type:
         self.level = lvl
 
     def __str__(self):
-        s = self.cls.name + '&' * self.level
-        return s
+        return self.cls.name + '&' * self.level
+
+    def fullname(self):
+        return self.cls.fullname() + '&' * self.level
+
+    def fullpath(self):
+        return self.cls.fullpath() + '&' * self.level
 
     def size(self, lvl=-1):
         if lvl == -1:
@@ -78,7 +84,7 @@ class Variable:
         self.offset = off
 
     def __str__(self):
-        return '{} {} [{}]'.format(self.name, self.type, self.location)
+        return '{} {}'.format(self.name, self.type, self.location)
 
     def var_type(self):
         return Type(self.type.cls, self.type.level + 1)
@@ -154,17 +160,17 @@ class SymbolTable:
         else:
             raise KeyError('cannot find symbol "{}"'.format(name))
 
-    def ancestor(self, loc):
-        if self.LOCATION == loc:
+    def ancestor(self, sym):
+        if self.TYPE == sym:
             return self
         elif self.parent is not None:
-            return self.parent.ancestor(loc)
+            return self.parent.ancestor(sym)
         else:
-            raise LookupError('no ancestor of location {}'.format(loc))
+            raise LookupError('no ancestor of type {}'.format(sym))
 
 
 class Module(SymbolTable):
-    LOCATION = Location.Module
+    LOCATION = Location.Global
     TYPE = Symbol.Module
 
     def __init__(self, name):
@@ -175,6 +181,26 @@ class Module(SymbolTable):
 
     def __lt__(self, other):
         return self.name < other.name
+
+    def fullname(self):
+        return self.name
+
+    def fullpath(self):
+        if self.parent is not None:
+            assert self.parent.TYPE == Symbol.Module
+
+            # FIXME: use correct module hierarchy for this to work
+            # return self.parent.path('.') + self.fullname()
+            return self.fullname()
+        else:
+            return self.fullname()
+
+    def path(self, sep=':'):
+        path = self.fullpath()
+        if path != '':
+            path += sep
+
+        return path
 
     def add_module(self, mod):
         self._add_symbol(mod)
@@ -214,6 +240,12 @@ class Class(SymbolTable):
         self.name = name
         self.size = size
 
+    def fullname(self):
+        return self.name
+
+    def fullpath(self):
+        return self.ancestor(Symbol.Module).path() + self.fullname()
+
     def add_variable(self, name, tp):
         var = Variable(name, tp, Location.Struct, self.size)
         self.size += tp.size()
@@ -225,6 +257,7 @@ class Class(SymbolTable):
 
 class Function(SymbolTable):
     LOCATION = Location.Param
+    TYPE = Symbol.Function
 
     def __init__(self, name, ret):
         super().__init__()
@@ -237,11 +270,17 @@ class Function(SymbolTable):
     def __str__(self):
         return '{}({}){}'.format(
                 self.name,
-                ','.join(str(param.type) for param in self.params),
-                self.ret if not self.ret.none() else '')
+                ', '.join(str(p) for p in self.params),
+                ' ' + str(self.ret) if not self.ret.none() else '')
 
     def fullname(self):
-        return '{}:{}'.format(self.ancestor(Location.Module).name, self)
+        return '{}({}){}'.format(
+                self.name,
+                ','.join(p.type.fullpath() for p in self.params),
+                self.ret.fullpath() if not self.ret.none() else '')
+
+    def fullpath(self):
+        return self.ancestor(Symbol.Module).path() + self.fullname()
 
     def add_variable(self, name, tp):
         assert type(name) is str

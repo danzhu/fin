@@ -50,6 +50,8 @@
   - [ ] initialization
   - [ ] member function
   - [ ] destructor
+- [x] symbol full path
+  - [ ] fix standard library hierarchy (import)
 
 ## Runtime
 - [ ] recycle unused ptrs
