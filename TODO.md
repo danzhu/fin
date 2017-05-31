@@ -1,6 +1,7 @@
 # Fin Project Todo List
 
 ## Language
+
 - [ ] tuple parameter
 - [ ] static (stack) allocation
 - [ ] invariant validation
@@ -57,6 +58,7 @@
 - [x] partial order overload
 
 ## Runtime
+
 - [ ] recycle unused ptrs
 - [x] rename method to function
 - [x] use `std::function` instead of native function ptr

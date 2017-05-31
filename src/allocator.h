@@ -57,14 +57,14 @@ namespace Fin
         Ptr alloc(uint32_t size)
         {
             // TODO: reuse deallocated ptrs
-            Ptr ptr = heap.size() << 32;
+            auto ptr = static_cast<Ptr>(heap.size()) << 32;
             heap.emplace_back(Block{State::Allocated, new char[size], size});
             return ptr;
         }
 
         Ptr add(char *addr, uint32_t size)
         {
-            Ptr ptr = heap.size() << 32;
+            auto ptr = static_cast<Ptr>(heap.size()) << 32;
             heap.emplace_back(Block{State::Native, addr, size});
             return ptr;
         }
