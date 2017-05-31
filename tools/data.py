@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from enum import Enum
+import math
 
 class Location(Enum):
     Global = 0
@@ -12,10 +13,9 @@ class Location(Enum):
 class Symbol(Enum):
     Module   = 0
     Class    = 1
-    FnGroup  = 2
-    Function = 3
-    Variable = 4
-    Constant = 5
+    Function = 2
+    Variable = 3
+    Constant = 4
 
 
 class Type:
@@ -51,11 +51,10 @@ class Type:
         # 1: casting to none
         # 2: level reduction
         # 3: exact match
-        # 4: unknown
 
         # (Python's) None value denotes unknown type
         if tp is None:
-            return 4
+            return math.nan
 
         if self.cls != tp.cls:
             if self.none():
@@ -101,35 +100,6 @@ class Constant:
         self.type = Type(cls)
 
 
-class FunctionGroup:
-    TYPE = Symbol.FnGroup
-
-    def __init__(self, name):
-        self.name = name
-        self.functions = set()
-
-    def add(self, fn):
-        self.functions.add(fn)
-
-    def resolve(self, params, ret):
-        fns = set()
-        max_lvl = 1
-
-        for fn in self.functions:
-            lvl = fn.match(params, ret)
-
-            if lvl < max_lvl:
-                continue
-
-            if lvl > max_lvl:
-                max_lvl = lvl
-                fns = set()
-
-            fns.add(fn)
-
-        return fns
-
-
 class SymbolTable:
     def __init__(self, parent=None):
         self.parent = parent
@@ -145,28 +115,53 @@ class SymbolTable:
         self._check_exists(sym.name)
         self.symbols[sym.name] = sym
 
-    def get(self, name, *tps):
+    def find(self, name):
         if name in self.symbols:
-            sym = self.symbols[name]
+            return self.symbols[name]
 
-            if sym.TYPE not in tps:
-                raise TypeError('expected {}, but got {} "{}"'.format(
-                    ' or '.join(tps), sym.TYPE, name))
+        if self.parent:
+            return self.parent.find(name)
 
-            return sym
+        return None
 
-        elif self.parent:
-            return self.parent.get(name, *tps)
-        else:
+    def get(self, name, *tps):
+        sym = self.find(name)
+
+        if sym is None:
             raise KeyError('cannot find symbol "{}"'.format(name))
+
+        if sym.TYPE not in tps:
+            raise TypeError('expected {}, but got {} "{}"'.format(
+                ' or '.join(tps), sym.TYPE, name))
+
+        return sym
 
     def ancestor(self, sym):
         if self.TYPE == sym:
             return self
-        elif self.parent is not None:
+
+        if self.parent is not None:
             return self.parent.ancestor(sym)
+
+        raise LookupError('no ancestor of type {}'.format(sym))
+
+    def overloads(self, name):
+        if self.parent is not None:
+            res = self.parent.overloads(name)
         else:
-            raise LookupError('no ancestor of type {}'.format(sym))
+            res = set()
+
+        if name in self.symbols:
+            fns = self.symbols[name]
+
+            if type(fns) is not set:
+                raise LookupError('{} "{}" is not a function'.format(
+                    fns.TYPE,
+                    name))
+
+            res |= {Match(fn) for fn in fns}
+
+        return res
 
 
 class Module(SymbolTable):
@@ -212,10 +207,13 @@ class Module(SymbolTable):
 
     def add_function(self, fn):
         if fn.name not in self.symbols:
-            group = FunctionGroup(fn.name)
-            self.symbols[group.name] = group
-        elif self.symbols[fn.name].TYPE != Symbol.FnGroup:
+            group = set()
+            self.symbols[fn.name] = group
+
+        elif type(self.symbols[fn.name]) is not set:
+            # TODO: better way to check
             raise KeyError('redefining non-function as function')
+
         else:
             group = self.symbols[fn.name]
 
@@ -296,19 +294,21 @@ class Function(SymbolTable):
 
         return var
 
-    def match(self, params, ret):
-        if len(self.params) != len(params):
-            return 0
+    def match(self, args, ret):
+        if len(self.params) != len(args):
+            return None
+
+        lvls = [p.type.match(a) for p, a in zip(self.params, args)]
 
         if ret is not None:
-            lvl = ret.match(self.ret)
+            lvls.append(ret.match(self.ret))
         else:
-            lvl = 4
+            lvls.append(math.nan)
 
-        for i in range(len(params)):
-            lvl = min(lvl, self.params[i].type.match(params[i]))
+        if 0 in lvls:
+            return None
 
-        return lvl
+        return lvls
 
 
 class Block(SymbolTable):
@@ -332,6 +332,27 @@ class Block(SymbolTable):
         self._add_symbol(var)
 
         return var
+
+
+class Match:
+    def __init__(self, fn):
+        self.function = fn
+
+    def __lt__(self, other):
+        assert len(self.match) == len(other.match)
+
+        less = False
+        for s, o in zip(self.match, other.match):
+            if s > o:
+                return False
+            if s < o:
+                less = True
+
+        return less
+
+    def update(self, args, ret):
+        self.match = self.function.match(args, ret)
+        return self.match is not None
 
 
 NONE = Class('None', 0)
@@ -387,3 +408,20 @@ def load_module(mod_name, glob):
                 raise ValueError('invalid declaration type')
 
     return mod
+
+def resolve_overload(matches, args, ret):
+    res = set()
+
+    for match in matches:
+        if not match.update(args, ret):
+            continue
+
+        res = {r for r in res if not r < match}
+
+        for r in res:
+            if match < r:
+                break
+        else:
+            res.add(match)
+
+    return res

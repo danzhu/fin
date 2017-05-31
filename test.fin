@@ -5,10 +5,15 @@ struct Vec
 def distance(v Vec) Int
     v.x * v.x + v.y * v.y
 
-def main()
+def print(v Vec)
+    print(v.x)
+    print(v.y)
+
+def test()
     let v Vec
     v.x = 3
     v.y = 4
+    print(v)
     print(distance(v))
 
-main()
+test()

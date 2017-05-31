@@ -52,6 +52,9 @@
   - [ ] destructor
 - [x] symbol full path
   - [ ] fix standard library hierarchy (import)
+- [ ] `let` type inference
+- [x] function group no override
+- [x] partial order overload
 
 ## Runtime
 - [ ] recycle unused ptrs

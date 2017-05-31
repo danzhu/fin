@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import data
-from data import Location, Symbol, Type, Module, Function, Class, Block
+from data import Symbol, Type, Module, Function, Class, Block
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=None):
@@ -91,11 +91,13 @@ class Node:
         if self.function is not None:
             return
 
-        params = [c.expr_type for c in self.children[1:]]
-        fns = self.fn_group.resolve(params, self.target_type)
+        self.overloads = data.resolve_overload(
+                self.overloads,
+                [c.expr_type for c in self.children[1:]],
+                self.target_type)
 
-        if len(fns) == 1:
-            self.function = fns.pop()
+        if len(self.overloads) == 1:
+            self.function = self.overloads.pop().function
             self.expr_type = self.function.ret
             self.arg_size = sum(c.type.size() for c in self.function.params)
 
@@ -104,16 +106,19 @@ class Node:
 
             for i in range(len(self.function.params)):
                 self.children[i + 1]._expect_type(self.function.params[i].type)
+            return
 
-        elif not required:
-            pass
+        if not required:
+            return
 
-        elif len(fns) == 0:
-            raise LookupError('no viable function overload')
+        if len(res) == 0:
+            # TODO: print args and ret
+            raise LookupError('no viable function overload for "{}"'.format(
+                name))
 
         else:
             raise LookupError('cannot resolve function overload between'
-                    + ''.join('\n  ' + str(fn) for fn in fns))
+                    + ''.join('\n  ' + str(fn) for fn in self.overloads))
 
     def _analyze_acquire(self, mod_name, syms, refs):
         self.annotated = True
@@ -178,7 +183,7 @@ class Node:
             self.expr_type = Type(data.NONE)
 
         elif self.type == 'CALL':
-            self.fn_group = syms.get(self.children[0].value, Symbol.FnGroup)
+            self.overloads = syms.overloads(self.children[0].value)
 
         elif self.type == 'MEMBER':
             cls = self.children[0].expr_type.cls
@@ -196,6 +201,7 @@ class Node:
             self.expr_type = Type(data.NONE)
 
         elif self.type == 'RETURN':
+            self.return_type = syms.ancestor(Symbol.Function).ret
             self.expr_type = Type(data.NONE)
 
         elif self.type == 'EMPTY':
@@ -269,11 +275,11 @@ class Node:
             self.children[1]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
-            self.children[0]._expect_type(syms.context.ret)
+            self.children[0]._expect_type(self.return_type)
 
         elif self.type == 'LET':
             if self.children[2].type != 'EMPTY':
-                if self.sym.type.level != self.level + 1:
+                if self.sym.type.level != self.level:
                     raise TypeError('initialization level mismatch')
                 tp = Type(self.sym.type.cls, self.level)
                 self.children[2]._expect_type(tp)
