@@ -216,7 +216,7 @@ class Generator:
         self._cast(node)
 
     def CALL(self, node):
-        for c in node.children[1].children:
+        for c in node.children[0].children:
             self._gen(c)
 
         self._write('call', node.function.fullpath(), node.arg_size)
@@ -225,7 +225,7 @@ class Generator:
 
     def METHOD(self, node):
         self._gen(node.children[0])
-        for c in node.children[2].children:
+        for c in node.children[1].children:
             self._gen(c)
 
         self._write('call', node.function.fullpath(), node.arg_size)
@@ -253,16 +253,26 @@ class Generator:
         self._gen(node.children[0])
         self._gen(node.children[1])
 
-        op = node.value.lower()
+        if node.value == '+':
+            op = 'add'
+        elif node.value == '-':
+            op = 'sub'
+        elif node.value == '*':
+            op = 'mult'
+        elif node.value == '/':
+            op = 'div'
+        elif node.value == '%':
+            op = 'mod'
+
         tp = node.children[0].expr_type.cls.name[0].lower()
         self._write('{}_{}'.format(op, tp))
 
         self._cast(node)
 
     def UNARY(self, node):
-        self._gen(node.children[0], 0)
+        self._gen(node.children[0])
 
-        if node.value == 'SUB':
+        if node.value == '-':
             tp = node.children[0].expr_type.cls.name[0].lower()
             self._write('neg_{}'.format(tp))
 

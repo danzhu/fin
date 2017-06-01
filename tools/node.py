@@ -91,14 +91,12 @@ class Node:
         if self.function is not None:
             return
 
-        arg_nodes = self.children[-1].children
-        if self.type == 'METHOD':
-            arg_nodes = [self.children[0]] + arg_nodes
-            name = self.children[1].value
-        elif self.type == 'CALL':
-            name = self.children[0].value
+        if self.type in ['BIN', 'UNARY']:
+            arg_nodes = self.children
         else:
-            assert False
+            arg_nodes = self.children[-1].children
+            if self.type == 'METHOD':
+                arg_nodes = [self.children[0]] + arg_nodes
 
         args = [c.expr_type for c in arg_nodes]
         ret = self.target_type
@@ -106,7 +104,7 @@ class Node:
         self.overloads = symbol.resolve_overload(self.overloads, args, ret)
 
         if len(self.overloads) == 0:
-            fn = '{}({}) {}'.format(name,
+            fn = '{}({}) {}'.format(self.value,
                     ', '.join(str(a or '?') for a in args),
                     ret or '?')
             raise LookupError('no viable function overload for:\n  ' + fn)
@@ -117,7 +115,8 @@ class Node:
             self.arg_size = sum(c.type.size() for c in self.function.params)
 
             # record usage for ref generation
-            refs.add(self.function)
+            if self.type in ['CALL', 'METHOD']:
+                refs.add(self.function)
 
             for c, t in zip(arg_nodes, self.function.params):
                 c._expect_type(t.type)
@@ -174,41 +173,27 @@ class Node:
         elif self.type == 'FLOAT':
             self.expr_type = Type(symbol.FLOAT)
 
-        elif self.type == 'TEST':
+        elif self.type in ['TEST', 'COMP']:
             self.expr_type = Type(symbol.BOOL)
 
-        elif self.type == 'BIN':
-            self.expr_type = Type(self.children[0].expr_type.cls)
-
-        elif self.type == 'UNARY':
-            self.expr_type = Type(self.children[0].expr_type.cls)
-
-        elif self.type == 'COMP':
-            self.expr_type = Type(symbol.BOOL)
-
-        elif self.type == 'ASSN':
-            self.expr_type = Type(symbol.NONE)
-
-        elif self.type == 'INC_ASSN':
-            self.expr_type = Type(symbol.NONE)
+        elif self.type in ['BIN', 'UNARY']:
+            self.overloads = syms.overloads(self.value)
 
         elif self.type == 'CALL':
-            name = self.children[0].value
-            self.overloads = syms.overloads(name)
+            self.overloads = syms.overloads(self.value)
 
             if len(self.overloads) == 0:
-                raise LookupError('no function "{}" defined'.format(name))
+                raise LookupError('no function "{}" defined'.format(self.value))
 
         elif self.type == 'METHOD':
-            name = self.children[1].value
-            self.overloads = syms.overloads(name)
+            self.overloads = syms.overloads(self.value)
 
             if len(self.overloads) == 0:
-                raise LookupError('no method "{}" defined'.format(name))
+                raise LookupError('no method "{}" defined'.format(self.value))
 
         elif self.type == 'MEMBER':
             cls = self.children[0].expr_type.cls
-            self.field = cls.get(self.children[1].value, Symbol.Variable)
+            self.field = cls.get(self.value, Symbol.Variable)
             self.expr_type = self.field.var_type()
 
         elif self.type == 'BLOCK':
@@ -218,30 +203,17 @@ class Node:
             tps = [c.expr_type for c in self.children[1:]]
             self.expr_type = symbol.interpolate_types(tps)
 
-        elif self.type == 'WHILE':
-            self.expr_type = Type(symbol.NONE)
-
         elif self.type == 'RETURN':
             self.return_type = syms.ancestor(Symbol.Function).ret
             self.expr_type = Type(symbol.NONE)
 
-        elif self.type == 'EMPTY':
+        elif self.type in ['ASSN', 'INC_ASSN', 'WHILE', 'EMPTY']:
             self.expr_type = Type(symbol.NONE)
 
     def _analyze_expect(self, refs):
         if self.type == 'TEST':
             self.children[0]._expect_type(Type(symbol.BOOL))
             self.children[1]._expect_type(Type(symbol.BOOL))
-
-        elif self.type == 'BIN':
-            self.children[0]._expect_types(*symbol.NUM_TYPES)
-
-            tp = Type(self.children[0].expr_type.cls)
-            self.children[0]._expect_type(tp)
-            self.children[1]._expect_type(tp)
-
-        elif self.type == 'UNARY':
-            self.children[0]._expect_types(*symbol.NUM_TYPES)
 
         elif self.type == 'COMP':
             self.children[0]._expect_types(*symbol.NUM_TYPES)
@@ -264,7 +236,7 @@ class Node:
             tp = Type(self.children[0].expr_type.cls)
             self.children[1]._expect_type(tp)
 
-        elif self.type in ['CALL', 'METHOD']:
+        elif self.type in ['CALL', 'METHOD', 'BIN', 'UNARY']:
             self._resolve_overload(refs)
 
         elif self.type == 'MEMBER':
@@ -311,5 +283,5 @@ class Node:
         for c in self.children:
             c._analyze_expect(refs)
 
-        if self.type in ['CALL', 'METHOD']:
+        if self.type in ['CALL', 'METHOD', 'BIN', 'UNARY']:
             self._resolve_overload(refs, required=True)

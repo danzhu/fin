@@ -266,7 +266,7 @@ class Parser:
     def _expr(self):
         node = self._term()
         while self._lookahead.type in ['ADD', 'SUB']:
-            op = self._lookahead.type
+            op = self._lookahead.value
             self._next()
             r = self._term()
             node = Node('BIN', (node, r), op)
@@ -275,7 +275,7 @@ class Parser:
     def _term(self):
         node = self._factor()
         while self._lookahead.type in ['MULT', 'DIV', 'MOD']:
-            op = self._lookahead.type
+            op = self._lookahead.value
             self._next()
             r = self._factor()
             node = Node('BIN', (node, r), op)
@@ -283,7 +283,7 @@ class Parser:
 
     def _factor(self):
         if self._lookahead.type in ['ADD', 'SUB']:
-            op = self._lookahead.type
+            op = self._lookahead.value
             self._next()
             val = self._factor()
             return Node('UNARY', (val,), op)
@@ -295,15 +295,16 @@ class Parser:
 
         while self._lookahead.type == 'DOT':
             self._next() # DOT
-            name = self._id()
+            name = self._lookahead.value
+            self._expect('ID')
 
             if self._lookahead.type == 'LPAREN':
                 # method call
                 args = self._args()
-                node = Node('METHOD', (node, name, args))
+                node = Node('METHOD', (node, args), name)
             else:
                 # member access
-                node = Node('MEMBER', (node, name))
+                node = Node('MEMBER', (node,), name)
 
         return node
 
@@ -314,9 +315,8 @@ class Parser:
             self._next() # ID
 
             if self._lookahead.type == 'LPAREN':
-                node = Node('ID', (), name)
                 args = self._args()
-                return Node('CALL', (node, args))
+                return Node('CALL', (args,), name)
             else:
                 return Node('VAR', (), name)
 

@@ -370,10 +370,32 @@ NUM_TYPES = [INT, FLOAT]
 
 def load_builtins():
     mod = Module('')
-    for tp in { NONE, BOOL, INT, FLOAT }:
-        mod.add_class(tp)
+
+    # classes
+    for cls in { NONE, BOOL, INT, FLOAT }:
+        mod.add_class(cls)
+
+    # constants
     for const in { TRUE, FALSE }:
         mod.add_constant(const)
+
+    # builtin operations
+    for cls in { INT, FLOAT }:
+        tp = Type(cls)
+
+        # binary
+        for op in ['+', '-', '*', '/', '%']:
+            fn = Function(op, tp)
+            fn.add_variable('l', tp)
+            fn.add_variable('r', tp)
+            mod.add_function(fn)
+
+        # unary
+        for op in ['+', '-']:
+            fn = Function(op, tp)
+            fn.add_variable('v', tp)
+            mod.add_function(fn)
+
     return mod
 
 def to_type(tp, syms):
@@ -402,8 +424,8 @@ def load_module(mod_name, glob):
             if tp == 'def':
                 fn = Function(name, to_type(ret, mod))
                 for i in range(len(params) // 2):
-                    name = params[i]
-                    tp = to_type(params[i + 1], mod)
+                    name = params[i * 2]
+                    tp = to_type(params[i * 2 + 1], mod)
                     fn.add_variable(name, tp)
                 mod.add_function(fn)
 

@@ -9,18 +9,10 @@ def print(v Vec)
     print(v.x)
     print(v.y)
 
-def test(useVec Bool)
-    if useVec
-        let v Vec
-        v.x = 3
-        v.y = 4
-        v.x = v.distance()
-        v.x
-    else
-        let i Int
-        i = 5
-        i
-    .print()
+def test()
+    let v Vec
+    v.x = 3
+    v.y = 4
+    (-distance(v) + 1).print()
 
-test(FALSE)
-test(TRUE)
+test()
