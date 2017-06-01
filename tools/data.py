@@ -99,6 +99,9 @@ class Constant:
 
         self.type = Type(cls)
 
+    def var_type(self):
+        return Type(self.cls)
+
 
 class SymbolTable:
     def __init__(self, parent=None):
@@ -132,7 +135,7 @@ class SymbolTable:
 
         if sym.TYPE not in tps:
             raise TypeError('expected {}, but got {} "{}"'.format(
-                ' or '.join(tps), sym.TYPE, name))
+                ' or '.join(str(t) for t in tps), sym.TYPE, name))
 
         return sym
 

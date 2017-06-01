@@ -165,7 +165,7 @@ class Node:
 
         # expr type
         if self.type == 'VAR':
-            self.sym = syms.get(self.value, Symbol.Variable)
+            self.sym = syms.get(self.value, Symbol.Variable, Symbol.Constant)
             self.expr_type = self.sym.var_type()
 
         elif self.type == 'NUM':
@@ -287,6 +287,8 @@ class Node:
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
+            self.expr_type = self.target_type
+
             self.children[0]._expect_type(Type(data.BOOL))
             self.children[1]._expect_type(self.expr_type)
             self.children[2]._expect_type(self.expr_type)

@@ -279,7 +279,7 @@ class Generator:
         self._cast(node)
 
     def VAR(self, node):
-        if node.sym.TYPE == 'CONSTANT':
+        if node.sym.TYPE == Symbol.Constant:
             if node.sym.cls == data.BOOL:
                 if node.sym.value:
                     self._write('const_true')
