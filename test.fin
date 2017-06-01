@@ -14,6 +14,6 @@ def test()
     v.x = 3
     v.y = 4
     print(v)
-    print(distance(v))
+    v.distance().print()
 
 test()

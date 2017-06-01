@@ -200,7 +200,19 @@ class Parser:
         return Node('BLOCK', stmts)
 
     def _args(self):
-        return Node('ARGS', args)
+        children = []
+        self._expect('LPAREN') # LPAREN
+        if self._lookahead.type == 'RPAREN':
+            self._next() # RPAREN
+        else:
+            while True:
+                children.append(self._test())
+
+                tp = self._lookahead.type
+                self._expect('COMMA', 'RPAREN')
+                if tp == 'RPAREN':
+                    break
+        return Node('ARGS', children)
 
     def _test(self):
         node = self._or_test()
@@ -276,7 +288,25 @@ class Parser:
             val = self._factor()
             return Node('UNARY', (val,), op)
         else:
-            return self._atom()
+            return self._atom_expr()
+
+    def _atom_expr(self):
+        node = self._atom()
+
+        while self._lookahead.type == 'DOT':
+            self._next() # DOT
+            name = self._id()
+
+            if self._lookahead.type == 'LPAREN':
+                # method call
+                args = self._args()
+                node = Node('METHOD', (node, name, args))
+            else:
+                # member access
+                node = Node('MEMBER', (node, name))
+
+        return node
+
 
     def _atom(self):
         if self._lookahead.type == 'ID':
@@ -284,27 +314,11 @@ class Parser:
             self._next() # ID
 
             if self._lookahead.type == 'LPAREN':
-                children = [Node('ID', (), name)]
-                self._next() # LPAREN
-                if self._lookahead.type == 'RPAREN':
-                    self._next() # RPAREN
-                else:
-                    while True:
-                        children.append(self._test())
-
-                        tp = self._lookahead.type
-                        self._expect('COMMA', 'RPAREN')
-                        if tp == 'RPAREN':
-                            break
-                return Node('CALL', children)
-
-            node = Node('VAR', (), name)
-            while self._lookahead.type == 'DOT':
-                self._next() # DOT
-                field = self._id()
-                node = Node('MEMBER', (node, field))
-
-            return node
+                node = Node('ID', (), name)
+                args = self._args()
+                return Node('CALL', (node, args))
+            else:
+                return Node('VAR', (), name)
 
         elif self._lookahead.type in ['NUM', 'FLOAT']:
             tp = self._lookahead.type

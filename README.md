@@ -8,18 +8,18 @@ In short, it's "just another programming language" :)
 
 ## Compilation
 
-Requires CMake and Python 3. To build, do (the usual CMake stuff)
+Requires CMake, a C++14 compiler, and Python 3. To build the runtime:
 
 ```sh
 mkdir build && cd build
 cmake ..
+cmake --build .
 ```
 
-To compile and run the sample program `test.fin`, build the target `run`. On
-Make-based configurations this is
+To compile and run the test program `test.fin`, build the target `run`:
 
 ```sh
-make run
+cmake --build . --target run
 ```
 
 To enable debug logging in runtime, pass `-DDEBUG=[level]` to CMake when

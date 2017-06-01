@@ -91,13 +91,22 @@ class Node:
         if self.function is not None:
             return
 
-        args = [c.expr_type for c in self.children[1:]]
+        arg_nodes = self.children[-1].children
+        if self.type == 'METHOD':
+            arg_nodes = [self.children[0]] + arg_nodes
+            name = self.children[1].value
+        elif self.type == 'CALL':
+            name = self.children[0].value
+        else:
+            assert False
+
+        args = [c.expr_type for c in arg_nodes]
         ret = self.target_type
 
         self.overloads = data.resolve_overload(self.overloads, args, ret)
 
         if len(self.overloads) == 0:
-            fn = '{}({}) {}'.format(self.children[0].value,
+            fn = '{}({}) {}'.format(name,
                     ', '.join(str(a or '?') for a in args),
                     ret or '?')
             raise LookupError('no viable function overload for:\n  ' + fn)
@@ -110,8 +119,8 @@ class Node:
             # record usage for ref generation
             refs.add(self.function)
 
-            for i in range(len(self.function.params)):
-                self.children[i + 1]._expect_type(self.function.params[i].type)
+            for c, t in zip(arg_nodes, self.function.params):
+                c._expect_type(t.type)
 
             return
 
@@ -190,6 +199,13 @@ class Node:
             if len(self.overloads) == 0:
                 raise LookupError('no function "{}" defined'.format(name))
 
+        elif self.type == 'METHOD':
+            name = self.children[1].value
+            self.overloads = syms.overloads(name)
+
+            if len(self.overloads) == 0:
+                raise LookupError('no method "{}" defined'.format(name))
+
         elif self.type == 'MEMBER':
             cls = self.children[0].expr_type.cls
             self.field = cls.get(self.children[1].value, Symbol.Variable)
@@ -248,7 +264,7 @@ class Node:
             tp = Type(self.children[0].expr_type.cls)
             self.children[1]._expect_type(tp)
 
-        elif self.type == 'CALL':
+        elif self.type in ['CALL', 'METHOD']:
             self._resolve_overload(refs)
 
         elif self.type == 'MEMBER':
@@ -293,5 +309,5 @@ class Node:
         for c in self.children:
             c._analyze_expect(refs)
 
-        if self.type == 'CALL':
-            self._resolve_overload(refs, True)
+        if self.type in ['CALL', 'METHOD']:
+            self._resolve_overload(refs, required=True)

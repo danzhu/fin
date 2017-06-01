@@ -216,7 +216,16 @@ class Generator:
         self._cast(node)
 
     def CALL(self, node):
-        for c in node.children[1:]:
+        for c in node.children[1].children:
+            self._gen(c)
+
+        self._write('call', node.function.fullpath(), node.arg_size)
+
+        self._cast(node)
+
+    def METHOD(self, node):
+        self._gen(node.children[0])
+        for c in node.children[2].children:
             self._gen(c)
 
         self._write('call', node.function.fullpath(), node.arg_size)
