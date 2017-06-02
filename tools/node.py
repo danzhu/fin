@@ -24,11 +24,14 @@ class Node:
             content += ' {}'.format(self.value)
 
         if self.expr_type:
-            content += ' [{}]'.format(self.expr_type)
-        if self.target_type:
-            content += ' -> [{}]'.format(self.target_type)
+            content += ' [{}'.format(self.expr_type)
+            if self.target_type:
+                content += ' -> {}'.format(self.target_type)
+            content += ']'
+
         if self.level:
             content += ' {}'.format(self.level)
+
         return content
 
     def print(self, indent=0):
@@ -42,6 +45,7 @@ class Node:
 
     def _error(self, msg, *args):
         msg = msg.format(*args)
+        msg += '\n  in node {}'.format(self)
         raise RuntimeError(msg)
 
     def _expect_type(self, tp):
@@ -60,20 +64,27 @@ class Node:
         if self.type == 'DEF':
             name = self.value
             ret = self.children[1]._type(mod)
+            if ret is None:
+                ret = Type(symbols.NONE)
+
             self.function = Function(name, ret)
+
             for p in self.children[0].children:
                 name = p.value
                 tp = p.children[0]._type(mod)
                 self.function.add_variable(name, tp)
+
             mod.add_function(self.function)
 
         elif self.type == 'STRUCT':
             name = self.value
             self.struct = Class(name)
+
             for f in self.children:
                 name = f.value
                 tp = f.children[0]._type(mod)
                 self.struct.add_variable(name, tp)
+
             mod.add_class(self.struct)
 
         else:
@@ -81,11 +92,10 @@ class Node:
 
     def _type(self, syms):
         if self.value is None:
-            tp = symbols.NONE
-            lvl = 0
-        else:
-            tp = syms.get(self.value, Symbol.Class)
-            lvl = self.level
+            return None
+
+        tp = syms.get(self.value, Symbol.Class)
+        lvl = self.level
 
         return Type(tp, lvl)
 
@@ -112,8 +122,6 @@ class Node:
         self.arg_size = sum(c.type.size() for c in self.function.params)
 
     def _analyze_acquire(self, mod_name, syms, refs):
-        self.annotated = True
-
         # symbol table
         if self.type == 'FILE':
             self.module = Module(mod_name)
@@ -133,12 +141,6 @@ class Node:
         elif self.type == 'BLOCK':
             syms = Block(syms)
             self.block = syms
-
-        # local variable symbol creation
-        if self.type == 'LET':
-            name = self.value
-            tp = self.children[0]._type(syms)
-            self.sym = syms.add_variable(name, tp)
 
         # process children
         for c in self.children:
@@ -198,6 +200,16 @@ class Node:
             self.return_type = syms.ancestor(Symbol.Function).ret
             self.expr_type = Type(symbols.NONE)
 
+        elif self.type == 'LET':
+            name = self.value
+            tp = self.children[0]._type(syms)
+            if tp is None:
+                tp = Type(self.children[1].expr_type.cls, self.level)
+                if tp is None:
+                    self._error('type is required when no initialization')
+
+            self.sym = syms.add_variable(name, tp)
+
         elif self.type in ['ASSN', 'INC_ASSN', 'WHILE', 'EMPTY']:
             self.expr_type = Type(symbols.NONE)
 
@@ -224,7 +236,7 @@ class Node:
             self._resolve_overload(refs)
 
             if self.function is None:
-                raise LookupError('cannot resolve function overload between:\n'
+                self._error('cannot resolve function overload between:\n'
                         + '\n'.join('  ' + str(fn) for fn in self.overloads))
 
             # record usage for ref generation
@@ -271,9 +283,9 @@ class Node:
         elif self.type == 'LET':
             if self.children[1].type != 'EMPTY':
                 if self.sym.type.level != self.level:
-                    raise TypeError('initialization level mismatch')
+                    self._error('initialization level mismatch')
                 tp = Type(self.sym.type.cls, self.level)
-                self.children[2]._expect_type(tp)
+                self.children[1]._expect_type(tp)
 
         # recurse
         for c in self.children:

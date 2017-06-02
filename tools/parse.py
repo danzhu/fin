@@ -113,7 +113,11 @@ class Parser:
     def _let(self):
         self._expect('LET')
         name = self._name()
-        tp = self._type()
+
+        if self._lookahead.type == 'ID':
+            tp = self._type()
+        else:
+            tp = Node('TYPE', ())
 
         lvl = 0
         if self._lookahead.type in ['ASSN', 'COLON']:
