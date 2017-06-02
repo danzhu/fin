@@ -156,7 +156,7 @@ class Node:
         elif self.type == 'TEST':
             self.expr_type = Type(symbols.BOOL)
 
-        elif self.type in ['BIN', 'UNARY', 'COMP']:
+        elif self.type == 'OP':
             self.overloads = syms.overloads(self.value)
             self.args = self.children
 
@@ -218,7 +218,7 @@ class Node:
             tp = Type(self.children[0].expr_type.cls)
             self.children[1]._expect_type(tp)
 
-        elif self.type in ['CALL', 'METHOD', 'BIN', 'UNARY', 'COMP']:
+        elif self.type in ['CALL', 'METHOD', 'OP']:
             self._resolve_overload(refs)
 
             if self.function is None:

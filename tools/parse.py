@@ -260,7 +260,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             r = self._expr()
-            node = Node('COMP', (node, r), op)
+            node = Node('OP', (node, r), op)
         return node
 
     def _expr(self):
@@ -269,7 +269,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             r = self._term()
-            node = Node('BIN', (node, r), op)
+            node = Node('OP', (node, r), op)
         return node
 
     def _term(self):
@@ -278,7 +278,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             r = self._factor()
-            node = Node('BIN', (node, r), op)
+            node = Node('OP', (node, r), op)
         return node
 
     def _factor(self):
@@ -286,7 +286,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             val = self._factor()
-            return Node('UNARY', (val,), op)
+            return Node('OP', (val,), op)
         else:
             return self._atom_expr()
 

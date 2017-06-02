@@ -240,11 +240,28 @@ class Generator:
 
         self._cast(node)
 
-    def COMP(self, node):
-        self._gen(node.children[0])
-        self._gen(node.children[1])
+    def OP(self, node):
+        for c in node.children:
+            self._gen(c)
 
-        if node.value == '<':
+        if len(node.children) == 1:
+            if node.value == '+':
+                raise NotImplementedError('unary + not implemented')
+            elif node.value == '-':
+                op = 'neg'
+            else:
+                assert False, 'unknown operator'
+        elif node.value == '+':
+            op = 'add'
+        elif node.value == '-':
+            op = 'sub'
+        elif node.value == '*':
+            op = 'mult'
+        elif node.value == '/':
+            op = 'div'
+        elif node.value == '%':
+            op = 'mod'
+        elif node.value == '<':
             op = 'lt'
         elif node.value == '<=':
             op = 'le'
@@ -256,38 +273,11 @@ class Generator:
             op = 'eq'
         elif node.value == '!=':
             op = 'ne'
+        else:
+            assert False, 'unknown operator'
 
         tp = node.children[0].expr_type.cls.name[0].lower()
         self._write('{}_{}'.format(op, tp))
-
-        self._cast(node)
-
-    def BIN(self, node):
-        self._gen(node.children[0])
-        self._gen(node.children[1])
-
-        if node.value == '+':
-            op = 'add'
-        elif node.value == '-':
-            op = 'sub'
-        elif node.value == '*':
-            op = 'mult'
-        elif node.value == '/':
-            op = 'div'
-        elif node.value == '%':
-            op = 'mod'
-
-        tp = node.children[0].expr_type.cls.name[0].lower()
-        self._write('{}_{}'.format(op, tp))
-
-        self._cast(node)
-
-    def UNARY(self, node):
-        self._gen(node.children[0])
-
-        if node.value == '-':
-            tp = node.children[0].expr_type.cls.name[0].lower()
-            self._write('neg_{}'.format(tp))
 
         self._cast(node)
 
