@@ -91,7 +91,7 @@ class Node:
         if self.function is not None:
             return
 
-        if self.type in ['BIN', 'UNARY']:
+        if self.type in ['BIN', 'UNARY', 'COMP']:
             arg_nodes = self.children
         else:
             arg_nodes = self.children[-1].children
@@ -173,10 +173,10 @@ class Node:
         elif self.type == 'FLOAT':
             self.expr_type = Type(symbol.FLOAT)
 
-        elif self.type in ['TEST', 'COMP']:
+        elif self.type == 'TEST':
             self.expr_type = Type(symbol.BOOL)
 
-        elif self.type in ['BIN', 'UNARY']:
+        elif self.type in ['BIN', 'UNARY', 'COMP']:
             self.overloads = syms.overloads(self.value)
 
         elif self.type == 'CALL':
@@ -215,13 +215,6 @@ class Node:
             self.children[0]._expect_type(Type(symbol.BOOL))
             self.children[1]._expect_type(Type(symbol.BOOL))
 
-        elif self.type == 'COMP':
-            self.children[0]._expect_types(*symbol.NUM_TYPES)
-
-            tp = Type(self.children[0].expr_type.cls)
-            self.children[0]._expect_type(tp)
-            self.children[1]._expect_type(tp)
-
         elif self.type == 'ASSN':
             tp = Type(self.children[0].expr_type.cls, self.level + 1)
             self.children[0]._expect_type(tp)
@@ -236,7 +229,7 @@ class Node:
             tp = Type(self.children[0].expr_type.cls)
             self.children[1]._expect_type(tp)
 
-        elif self.type in ['CALL', 'METHOD', 'BIN', 'UNARY']:
+        elif self.type in ['CALL', 'METHOD', 'BIN', 'UNARY', 'COMP']:
             self._resolve_overload(refs)
 
         elif self.type == 'MEMBER':
@@ -283,5 +276,5 @@ class Node:
         for c in self.children:
             c._analyze_expect(refs)
 
-        if self.type in ['CALL', 'METHOD', 'BIN', 'UNARY']:
+        if self.type in ['CALL', 'METHOD', 'BIN', 'UNARY', 'COMP']:
             self._resolve_overload(refs, required=True)

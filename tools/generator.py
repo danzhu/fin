@@ -243,7 +243,19 @@ class Generator:
         self._gen(node.children[0])
         self._gen(node.children[1])
 
-        op = node.value.lower()
+        if node.value == '<':
+            op = 'lt'
+        elif node.value == '<=':
+            op = 'le'
+        elif node.value == '>':
+            op = 'gt'
+        elif node.value == '>=':
+            op = 'ge'
+        elif node.value == '==':
+            op = 'eq'
+        elif node.value == '!=':
+            op = 'ne'
+
         tp = node.children[0].expr_type.cls.name[0].lower()
         self._write('{}_{}'.format(op, tp))
 

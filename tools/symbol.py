@@ -396,6 +396,13 @@ def load_builtins():
             fn.add_variable('v', tp)
             mod.add_function(fn)
 
+        # comparison
+        for op in ['<', '<=', '>', '>=', '==', '!=']:
+            fn = Function(op, Type(BOOL))
+            fn.add_variable('l', tp)
+            fn.add_variable('r', tp)
+            mod.add_function(fn)
+
     return mod
 
 def to_type(tp, syms):

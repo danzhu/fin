@@ -13,6 +13,8 @@ def test()
     let v Vec
     v.x = 3
     v.y = 4
-    (-distance(v) + 1).print()
+    if v.x > 0
+        (-distance(v) + 1).print()
+        0
 
 test()

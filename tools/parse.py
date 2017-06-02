@@ -257,7 +257,7 @@ class Parser:
     def _comp(self):
         node = self._expr()
         if self._lookahead.type == 'COMP':
-            op = self._lookahead.variant
+            op = self._lookahead.value
             self._next()
             r = self._expr()
             node = Node('COMP', (node, r), op)
