@@ -411,6 +411,9 @@ def to_type(tp, syms):
     return Type(syms.get(name, Symbol.Class), lvl)
 
 def interpolate_types(tps):
+    if None in tps:
+        return None
+
     cls = tps[0].cls
     lvl = tps[0].level
     for tp in tps:

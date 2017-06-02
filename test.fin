@@ -14,7 +14,9 @@ def test()
     v.x = 3
     v.y = 4
     if v.x > 0
-        (-distance(v) + 1).print()
-        0
+        -distance(v) + 1
+    else
+        v.y
+    .print()
 
 test()

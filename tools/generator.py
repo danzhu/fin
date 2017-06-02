@@ -39,6 +39,7 @@ class Generator:
         tp = node.expr_type
         tar = node.target_type
 
+        assert tp
         assert tar
 
         if not tar.none():
