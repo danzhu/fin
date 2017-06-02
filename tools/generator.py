@@ -96,7 +96,7 @@ class Generator:
         end = 'END_FN_' + node.function.fullname()
 
         self._write('function', node.function.fullname(), end)
-        self._gen(node.children[3])
+        self._gen(node.children[2])
 
         if node.function.ret.none():
             self._write('return')
@@ -124,10 +124,10 @@ class Generator:
 
     def LET(self, node):
         # self._write('# let {}'.format(node.sym.name))
-        if node.children[2].type == 'EMPTY':
+        if node.children[1].type == 'EMPTY':
             self._write('push', node.sym.type.size())
         else:
-            self._gen(node.children[2])
+            self._gen(node.children[1])
 
     def IF(self, node):
         els = self._label('ELSE')

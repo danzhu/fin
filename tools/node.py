@@ -17,10 +17,12 @@ class Node:
 
     def __str__(self):
         content = self.type
-        if self.value:
-            content += ' {}'.format(self.value)
+
         if self.function:
             content += ' {}'.format(self.function)
+        elif self.value:
+            content += ' {}'.format(self.value)
+
         if self.expr_type:
             content += ' [{}]'.format(self.expr_type)
         if self.target_type:
@@ -56,21 +58,21 @@ class Node:
 
     def _decl(self, mod):
         if self.type == 'DEF':
-            name = self.children[0].value
-            ret = self.children[2]._type(mod)
+            name = self.value
+            ret = self.children[1]._type(mod)
             self.function = Function(name, ret)
-            for p in self.children[1].children:
-                name = p.children[0].value
-                tp = p.children[1]._type(mod)
+            for p in self.children[0].children:
+                name = p.value
+                tp = p.children[0]._type(mod)
                 self.function.add_variable(name, tp)
             mod.add_function(self.function)
 
         elif self.type == 'STRUCT':
-            name = self.children[0].value
+            name = self.value
             self.struct = Class(name)
-            for f in self.children[1].children:
-                name = f.children[0].value
-                tp = f.children[1]._type(mod)
+            for f in self.children:
+                name = f.value
+                tp = f.children[0]._type(mod)
                 self.struct.add_variable(name, tp)
             mod.add_class(self.struct)
 
@@ -78,11 +80,11 @@ class Node:
             assert False, 'unknown declaration'
 
     def _type(self, syms):
-        if len(self.children) == 0:
+        if self.value is None:
             tp = symbols.NONE
             lvl = 0
         else:
-            tp = syms.get(self.children[0].value, Symbol.Class)
+            tp = syms.get(self.value, Symbol.Class)
             lvl = self.level
 
         return Type(tp, lvl)
@@ -134,8 +136,8 @@ class Node:
 
         # local variable symbol creation
         if self.type == 'LET':
-            name = self.children[0].value
-            tp = self.children[1]._type(syms)
+            name = self.value
+            tp = self.children[0]._type(syms)
             self.sym = syms.add_variable(name, tp)
 
         # process children
@@ -241,7 +243,7 @@ class Node:
                 c._expect_type(Type(symbols.NONE))
 
         elif self.type == 'DEF':
-            self.children[3]._expect_type(self.function.ret)
+            self.children[2]._expect_type(self.function.ret)
 
         elif self.type == 'BLOCK':
             for c in self.children[:-1]:
@@ -267,7 +269,7 @@ class Node:
             self.children[0]._expect_type(self.return_type)
 
         elif self.type == 'LET':
-            if self.children[2].type != 'EMPTY':
+            if self.children[1].type != 'EMPTY':
                 if self.sym.type.level != self.level:
                     raise TypeError('initialization level mismatch')
                 tp = Type(self.sym.type.cls, self.level)

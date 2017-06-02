@@ -46,36 +46,34 @@ class Parser:
 
     def _import(self):
         self._expect('IMPORT')
-        name = self._id()
+        name = self._name()
         self._expect('EOL')
-        return Node('IMPORT', (name,))
+        return Node('IMPORT', (), name)
 
     def _struct(self):
         self._expect('STRUCT')
-        name = self._id()
+        name = self._name()
         self._expect('EOL')
-        fields = self._fields()
-        return Node('STRUCT', (name, fields))
 
-    def _fields(self):
         self._expect('INDENT')
         children = []
         while self._lookahead.type != 'DEDENT':
             children.append(self._field())
         self._next() # DEDENT
         self._expect('EOL')
-        return Node('FIELDS', children)
+
+        return Node('STRUCT', children, name)
 
     def _field(self):
-        name = self._id()
+        name = self._name()
         tp = self._type()
         self._expect('EOL')
-        return Node('FIELD', (name, tp))
+        return Node('FIELD', (tp,), name)
 
     def _def(self):
         self._expect('DEF')
 
-        name = self._id()
+        name = self._name()
         params = self._params()
 
         if self._lookahead.type == 'EOL':
@@ -87,7 +85,7 @@ class Parser:
 
         cont = self._block()
         self._expect('EOL')
-        return Node('DEF', (name, params, ret, cont))
+        return Node('DEF', (params, ret, cont), name)
 
     def _params(self):
         self._expect('LPAREN')
@@ -114,7 +112,7 @@ class Parser:
 
     def _let(self):
         self._expect('LET')
-        name = self._id()
+        name = self._name()
         tp = self._type()
 
         lvl = 0
@@ -131,7 +129,7 @@ class Parser:
         else:
             self._expect()
 
-        return Node('LET', (name, tp, val), None, lvl)
+        return Node('LET', (tp, val), name, lvl)
 
     def _if(self):
         self._expect('IF')
@@ -179,17 +177,17 @@ class Parser:
         return Node('RETURN', children)
 
     def _param(self):
-        name = self._id()
+        name = self._name()
         tp = self._type()
-        return Node('PARAM', (name, tp))
+        return Node('PARAM', (tp,), name)
 
     def _type(self):
-        name = self._id()
+        name = self._name()
         lvl = 0
         while self._lookahead.type == 'AMP':
             self._next()
             lvl += 1
-        return Node('TYPE', (name,), None, lvl)
+        return Node('TYPE', (), name, lvl)
 
     def _block(self):
         stmts = []
@@ -295,8 +293,7 @@ class Parser:
 
         while self._lookahead.type == 'DOT':
             self._next() # DOT
-            name = self._lookahead.value
-            self._expect('ID')
+            name = self._name()
 
             if self._lookahead.type == 'LPAREN':
                 # method call
@@ -311,8 +308,7 @@ class Parser:
 
     def _atom(self):
         if self._lookahead.type == 'ID':
-            name = self._lookahead.value
-            self._next() # ID
+            name = self._name()
 
             if self._lookahead.type == 'LPAREN':
                 args = self._args()
@@ -347,7 +343,7 @@ class Parser:
         else:
             self._expect()
 
-    def _id(self):
+    def _name(self):
         name = self._lookahead.value
         self._expect('ID')
-        return Node('ID', (), name)
+        return name
