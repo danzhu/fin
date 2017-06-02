@@ -226,7 +226,7 @@ class Parser:
 
         tp = self._lookahead.type
         if tp == 'INC_ASSN':
-            op = self._lookahead.variant
+            op = self._lookahead.value
             self._next()
 
         else:

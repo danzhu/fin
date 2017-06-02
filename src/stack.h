@@ -65,6 +65,16 @@ namespace Fin
             return &_content[_size];
         }
 
+        char *top(uint16_t size)
+        {
+            if (_size < size)
+                throw std::overflow_error{"accessing at negative index"};
+
+            LOG(2) << std::endl << "  ^ [" << _size << ", " << size << "]";
+
+            return &_content[_size - size];
+        }
+
         template<typename T> T &at(uint32_t idx)
         {
             return *reinterpret_cast<T*>(at(idx, sizeof(T)));

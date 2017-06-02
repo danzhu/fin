@@ -199,7 +199,7 @@ void Fin::Runtime::execute()
                     auto src = opStack.at(loc, size);
                     auto dest = opStack.at(loc - amount, size);
                     move(src, dest, size);
-                    opStack.resize(opStack.size() - amount);
+                    opStack.pop(amount);
                 }
                 continue;
 
@@ -234,7 +234,7 @@ void Fin::Runtime::execute()
                 {
                     auto size = readConst<uint16_t>();
 
-                    opStack.resize(opStack.size() + size);
+                    opStack.push(size);
                 }
                 continue;
 
@@ -242,7 +242,17 @@ void Fin::Runtime::execute()
                 {
                     auto size = readConst<uint16_t>();
 
-                    opStack.resize(opStack.size() - size);
+                    opStack.pop(size);
+                }
+                continue;
+
+            case Opcode::Dup:
+                {
+                    auto size = readConst<uint16_t>();
+
+                    auto src = opStack.top(size);
+                    auto dest = opStack.push(size);
+                    move(src, dest, size);
                 }
                 continue;
 
@@ -251,7 +261,6 @@ void Fin::Runtime::execute()
                     auto size = readConst<uint16_t>();
 
                     auto ptr = opStack.pop<Ptr>();
-
                     auto src = alloc.read(ptr, size);
                     auto dest = opStack.push(size);
                     move(src, dest, size);
@@ -262,9 +271,8 @@ void Fin::Runtime::execute()
                 {
                     auto size = readConst<uint16_t>();
 
-                    auto ptr = opStack.pop<Ptr>();
-
                     auto src = opStack.pop(size);
+                    auto ptr = opStack.pop<Ptr>();
                     auto dest = alloc.write(ptr, size);
                     move(src, dest, size);
                 }

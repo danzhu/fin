@@ -192,26 +192,37 @@ class Generator:
         self._cast(node)
 
     def ASSN(self, node):
-        self._gen(node.children[1]) # value
-        self._gen(node.children[0]) # id
+        self._gen(node.children[0])
+        self._gen(node.children[1])
 
-        self._write('store', node.children[0].expr_type.size(node.level))
+        size = node.children[0].expr_type.size(node.level)
+        self._write('store', size)
 
         self._cast(node)
 
     def INC_ASSN(self, node):
-        size = node.children[0].expr_type.size(0)
+        tp = node.children[0].expr_type
+        size = tp.size(0)
 
         self._gen(node.children[0])
+        self._write('dup', tp.size())
         self._write('load', size)
         self._gen(node.children[1])
 
-        op = node.value.split('_', 1)[0].lower()
-        tp = node.children[0].expr_type.cls.name[0].lower()
+        if node.value == '+=':
+            op = 'add'
+        elif node.value == '-=':
+            op = 'sub'
+        elif node.value == '*=':
+            op = 'mult'
+        elif node.value == '/=':
+            op = 'div'
+        elif node.value == '%=':
+            op = 'mod'
+
+        tp = tp.cls.name[0].lower()
         self._write('{}_{}'.format(op, tp))
 
-        # FIXME: re-evaluation of children is problematic
-        self._gen(node.children[0])
         self._write('store', size)
 
         self._cast(node)
