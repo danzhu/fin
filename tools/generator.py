@@ -201,29 +201,6 @@ class Generator:
         self._cast(node)
 
     def INC_ASSN(self, node):
-        tp = node.children[0].expr_type
-        size = tp.size(0)
-
-        self._gen(node.children[0])
-        self._write('dup', tp.size())
-        self._write('load', size)
-        self._gen(node.children[1])
-
-        if node.value == '+=':
-            op = 'add'
-        elif node.value == '-=':
-            op = 'sub'
-        elif node.value == '*=':
-            op = 'mult'
-        elif node.value == '/=':
-            op = 'div'
-        elif node.value == '%=':
-            op = 'mod'
-
-        tp = tp.cls.name[0].lower()
-        self._write('{}_{}'.format(op, tp))
-
-        self._write('store', size)
 
         self._cast(node)
 
@@ -252,43 +229,62 @@ class Generator:
         self._cast(node)
 
     def OP(self, node):
-        for c in node.children:
-            self._gen(c)
+        val = node.value
+        assn = False
 
         if len(node.children) == 1:
-            if node.value == '+':
+            if val == '+':
                 raise NotImplementedError('unary + not implemented')
-            elif node.value == '-':
+            elif val == '-':
                 op = 'neg'
             else:
                 assert False, 'unknown operator'
-        elif node.value == '+':
-            op = 'add'
-        elif node.value == '-':
-            op = 'sub'
-        elif node.value == '*':
-            op = 'mult'
-        elif node.value == '/':
-            op = 'div'
-        elif node.value == '%':
-            op = 'mod'
-        elif node.value == '<':
+
+        elif val == '<':
             op = 'lt'
-        elif node.value == '<=':
-            op = 'le'
-        elif node.value == '>':
+        elif val == '>':
             op = 'gt'
-        elif node.value == '>=':
+        elif val == '<=':
+            op = 'le'
+        elif val == '>=':
             op = 'ge'
-        elif node.value == '==':
+        elif val == '==':
             op = 'eq'
-        elif node.value == '!=':
+        elif val == '!=':
             op = 'ne'
         else:
-            assert False, 'unknown operator'
+            if val[-1] == '=':
+                assn = True
+                val = val[:-1]
+
+            if val == '+':
+                op = 'add'
+            elif val == '-':
+                op = 'sub'
+            elif val == '*':
+                op = 'mult'
+            elif val == '/':
+                op = 'div'
+            elif val == '%':
+                op = 'mod'
+            else:
+                assert False, 'unknown operator'
+
+        self._gen(node.children[0])
+        if assn:
+            tp = node.children[0].expr_type
+            size = tp.size(0)
+
+            self._write('dup', tp.size())
+            self._write('load', size)
+        if len(node.children) > 1:
+            self._gen(node.children[1])
 
         tp = node.children[0].expr_type.cls.name[0].lower()
         self._write('{}_{}'.format(op, tp))
+
+        if assn:
+            self._write('store', size)
 
         self._cast(node)
 

@@ -222,23 +222,21 @@ class Parser:
         if self._lookahead.type not in ['ASSN', 'INC_ASSN', 'COLON']:
             return node
 
-        lvl = 0
-
-        tp = self._lookahead.type
-        if tp == 'INC_ASSN':
+        if self._lookahead.type == 'INC_ASSN':
             op = self._lookahead.value
-            self._next()
+            self._next() # INC_ASSN
+            val = self._test()
+            return Node('OP', (node, val), op)
 
-        else:
-            tp = 'ASSN'
-            while self._lookahead.type == 'COLON':
-                self._next()
-                lvl += 1
-            op = None
-            self._expect('ASSN')
+        lvl = 0
+        while self._lookahead.type == 'COLON':
+            self._next()
+            lvl += 1
+        op = None
+        self._expect('ASSN')
 
         val = self._test()
-        return Node(tp, (node, val), op, lvl)
+        return Node('ASSN', (node, val), op, lvl)
 
     def _or_test(self):
         node = self._and_test()

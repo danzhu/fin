@@ -386,21 +386,28 @@ def load_builtins():
         # binary
         for op in ['+', '-', '*', '/', '%']:
             fn = Function(op, tp)
-            fn.add_variable('l', tp)
-            fn.add_variable('r', tp)
+            fn.add_variable('left', tp)
+            fn.add_variable('right', tp)
             mod.add_function(fn)
 
         # unary
         for op in ['+', '-']:
             fn = Function(op, tp)
-            fn.add_variable('v', tp)
+            fn.add_variable('value', tp)
             mod.add_function(fn)
 
         # comparison
         for op in ['<', '<=', '>', '>=', '==', '!=']:
             fn = Function(op, Type(BOOL))
-            fn.add_variable('l', tp)
-            fn.add_variable('r', tp)
+            fn.add_variable('left', tp)
+            fn.add_variable('right', tp)
+            mod.add_function(fn)
+
+        # incremental assignment
+        for op in ['+=', '-=', '*=', '/=', '%=']:
+            fn = Function(op, Type(NONE))
+            fn.add_variable('self', Type(cls, 1))
+            fn.add_variable('value', tp)
             mod.add_function(fn)
 
     return mod

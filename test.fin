@@ -19,7 +19,7 @@ def test()
     if v.x < 0
         -distance(v) + 1
     else
-        i += distance(v)
+        i += input()
         v.y + j
     .print()
 

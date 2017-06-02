@@ -210,7 +210,7 @@ class Node:
 
             self.sym = syms.add_variable(name, tp)
 
-        elif self.type in ['ASSN', 'INC_ASSN', 'WHILE', 'EMPTY']:
+        elif self.type in ['ASSN', 'WHILE', 'EMPTY']:
             self.expr_type = Type(symbols.NONE)
 
     def _analyze_expect(self, refs):
@@ -223,13 +223,6 @@ class Node:
             self.children[0]._expect_type(tp)
 
             tp = Type(self.children[0].expr_type.cls, self.level)
-            self.children[1]._expect_type(tp)
-
-        elif self.type == 'INC_ASSN':
-            tp = Type(self.children[0].expr_type.cls, 1)
-            self.children[0]._expect_type(tp)
-
-            tp = Type(self.children[0].expr_type.cls)
             self.children[1]._expect_type(tp)
 
         elif self.type in ['CALL', 'METHOD', 'OP']:
