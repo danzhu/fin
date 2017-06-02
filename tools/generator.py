@@ -3,8 +3,8 @@
 import sys
 from lexer import Lexer
 from parse import Parser
-from symbol import Location, Symbol
-import symbol
+from symbols import Location, Symbol
+import symbols
 
 class Generator:
     def __init__(self):
@@ -302,7 +302,7 @@ class Generator:
 
     def VAR(self, node):
         if node.sym.TYPE == Symbol.Constant:
-            if node.sym.cls == symbol.BOOL:
+            if node.sym.cls == symbols.BOOL:
                 if node.sym.value:
                     self._write('const_true')
                 else:

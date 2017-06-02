@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import symbol
-from symbol import Symbol, Type, Module, Function, Class, Block
+import symbols
+from symbols import Symbol, Type, Module, Function, Class, Block
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=None):
@@ -79,7 +79,7 @@ class Node:
 
     def _type(self, syms):
         if len(self.children) == 0:
-            tp = symbol.NONE
+            tp = symbols.NONE
             lvl = 0
         else:
             tp = syms.get(self.children[0].value, Symbol.Class)
@@ -101,7 +101,7 @@ class Node:
         args = [c.expr_type for c in arg_nodes]
         ret = self.target_type
 
-        self.overloads = symbol.resolve_overload(self.overloads, args, ret)
+        self.overloads = symbols.resolve_overload(self.overloads, args, ret)
 
         if len(self.overloads) == 0:
             fn = '{}({}) {}'.format(self.value,
@@ -168,13 +168,13 @@ class Node:
             self.expr_type = self.sym.var_type()
 
         elif self.type == 'NUM':
-            self.expr_type = Type(symbol.INT)
+            self.expr_type = Type(symbols.INT)
 
         elif self.type == 'FLOAT':
-            self.expr_type = Type(symbol.FLOAT)
+            self.expr_type = Type(symbols.FLOAT)
 
         elif self.type == 'TEST':
-            self.expr_type = Type(symbol.BOOL)
+            self.expr_type = Type(symbols.BOOL)
 
         elif self.type in ['BIN', 'UNARY', 'COMP']:
             self.overloads = syms.overloads(self.value)
@@ -201,19 +201,19 @@ class Node:
 
         elif self.type == 'IF':
             tps = [c.expr_type for c in self.children[1:]]
-            self.expr_type = symbol.interpolate_types(tps)
+            self.expr_type = symbols.interpolate_types(tps)
 
         elif self.type == 'RETURN':
             self.return_type = syms.ancestor(Symbol.Function).ret
-            self.expr_type = Type(symbol.NONE)
+            self.expr_type = Type(symbols.NONE)
 
         elif self.type in ['ASSN', 'INC_ASSN', 'WHILE', 'EMPTY']:
-            self.expr_type = Type(symbol.NONE)
+            self.expr_type = Type(symbols.NONE)
 
     def _analyze_expect(self, refs):
         if self.type == 'TEST':
-            self.children[0]._expect_type(Type(symbol.BOOL))
-            self.children[1]._expect_type(Type(symbol.BOOL))
+            self.children[0]._expect_type(Type(symbols.BOOL))
+            self.children[1]._expect_type(Type(symbols.BOOL))
 
         elif self.type == 'ASSN':
             tp = Type(self.children[0].expr_type.cls, self.level + 1)
@@ -238,7 +238,7 @@ class Node:
 
         elif self.type == 'FILE':
             for c in self.children:
-                c._expect_type(Type(symbol.NONE))
+                c._expect_type(Type(symbols.NONE))
 
         elif self.type == 'DEF':
             self.children[3]._expect_type(self.function.ret)
@@ -247,19 +247,19 @@ class Node:
             self.expr_type = self.target_type
 
             for c in self.children[:-1]:
-                c._expect_type(Type(symbol.NONE))
+                c._expect_type(Type(symbols.NONE))
 
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
             self.expr_type = self.target_type
 
-            self.children[0]._expect_type(Type(symbol.BOOL))
+            self.children[0]._expect_type(Type(symbols.BOOL))
             self.children[1]._expect_type(self.expr_type)
             self.children[2]._expect_type(self.expr_type)
 
         elif self.type == 'WHILE':
-            self.children[0]._expect_type(Type(symbol.BOOL))
+            self.children[0]._expect_type(Type(symbols.BOOL))
             self.children[1]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':

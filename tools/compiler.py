@@ -6,8 +6,8 @@ from lexer import Lexer
 from parse import Parser
 from generator import Generator
 from asm import Assembler
-import symbol
-from symbol import Location, Module
+import symbols
+from symbols import Location, Module
 
 class Compiler:
     def __init__(self, lex):
@@ -27,8 +27,8 @@ class Compiler:
 
         root = self.parser.parse(tokens)
 
-        glob = symbol.load_builtins()
-        syms = symbol.load_module('fin', glob)
+        glob = symbols.load_builtins()
+        syms = symbols.load_module('fin', glob)
         refs = set()
 
         if stage == 'parse':
