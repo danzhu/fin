@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import symbols
-from symbols import Symbol, Type, Module, Function, Class, Block
+from symbols import Symbol, Module, Function, Struct, Block, Reference
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=None):
@@ -54,18 +54,12 @@ class Node:
 
         self.target_type = tp
 
-    def _expect_types(self, *tps):
-        if self.expr_type.cls not in tps:
-            self._error('expecting {}, but got {}',
-                ' or '.join(tp.name for tp in tps),
-                self.expr_type)
-
     def _decl(self, mod):
         if self.type == 'DEF':
             name = self.value
             ret = self.children[1]._type(mod)
             if ret is None:
-                ret = Type(symbols.NONE)
+                ret = symbols.NONE
 
             self.function = Function(name, ret)
 
@@ -78,14 +72,14 @@ class Node:
 
         elif self.type == 'STRUCT':
             name = self.value
-            self.struct = Class(name)
+            self.struct = Struct(name)
 
             for f in self.children:
                 name = f.value
                 tp = f.children[0]._type(mod)
                 self.struct.add_variable(name, tp)
 
-            mod.add_class(self.struct)
+            mod.add_struct(self.struct)
 
         else:
             assert False, 'unknown declaration'
@@ -94,10 +88,12 @@ class Node:
         if self.value is None:
             return None
 
-        tp = syms.get(self.value, Symbol.Class)
+        tp = syms.get(self.value, Symbol.Type)
         lvl = self.level
+        if lvl > 0:
+            tp = Reference(tp, lvl)
 
-        return Type(tp, lvl)
+        return tp
 
     def _resolve_overload(self, refs):
         if self.function is not None:
@@ -110,9 +106,9 @@ class Node:
 
         if len(self.overloads) == 0:
             fn = '{}({}) {}'.format(self.value,
-                    ', '.join(str(a or '?') for a in args),
-                    ret or '?')
-            raise LookupError('no viable function overload for:\n  ' + fn)
+                    ', '.join(str(a) for a in args),
+                    ret)
+            self._error('no viable function overload for:\n  ' + fn)
 
         if len(self.overloads) > 1:
             return
@@ -152,41 +148,48 @@ class Node:
             self.expr_type = self.sym.var_type()
 
         elif self.type == 'NUM':
-            self.expr_type = Type(symbols.INT)
+            self.expr_type = symbols.INT
 
         elif self.type == 'FLOAT':
-            self.expr_type = Type(symbols.FLOAT)
+            self.expr_type = symbols.FLOAT
 
         elif self.type == 'TEST':
-            self.expr_type = Type(symbols.BOOL)
+            self.expr_type = symbols.BOOL
 
         elif self.type == 'OP':
+            self.expr_type = symbols.UNKNOWN
             self.overloads = syms.overloads(self.value)
             self.args = self.children
 
             self._resolve_overload(refs)
 
         elif self.type == 'CALL':
+            self.expr_type = symbols.UNKNOWN
             self.overloads = syms.overloads(self.value)
             self.args = self.children[0].children
 
             if len(self.overloads) == 0:
-                raise LookupError('no function "{}" defined'.format(self.value))
+                self._error('no function "{}" defined', self.value)
 
             self._resolve_overload(refs)
 
         elif self.type == 'METHOD':
+            self.expr_type = symbols.UNKNOWN
             self.overloads = syms.overloads(self.value)
             self.args = [self.children[0]] + self.children[1].children
 
             if len(self.overloads) == 0:
-                raise LookupError('no method "{}" defined'.format(self.value))
+                self._error('no method "{}" defined', self.value)
 
             self._resolve_overload(refs)
 
         elif self.type == 'MEMBER':
-            cls = self.children[0].expr_type.cls
-            self.field = cls.get(self.value, Symbol.Variable)
+            tp = symbols.to_level(self.children[0].expr_type, 0)
+
+            if type(tp) is not Struct:
+                self._error('member access requires struct type')
+
+            self.field = tp.get(self.value, Symbol.Variable)
             self.expr_type = self.field.var_type()
 
         elif self.type == 'BLOCK':
@@ -198,31 +201,34 @@ class Node:
 
         elif self.type == 'RETURN':
             self.return_type = syms.ancestor(Symbol.Function).ret
-            self.expr_type = Type(symbols.NONE)
+            self.expr_type = symbols.NONE
 
         elif self.type == 'LET':
             name = self.value
             tp = self.children[0]._type(syms)
             if tp is None:
-                tp = Type(self.children[1].expr_type.cls, self.level)
+                tp = self.children[1].expr_type
+
                 if tp is None:
                     self._error('type is required when no initialization')
+
+                tp = symbols.to_level(tp, self.level)
 
             self.sym = syms.add_variable(name, tp)
 
         elif self.type in ['ASSN', 'WHILE', 'EMPTY']:
-            self.expr_type = Type(symbols.NONE)
+            self.expr_type = symbols.NONE
 
     def _analyze_expect(self, refs):
         if self.type == 'TEST':
-            self.children[0]._expect_type(Type(symbols.BOOL))
-            self.children[1]._expect_type(Type(symbols.BOOL))
+            self.children[0]._expect_type(symbols.BOOL)
+            self.children[1]._expect_type(symbols.BOOL)
 
         elif self.type == 'ASSN':
-            tp = Type(self.children[0].expr_type.cls, self.level + 1)
+            tp = symbols.to_level(self.children[0].expr_type, self.level + 1)
             self.children[0]._expect_type(tp)
 
-            tp = Type(self.children[0].expr_type.cls, self.level)
+            tp = symbols.to_level(self.children[0].expr_type, self.level)
             self.children[1]._expect_type(tp)
 
         elif self.type in ['CALL', 'METHOD', 'OP']:
@@ -240,26 +246,26 @@ class Node:
                 c._expect_type(t.type)
 
         elif self.type == 'MEMBER':
-            tp = Type(self.children[0].expr_type.cls, 1)
+            tp = symbols.to_level(self.children[0].expr_type, 1)
             self.children[0]._expect_type(tp)
 
         elif self.type == 'FILE':
             for c in self.children:
-                c._expect_type(Type(symbols.NONE))
+                c._expect_type(symbols.NONE)
 
         elif self.type == 'DEF':
             self.children[2]._expect_type(self.function.ret)
 
         elif self.type == 'BLOCK':
             for c in self.children[:-1]:
-                c._expect_type(Type(symbols.NONE))
+                c._expect_type(symbols.NONE)
 
             self.expr_type = self.target_type
 
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
-            self.children[0]._expect_type(Type(symbols.BOOL))
+            self.children[0]._expect_type(symbols.BOOL)
 
             self.expr_type = self.target_type
 
@@ -267,7 +273,7 @@ class Node:
             self.children[2]._expect_type(self.expr_type)
 
         elif self.type == 'WHILE':
-            self.children[0]._expect_type(Type(symbols.BOOL))
+            self.children[0]._expect_type(symbols.BOOL)
             self.children[1]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
@@ -275,9 +281,15 @@ class Node:
 
         elif self.type == 'LET':
             if self.children[1].type != 'EMPTY':
-                if self.sym.type.level != self.level:
+                if type(self.sym.type) is Reference:
+                    lvl = self.sym.type.level
+                else:
+                    lvl = 0
+
+                if lvl != self.level:
                     self._error('initialization level mismatch')
-                tp = Type(self.sym.type.cls, self.level)
+
+                tp = symbols.to_level(self.sym.type, lvl)
                 self.children[1]._expect_type(tp)
 
         # recurse

@@ -12,65 +12,10 @@ class Location(Enum):
 
 class Symbol(Enum):
     Module   = 0
-    Class    = 1
+    Type     = 1
     Function = 2
     Variable = 3
     Constant = 4
-
-
-class Type:
-    def __init__(self, cls, lvl=0):
-        self.cls = cls
-        self.level = lvl
-
-    def __str__(self):
-        return self.cls.name + '&' * self.level
-
-    def fullname(self):
-        return self.cls.fullname() + '&' * self.level
-
-    def fullpath(self):
-        return self.cls.fullpath() + '&' * self.level
-
-    def size(self, lvl=-1):
-        if lvl == -1:
-            lvl = self.level
-        if lvl > 0:
-            return 8 # size of pointer
-        else:
-            return self.cls.size
-
-    def none(self):
-        return self.cls == NONE and self.level == 0
-
-    def empty(self):
-        return self.cls.size == 0 and self.level == 0
-
-    def match(self, tp):
-        # 0: type mismatch
-        # 1: casting to none
-        # 2: level reduction
-        # 3: exact match
-
-        # (Python's) None value denotes unknown type
-        if tp is None:
-            return math.nan
-
-        if self.cls != tp.cls:
-            if self.none():
-                # everything can be cast to None
-                return 1
-            else:
-                # otherwise, type mismatch
-                return 0
-
-        if self.level > tp.level:
-            return 0
-
-        if self.level < tp.level:
-            return 2
-
-        return 3
 
 
 class Variable:
@@ -86,21 +31,22 @@ class Variable:
         return '{} {}'.format(self.name, self.type, self.location)
 
     def var_type(self):
-        return Type(self.type.cls, self.type.level + 1)
+        if type(self.type) is not Reference:
+            return Reference(self.type, 1)
+        else:
+            return Reference(self.type.type, self.type.level + 1)
 
 
 class Constant:
     TYPE = Symbol.Constant
 
-    def __init__(self, name, cls, val):
+    def __init__(self, name, tp, val):
         self.name = name
-        self.cls = cls
+        self.type = tp
         self.value = val
 
-        self.type = Type(cls)
-
     def var_type(self):
-        return Type(self.cls)
+        return self.type
 
 
 class SymbolTable:
@@ -204,9 +150,9 @@ class Module(SymbolTable):
         self._add_symbol(mod)
         mod.parent = self
 
-    def add_class(self, cls):
-        self._add_symbol(cls)
-        cls.parent = self
+    def add_struct(self, struct):
+        self._add_symbol(struct)
+        struct.parent = self
 
     def add_function(self, fn):
         if fn.name not in self.symbols:
@@ -231,15 +177,21 @@ class Module(SymbolTable):
 
 
 
-class Class(SymbolTable):
+class Struct(SymbolTable):
     LOCATION = Location.Struct
-    TYPE = Symbol.Class
+    TYPE = Symbol.Type
 
     def __init__(self, name, size=0):
         super().__init__()
 
         self.name = name
-        self.size = size
+        self._size = size
+
+    def __str__(self):
+        return self.name
+
+    def size(self):
+        return self._size
 
     def fullname(self):
         return self.name
@@ -248,12 +200,44 @@ class Class(SymbolTable):
         return self.ancestor(Symbol.Module).path() + self.fullname()
 
     def add_variable(self, name, tp):
-        var = Variable(name, tp, Location.Struct, self.size)
-        self.size += tp.size()
+        var = Variable(name, tp, Location.Struct, self._size)
+        self._size += tp.size()
 
         self._add_symbol(var)
 
         return var
+
+    def match(self, other):
+        if other == UNKNOWN:
+            return math.nan
+
+        # if reference, reduce to level 0
+        ref = type(other) is Reference
+        if ref:
+            other = other.type
+        elif type(other) is not Struct:
+            # does not accept other types
+            return None
+
+        if self == other:
+            # score is lower if there's level reduction
+            return 2.0 if ref else 3.0
+        elif other == NONE:
+            return 1.0
+        else:
+            return None
+
+    def interpolate(self, other):
+        if type(other) is Reference:
+            other = other.type
+
+        if self == UNKNOWN or other == UNKNOWN:
+            return UNKNOWN
+
+        if self != other:
+            return NONE
+
+        return self
 
 
 class Function(SymbolTable):
@@ -272,20 +256,19 @@ class Function(SymbolTable):
         return '{}({}){}'.format(
                 self.name,
                 ', '.join(str(p) for p in self.params),
-                ' ' + str(self.ret) if not self.ret.none() else '')
+                ' ' + str(self.ret) if self.ret != NONE else '')
 
     def fullname(self):
         return '{}({}){}'.format(
                 self.name,
                 ','.join(p.type.fullpath() for p in self.params),
-                self.ret.fullpath() if not self.ret.none() else '')
+                self.ret.fullpath() if self.ret != NONE else '')
 
     def fullpath(self):
         return self.ancestor(Symbol.Module).path() + self.fullname()
 
     def add_variable(self, name, tp):
         assert type(name) is str
-        assert type(tp) is Type
 
         var = Variable(name, tp, Location.Param, 0)
 
@@ -301,6 +284,12 @@ class Function(SymbolTable):
         if len(self.params) != len(args):
             return None
 
+        # None: type mismatch
+        # 1: casting to none
+        # 2: level reduction
+        # 3: exact match
+        # nan: unknown
+
         lvls = [p.type.match(a) for p, a in zip(self.params, args)]
 
         if ret is not None:
@@ -308,7 +297,7 @@ class Function(SymbolTable):
         else:
             lvls.append(math.nan)
 
-        if 0 in lvls:
+        if None in lvls:
             return None
 
         return lvls
@@ -353,36 +342,87 @@ class Match:
 
         return less
 
+    def __str__(self):
+        return '{} {}'.format(self.function, self.match)
+
     def update(self, args, ret):
         self.match = self.function.match(args, ret)
         return self.match is not None
 
 
-NONE = Class('None', 0)
-BOOL = Class('Bool', 1)
-INT = Class('Int', 4)
-FLOAT = Class('Float', 4)
+class Reference:
+    def __init__(self, tp, lvl):
+        self.type = tp
+        self.level = lvl
+
+    def __str__(self):
+        return str(self.type) + '&' * self.level
+
+    def fullname(self):
+        return self.type.fullname() + '&' * self.level
+
+    def fullpath(self):
+        return self.type.fullpath() + '&' * self.level
+
+    def size(self):
+        return 8 # size of pointer
+
+    def match(self, other):
+        if other == UNKNOWN:
+            return math.nan
+
+        if type(other) is not Reference:
+            other = Reference(other, 0)
+
+        if self.level > other.level:
+            return None
+
+        lvl = 2 + self.level / other.level
+
+        res = self.type.match(other.type)
+        if res is None:
+            return None
+
+        return min(lvl, res)
+
+    def interpolate(self, other):
+        if other == UNKNOWN:
+            return UNKNOWN
+
+        if type(other) is not Reference:
+            other = Reference(other, 0)
+
+        tp = self.type.interpolate(other.type)
+
+        lvl = min(self.level, other.level)
+        if lvl > 0:
+            tp = Reference(tp, lvl)
+
+        return tp
+
+
+NONE = Struct('None', 0)
+BOOL = Struct('Bool', 1)
+INT = Struct('Int', 4)
+FLOAT = Struct('Float', 4)
+UNKNOWN = Struct('?', -1)
 
 TRUE = Constant('TRUE', BOOL, True)
 FALSE = Constant('FALSE', BOOL, False)
-
-NUM_TYPES = [INT, FLOAT]
 
 def load_builtins():
     mod = Module('')
 
     # classes
-    for cls in { NONE, BOOL, INT, FLOAT }:
-        mod.add_class(cls)
+    for struct in { NONE, BOOL, INT, FLOAT }:
+        mod.add_struct(struct)
 
     # constants
     for const in { TRUE, FALSE }:
         mod.add_constant(const)
 
     # builtin operations
-    for cls in { INT, FLOAT }:
-        tp = Type(cls)
-
+    for tp in { INT, FLOAT }:
         # binary
         for op in ['+', '-', '*', '/', '%']:
             fn = Function(op, tp)
@@ -398,36 +438,50 @@ def load_builtins():
 
         # comparison
         for op in ['<', '<=', '>', '>=', '==', '!=']:
-            fn = Function(op, Type(BOOL))
+            fn = Function(op, BOOL)
             fn.add_variable('left', tp)
             fn.add_variable('right', tp)
             mod.add_function(fn)
 
         # incremental assignment
         for op in ['+=', '-=', '*=', '/=', '%=']:
-            fn = Function(op, Type(NONE))
-            fn.add_variable('self', Type(cls, 1))
+            fn = Function(op, NONE)
+            fn.add_variable('self', Reference(tp, 1))
             fn.add_variable('value', tp)
             mod.add_function(fn)
 
     return mod
 
-def to_type(tp, syms):
-    name = tp.rstrip('&')
-    lvl = len(tp) - len(name)
-    return Type(syms.get(name, Symbol.Class), lvl)
+def to_type(val, syms):
+    name = val.rstrip('&')
+    tp = syms.get(name, Symbol.Type)
+
+    lvl = len(val) - len(name)
+    if lvl > 0:
+        tp = Reference(tp, lvl)
+
+    return tp
+
+def to_level(tp, lvl):
+    if type(tp) is Reference:
+        tp = tp.type
+
+    if lvl > 0:
+        tp = Reference(tp, lvl)
+
+    return tp
+
+def to_ref(tp):
+    if type(tp) is not Reference:
+        tp = Reference(tp, 0)
+
+    return tp
 
 def interpolate_types(tps):
-    if None in tps:
-        return None
-
-    cls = tps[0].cls
-    lvl = tps[0].level
-    for tp in tps:
-        if tp.cls != cls:
-            return Type(NONE)
-        lvl = min(lvl, tp.level)
-    return Type(cls, lvl)
+    res = tps[0]
+    for tp in tps[1:]:
+        res = res.interpolate(tp)
+    return res
 
 def load_module(mod_name, glob):
     # TODO: a better way to locate

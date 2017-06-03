@@ -3,7 +3,7 @@
 import sys
 from lexer import Lexer
 from parse import Parser
-from symbols import Location, Symbol
+from symbols import Location, Symbol, Reference
 import symbols
 
 class Generator:
@@ -36,22 +36,28 @@ class Generator:
         self.indent -= 1
 
     def _cast(self, node):
-        tp = node.expr_type
-        tar = node.target_type
+        assert node.expr_type is not None
+        assert node.target_type is not None
 
-        assert tp
-        assert tar
+        if node.target_type == symbols.NONE:
+            if node.expr_type.size() > 0:
+                self._write('pop', node.expr_type.size())
 
-        if not tar.none():
-            assert not tp.none()
+            return
 
-            l = tp.level
-            while l > tar.level:
-                l -= 1
-                self._write('load', tp.size(l))
+        assert node.expr_type != symbols.NONE
 
-        elif not tp.empty():
-            self._write('pop', tp.size())
+        # TODO: need to change when cast is more than level reduction
+        if type(node.expr_type) is not Reference:
+            return
+
+        lvl = node.expr_type.level
+        tar = symbols.to_ref(node.target_type).level
+
+        while lvl > tar:
+            lvl -= 1
+            tp = symbols.to_level(node.expr_type, lvl)
+            self._write('load', tp.size())
 
     def _label(self, name):
         count = self._labels[name] if name in self._labels else 0
@@ -98,7 +104,7 @@ class Generator:
         self._write('function', node.function.fullname(), end)
         self._gen(node.children[2])
 
-        if node.function.ret.none():
+        if node.function.ret.size() == 0:
             self._write('return')
         else:
             self._write('return_val', node.function.ret.size())
@@ -114,16 +120,15 @@ class Generator:
         self._cast(node)
 
         # pop variables declared in block
-        # TODO: RAII
         size = node.block.offset
-        if size > 0:
-            if node.expr_type.none():
-                self._write('pop', size)
-            else:
-                self._write('reduce', node.target_type.size(), size)
+        if size == 0:
+            pass
+        elif node.target_type.size() == 0:
+            self._write('pop', size)
+        else:
+            self._write('reduce', node.target_type.size(), size)
 
     def LET(self, node):
-        # self._write('# let {}'.format(node.sym.name))
         if node.children[1].type == 'EMPTY':
             self._write('push', node.sym.type.size())
         else:
@@ -195,7 +200,7 @@ class Generator:
         self._gen(node.children[0])
         self._gen(node.children[1])
 
-        size = node.children[0].expr_type.size(node.level)
+        size = node.children[1].target_type.size()
         self._write('store', size)
 
         self._cast(node)
@@ -271,16 +276,18 @@ class Generator:
                 assert False, 'unknown operator'
 
         self._gen(node.children[0])
+
         if assn:
-            tp = node.children[0].expr_type
-            size = tp.size(0)
+            tp = node.children[0].target_type
+            size = tp.type.size()
 
             self._write('dup', tp.size())
             self._write('load', size)
+
         if len(node.children) > 1:
             self._gen(node.children[1])
 
-        tp = node.children[0].expr_type.cls.name[0].lower()
+        tp = node.children[0].target_type.fullname()[0].lower()
         self._write('{}_{}'.format(op, tp))
 
         if assn:
@@ -300,7 +307,7 @@ class Generator:
 
     def VAR(self, node):
         if node.sym.TYPE == Symbol.Constant:
-            if node.sym.cls == symbols.BOOL:
+            if node.sym == symbols.BOOL:
                 if node.sym.value:
                     self._write('const_true')
                 else:
