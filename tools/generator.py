@@ -134,6 +134,14 @@ class Generator:
         else:
             self._gen(node.children[1])
 
+    def ALLOC(self, node):
+        self._gen(node.children[1]) # size
+
+        size = node.element_type.size()
+        self._write('const_i', size)
+        self._write('mult_i')
+        self._write('alloc')
+
     def IF(self, node):
         els = self._label('ELSE')
         end = self._label('END_IF')
@@ -235,6 +243,17 @@ class Generator:
 
     def OP(self, node):
         val = node.value
+
+        if val == '[]':
+            self._gen(node.children[0])
+            self._gen(node.children[1])
+
+            tp = symbols.to_level(node.expr_type, node.expr_type.level - 1)
+            self._write('addr_offset', tp.size())
+
+            self._cast(node)
+            return
+
         assn = False
 
         if len(node.children) == 1:

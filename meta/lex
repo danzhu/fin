@@ -12,6 +12,8 @@
 > start : COLON
 > start ( LPAREN
 > start ) RPAREN
+> start [ LBRACKET
+> start ] RBRACKET
 > start < LT
 > start > GT
 > start \ BACKSLASH
@@ -62,3 +64,4 @@ keyword begin BEGIN
 keyword return RETURN
 keyword and AND
 keyword or OR
+keyword alloc ALLOC

@@ -77,7 +77,7 @@ class Parser:
         params = self._params()
 
         if self._lookahead.type == 'EOL':
-            ret = Node('TYPE', ())
+            ret = self._empty()
         else:
             ret = self._type()
 
@@ -114,10 +114,10 @@ class Parser:
         self._expect('LET')
         name = self._name()
 
-        if self._lookahead.type == 'ID':
-            tp = self._type()
+        if self._lookahead.type in ['ASSN', 'COLON', 'EOL']:
+            tp = self._empty()
         else:
-            tp = Node('TYPE', ())
+            tp = self._type()
 
         lvl = 0
         if self._lookahead.type in ['ASSN', 'COLON']:
@@ -186,12 +186,24 @@ class Parser:
         return Node('PARAM', (tp,), name)
 
     def _type(self):
-        name = self._name()
-        lvl = 0
-        while self._lookahead.type == 'AMP':
-            self._next()
-            lvl += 1
-        return Node('TYPE', (), name, lvl)
+        if self._lookahead.type == 'LBRACKET':
+            self._next() # LBRACKET
+            node = self._type()
+            self._expect('RBRACKET')
+            node = Node('ARRAY', (node,))
+        else:
+            name = self._name()
+            node = Node('TYPE', (), name)
+
+        if self._lookahead.type == 'AMP':
+            lvl = 0
+            while self._lookahead.type == 'AMP':
+                self._next()
+                lvl += 1
+
+            node = Node('REF', (node,), None, lvl)
+
+        return node
 
     def _block(self):
         stmts = []
@@ -293,17 +305,27 @@ class Parser:
     def _atom_expr(self):
         node = self._atom()
 
-        while self._lookahead.type == 'DOT':
-            self._next() # DOT
-            name = self._name()
+        while True:
+            if self._lookahead.type == 'DOT':
+                self._next() # DOT
+                name = self._name()
 
-            if self._lookahead.type == 'LPAREN':
-                # method call
-                args = self._args()
-                node = Node('METHOD', (node, args), name)
+                if self._lookahead.type == 'LPAREN':
+                    # method call
+                    args = self._args()
+                    node = Node('METHOD', (node, args), name)
+                else:
+                    # member access
+                    node = Node('MEMBER', (node,), name)
+
+            elif self._lookahead.type == 'LBRACKET':
+                self._next() # LBRACKET
+                idx = self._test()
+                self._expect('RBRACKET')
+                node = Node('OP', (node, idx), '[]')
+
             else:
-                # member access
-                node = Node('MEMBER', (node,), name)
+                break
 
         return node
 
@@ -329,6 +351,15 @@ class Parser:
             test = self._test()
             self._expect('RPAREN')
             return test
+
+        elif self._lookahead.type == 'ALLOC':
+            self._next()
+            tp = self._type()
+
+            self._expect('LBRACKET')
+            length = self._test()
+            self._expect('RBRACKET')
+            return Node('ALLOC', (tp, length))
 
         elif self._lookahead.type == 'IF':
             return self._if()

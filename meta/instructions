@@ -60,6 +60,10 @@ store size:H
 addr_frame offset:h
     Load address of frame at `offset` onto stack.
 
+addr_offset size:H
+    Pop address and index from stack, and push the address of that element onto
+    stack.
+
 offset offset:I
     Increment the value on stack by `offset`.
 

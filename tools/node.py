@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import symbols
-from symbols import Symbol, Module, Function, Struct, Block, Reference
+from symbols import Symbol, Module, Function, Struct, Block, Reference, Array
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=None):
@@ -24,10 +24,10 @@ class Node:
             content += ' {}'.format(self.value)
 
         if self.expr_type:
-            content += ' [{}'.format(self.expr_type)
+            content += ' <{}'.format(self.expr_type)
             if self.target_type:
                 content += ' -> {}'.format(self.target_type)
-            content += ']'
+            content += '>'
 
         if self.level:
             content += ' {}'.format(self.level)
@@ -49,8 +49,10 @@ class Node:
         raise RuntimeError(msg)
 
     def _expect_type(self, tp):
-        if tp.match(self.expr_type) == 0:
-            self._error('{} cannot be converted to {}', self.expr_type, tp)
+        if self.expr_type is not None:
+            gens = {}
+            if tp.accept(self.expr_type, gens) is None:
+                self._error('{} cannot be converted to {}', self.expr_type, tp)
 
         self.target_type = tp
 
@@ -85,15 +87,24 @@ class Node:
             assert False, 'unknown declaration'
 
     def _type(self, syms):
-        if self.value is None:
+        if self.type == 'EMPTY':
             return None
 
-        tp = syms.get(self.value, Symbol.Type)
-        lvl = self.level
-        if lvl > 0:
-            tp = Reference(tp, lvl)
+        if self.type == 'TYPE':
+            return syms.get(self.value, Symbol.Struct)
 
-        return tp
+        elif self.type == 'REF':
+            tp = self.children[0]._type(syms)
+
+            if self.level > 0:
+                tp = Reference(tp, self.level)
+
+            return tp
+
+        elif self.type == 'ARRAY':
+            tp = self.children[0]._type(syms)
+
+            return Array(tp)
 
     def _resolve_overload(self, refs):
         if self.function is not None:
@@ -113,9 +124,12 @@ class Node:
         if len(self.overloads) > 1:
             return
 
-        self.function = self.overloads.pop().function
-        self.expr_type = self.function.ret
-        self.arg_size = sum(c.type.size() for c in self.function.params)
+        overload = self.overloads.pop()
+        self.function = overload.function
+        self.expr_type = self.function.ret.resolve(overload.gens)
+        self.params = [p.type.resolve(overload.gens) for p in
+                self.function.params]
+        self.arg_size = sum(p.size() for p in self.params)
 
     def _analyze_acquire(self, mod_name, syms, refs):
         # symbol table
@@ -158,6 +172,7 @@ class Node:
 
         elif self.type == 'OP':
             self.expr_type = symbols.UNKNOWN
+            self.target_type = symbols.UNKNOWN
             self.overloads = syms.overloads(self.value)
             self.args = self.children
 
@@ -165,6 +180,7 @@ class Node:
 
         elif self.type == 'CALL':
             self.expr_type = symbols.UNKNOWN
+            self.target_type = symbols.UNKNOWN
             self.overloads = syms.overloads(self.value)
             self.args = self.children[0].children
 
@@ -175,6 +191,7 @@ class Node:
 
         elif self.type == 'METHOD':
             self.expr_type = symbols.UNKNOWN
+            self.target_type = symbols.UNKNOWN
             self.overloads = syms.overloads(self.value)
             self.args = [self.children[0]] + self.children[1].children
 
@@ -194,6 +211,10 @@ class Node:
 
         elif self.type == 'BLOCK':
             self.expr_type = self.children[-1].expr_type
+
+        elif self.type == 'ALLOC':
+            self.element_type = self.children[0]._type(syms)
+            self.expr_type = Reference(Array(self.element_type), 1)
 
         elif self.type == 'IF':
             tps = [c.expr_type for c in self.children[1:]]
@@ -235,15 +256,15 @@ class Node:
             self._resolve_overload(refs)
 
             if self.function is None:
-                self._error('cannot resolve function overload between:\n'
-                        + '\n'.join('  ' + str(fn) for fn in self.overloads))
+                self._error('cannot resolve function overload between:\n{}',
+                        '\n'.join('  ' + str(fn) for fn in self.overloads))
 
             # record usage for ref generation
             if self.type in ['CALL', 'METHOD']:
                 refs.add(self.function)
 
-            for c, t in zip(self.args, self.function.params):
-                c._expect_type(t.type)
+            for c, p in zip(self.args, self.params):
+                c._expect_type(p)
 
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 1)
@@ -263,6 +284,9 @@ class Node:
             self.expr_type = self.target_type
 
             self.children[-1]._expect_type(self.expr_type)
+
+        elif self.type == 'ALLOC':
+            self.children[1]._expect_type(symbols.INT)
 
         elif self.type == 'IF':
             self.children[0]._expect_type(symbols.BOOL)

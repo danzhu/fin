@@ -12,7 +12,7 @@ class Location(Enum):
 
 class Symbol(Enum):
     Module   = 0
-    Type     = 1
+    Struct   = 1
     Function = 2
     Variable = 3
     Constant = 4
@@ -47,6 +47,35 @@ class Constant:
 
     def var_type(self):
         return self.type
+
+
+class Generic:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def size(self):
+        assert False, 'should not use size on generic'
+
+    def match(self, other, gens):
+        if self.name in gens:
+            return gens[self.name].match(other, gens)
+        else:
+            gens[self.name] = other
+            return True
+
+    def accept(self, other, gens):
+        if self.name in gens:
+            return gens[self.name].accept(other, gens)
+
+        else:
+            gens[self.name] = other
+            return 3.0
+
+    def resolve(self, gens):
+        return gens[self.name]
 
 
 class SymbolTable:
@@ -179,7 +208,7 @@ class Module(SymbolTable):
 
 class Struct(SymbolTable):
     LOCATION = Location.Struct
-    TYPE = Symbol.Type
+    TYPE = Symbol.Struct
 
     def __init__(self, name, size=0):
         super().__init__()
@@ -207,14 +236,22 @@ class Struct(SymbolTable):
 
         return var
 
-    def match(self, other):
-        if other == UNKNOWN:
+    def match(self, other, gens):
+        return self == other
+
+    def accept(self, other, gens):
+        if self == UNKNOWN or other == UNKNOWN:
             return math.nan
 
         # if reference, reduce to level 0
         ref = type(other) is Reference
         if ref:
             other = other.type
+
+        elif type(other) is Generic:
+            gens[other.name] = self
+            return 3.0
+
         elif type(other) is not Struct:
             # does not accept other types
             return None
@@ -222,7 +259,7 @@ class Struct(SymbolTable):
         if self == other:
             # score is lower if there's level reduction
             return 2.0 if ref else 3.0
-        elif other == NONE:
+        elif self == NONE:
             return 1.0
         else:
             return None
@@ -239,6 +276,9 @@ class Struct(SymbolTable):
 
         return self
 
+    def resolve(self, gens):
+        return self
+
 
 class Function(SymbolTable):
     LOCATION = Location.Param
@@ -251,14 +291,18 @@ class Function(SymbolTable):
         self.ret = ret
 
         self.params = []
+        self.generics = []
 
     def __str__(self):
-        return '{}({}){}'.format(
+        return '{}{}({}){}'.format(
                 self.name,
+                '{' + ', '.join(str(g) for g in self.generics) + '}'
+                    if self.generics else '',
                 ', '.join(str(p) for p in self.params),
                 ' ' + str(self.ret) if self.ret != NONE else '')
 
     def fullname(self):
+        # TODO: generic parameters
         return '{}({}){}'.format(
                 self.name,
                 ','.join(p.type.fullpath() for p in self.params),
@@ -280,9 +324,19 @@ class Function(SymbolTable):
 
         return var
 
-    def match(self, args, ret):
+    def add_generic(self, name):
+        assert type(name) is str
+
+        gen = Generic(name)
+
+        self._add_symbol(gen)
+        self.generics.append(gen)
+
+        return gen
+
+    def resolve(self, args, ret):
         if len(self.params) != len(args):
-            return None
+            return None, None
 
         # None: type mismatch
         # 1: casting to none
@@ -290,17 +344,18 @@ class Function(SymbolTable):
         # 3: exact match
         # nan: unknown
 
-        lvls = [p.type.match(a) for p, a in zip(self.params, args)]
+        gens = {}
+        lvls = [p.type.accept(a, gens) for p, a in zip(self.params, args)]
 
         if ret is not None:
-            lvls.append(ret.match(self.ret))
+            lvls.append(ret.accept(self.ret, gens))
         else:
             lvls.append(math.nan)
 
         if None in lvls:
-            return None
+            return None, None
 
-        return lvls
+        return lvls, gens
 
 
 class Block(SymbolTable):
@@ -331,10 +386,10 @@ class Match:
         self.function = fn
 
     def __lt__(self, other):
-        assert len(self.match) == len(other.match)
+        assert len(self.levels) == len(other.levels)
 
         less = False
-        for s, o in zip(self.match, other.match):
+        for s, o in zip(self.levels, other.levels):
             if s > o:
                 return False
             if s < o:
@@ -343,15 +398,17 @@ class Match:
         return less
 
     def __str__(self):
-        return '{} {}'.format(self.function, self.match)
+        return '{} {}'.format(self.function, self.levels)
 
     def update(self, args, ret):
-        self.match = self.function.match(args, ret)
-        return self.match is not None
+        self.levels, self.gens = self.function.resolve(args, ret)
+        return self.levels is not None
 
 
 class Reference:
     def __init__(self, tp, lvl):
+        assert type(tp) is not Reference
+
         self.type = tp
         self.level = lvl
 
@@ -367,8 +424,13 @@ class Reference:
     def size(self):
         return 8 # size of pointer
 
-    def match(self, other):
-        if other == UNKNOWN:
+    def match(self, other, gens):
+        if type(other) is not Reference:
+            return False
+        return self.level == other.level and self.type.match(other.type, gens)
+
+    def accept(self, other, gens):
+        if self == UNKNOWN or other == UNKNOWN:
             return math.nan
 
         if type(other) is not Reference:
@@ -377,13 +439,10 @@ class Reference:
         if self.level > other.level:
             return None
 
-        lvl = 2 + self.level / other.level
-
-        res = self.type.match(other.type)
-        if res is None:
+        if self.type.match(other.type, gens):
+            return 2.0 + self.level / other.level
+        else:
             return None
-
-        return min(lvl, res)
 
     def interpolate(self, other):
         if other == UNKNOWN:
@@ -399,6 +458,40 @@ class Reference:
             tp = Reference(tp, lvl)
 
         return tp
+
+    def resolve(self, gens):
+        return Reference(self.type.resolve(gens), self.level)
+
+
+class Array:
+    def __init__(self, tp, size=-1):
+        self.type = tp
+        self._size = size
+
+    def __str__(self):
+        return '[{}]'.format(self.type)
+
+    def size(self):
+        if self._size == -1:
+            raise TypeError('array is unsized')
+        return self._size
+
+    def match(self, other, gens):
+        if type(other) is not Array:
+            return False
+        return self.type.match(other.type, gens)
+
+    def accept(self, other, gens):
+        if self == UNKNOWN or other == UNKNOWN:
+            return math.nan
+
+        if type(other) is not Array:
+            return None
+
+        return self.type == other.type
+
+    def resolve(self, gens):
+        return Array(self.type.resolve(gens))
 
 
 NONE = Struct('None', 0)
@@ -450,11 +543,19 @@ def load_builtins():
             fn.add_variable('value', tp)
             mod.add_function(fn)
 
+    # array subscript
+    fn = Function('[]', None)
+    t = fn.add_generic('T')
+    fn.add_variable('arr', Reference(Array(t), 1))
+    fn.add_variable('index', INT)
+    fn.ret = Reference(t, 1)
+    mod.add_function(fn)
+
     return mod
 
 def to_type(val, syms):
     name = val.rstrip('&')
-    tp = syms.get(name, Symbol.Type)
+    tp = syms.get(name, Symbol.Struct)
 
     lvl = len(val) - len(name)
     if lvl > 0:
@@ -463,6 +564,9 @@ def to_type(val, syms):
     return tp
 
 def to_level(tp, lvl):
+    if tp == UNKNOWN:
+        return UNKNOWN
+
     if type(tp) is Reference:
         tp = tp.type
 
@@ -505,10 +609,10 @@ def load_module(mod_name, glob):
 
     return mod
 
-def resolve_overload(matches, args, ret):
+def resolve_overload(overloads, args, ret):
     res = set()
 
-    for match in matches:
+    for match in overloads:
         if not match.update(args, ret):
             continue
 

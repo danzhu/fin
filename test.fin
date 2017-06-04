@@ -1,26 +1,26 @@
-struct Vec
-    x Int
-    y Int
+def fib(n Int) Int
+    let arr [Int]& := alloc Int[n + 1]
 
-def distance(v Vec) Int
-    v.x * v.x + v.y * v.y
+    arr[0] = 0
+    arr[1] = 1
 
-def print(v Vec)
-    print(v.x)
-    print(v.y)
+    let i = 2
+    while i < n + 1
+        arr[i] = arr[i - 2] + arr[i - 1]
+        i += 1
 
-def test()
-    let i = 1
-    let j := i
+    arr[n]
 
-    let v Vec
-    v.x = 3
-    v.y = 4
-    if v.x < 0
-        -distance(v) + 1
+def f(n Int) Int
+    if n == 0
+        0
+    elif n == 1
+        1
     else
-        i += input()
-        v.y + j
-    .print()
+        f(n - 2) + f(n - 1)
 
-test()
+def test(n Int)
+    fib(n).print()
+    f(n).print()
+
+test(30)
