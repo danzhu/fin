@@ -237,7 +237,7 @@ class Node:
 
             self.sym = syms.add_variable(name, tp)
 
-        elif self.type in ['ASSN', 'WHILE', 'EMPTY']:
+        elif self.type in ['ASSN', 'DEALLOC', 'WHILE', 'EMPTY']:
             self.expr_type = symbols.NONE
 
     def _analyze_expect(self, refs):
@@ -287,6 +287,12 @@ class Node:
 
         elif self.type == 'ALLOC':
             self.children[1]._expect_type(symbols.INT)
+
+        elif self.type == 'DEALLOC':
+            tp = self.children[0].expr_type
+            if type(tp) is not Reference:
+                self._error('expecting reference type')
+            self.children[0]._expect_type(Reference(tp.type, 1))
 
         elif self.type == 'IF':
             self.children[0]._expect_type(symbols.BOOL)

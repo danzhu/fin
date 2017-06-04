@@ -142,6 +142,11 @@ class Generator:
         self._write('mult_i')
         self._write('alloc')
 
+    def DEALLOC(self, node):
+        self._gen(node.children[0])
+
+        self._write('dealloc')
+
     def IF(self, node):
         els = self._label('ELSE')
         end = self._label('END_IF')

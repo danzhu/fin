@@ -361,6 +361,11 @@ class Parser:
             self._expect('RBRACKET')
             return Node('ALLOC', (tp, length))
 
+        elif self._lookahead.type == 'DEALLOC':
+            self._next()
+            val = self._test()
+            return Node('DEALLOC', (val,))
+
         elif self._lookahead.type == 'IF':
             return self._if()
 

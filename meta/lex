@@ -65,3 +65,4 @@ keyword return RETURN
 keyword and AND
 keyword or OR
 keyword alloc ALLOC
+keyword dealloc DEALLOC
