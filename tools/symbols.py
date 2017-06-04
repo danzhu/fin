@@ -18,6 +18,11 @@ class Symbol(Enum):
     Constant = 4
 
 
+MATCH_PERFECT = 3.0
+MATCH_REDUCTION = 2.0
+MATCH_TO_NONE = 1.0
+
+
 class Variable:
     TYPE = Symbol.Variable
 
@@ -72,7 +77,7 @@ class Generic:
 
         else:
             gens[self.name] = other
-            return 3.0
+            return MATCH_PERFECT
 
     def resolve(self, gens):
         return gens[self.name]
@@ -250,7 +255,7 @@ class Struct(SymbolTable):
 
         elif type(other) is Generic:
             gens[other.name] = self
-            return 3.0
+            return MATCH_PERFECT
 
         elif type(other) is not Struct:
             # does not accept other types
@@ -258,9 +263,9 @@ class Struct(SymbolTable):
 
         if self == other:
             # score is lower if there's level reduction
-            return 2.0 if ref else 3.0
+            return MATCH_REDUCTION if ref else MATCH_PERFECT
         elif self == NONE:
-            return 1.0
+            return MATCH_TO_NONE
         else:
             return None
 
@@ -437,10 +442,15 @@ class Reference:
             other = Reference(other, 0)
 
         if self.level > other.level:
-            return None
+            if type(other.type) is Generic:
+                gens[other.type.name] = to_level(self.type,
+                        self.level - other.level)
+                return MATCH_PERFECT
+            else:
+                return None
 
         if self.type.match(other.type, gens):
-            return 2.0 + self.level / other.level
+            return MATCH_REDUCTION + self.level / other.level
         else:
             return None
 

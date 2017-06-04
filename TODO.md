@@ -13,7 +13,7 @@
   - [ ] tuple assignment
 - [ ] namespace
 - [ ] dynamic (heap) allocation
-  - [ ] array allocation
+  - [x] array allocation
   - [ ] class instance allocation
 - [ ] exception / error handling
 - [ ] owner
