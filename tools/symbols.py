@@ -242,7 +242,11 @@ class Struct(SymbolTable):
         return var
 
     def match(self, other, gens):
-        return self == other
+        if type(other) is Generic:
+            gens[other.name] = self
+            return MATCH_PERFECT
+        else:
+            return self == other
 
     def accept(self, other, gens):
         if self == UNKNOWN or other == UNKNOWN:
@@ -339,7 +343,7 @@ class Function(SymbolTable):
 
         return gen
 
-    def resolve(self, args, ret):
+    def match(self, args, ret):
         if len(self.params) != len(args):
             return None, None
 
@@ -403,11 +407,22 @@ class Match:
         return less
 
     def __str__(self):
-        return '{} {}'.format(self.function, self.levels)
+        return '{} {}{}'.format(self.function,
+                self.levels,
+                ''.join('\n    where {}'.format(g) for g in self.gens))
 
     def update(self, args, ret):
-        self.levels, self.gens = self.function.resolve(args, ret)
+        self.levels, self.gens = self.function.match(args, ret)
         return self.levels is not None
+
+    def resolve(self):
+        for gen in self.function.generics:
+            if gen.name not in self.gens:
+                return None, None
+
+        ret = self.function.ret.resolve(self.gens)
+        params = [p.type.resolve(self.gens) for p in self.function.params]
+        return ret, params
 
 
 class Reference:
@@ -480,6 +495,12 @@ class Array:
 
     def __str__(self):
         return '[{}]'.format(self.type)
+
+    def fullname(self):
+        return '[{}]'.format(self.type.fullname())
+
+    def fullpath(self):
+        return '[{}]'.format(self.type.fullpath())
 
     def size(self):
         if self._size == -1:
@@ -559,6 +580,19 @@ def load_builtins():
     fn.add_variable('arr', Reference(Array(t), 1))
     fn.add_variable('index', INT)
     fn.ret = Reference(t, 1)
+    mod.add_function(fn)
+
+    # alloc
+    fn = Function('alloc', None)
+    t = fn.add_generic('T')
+    fn.add_variable('length', INT)
+    fn.ret = Reference(Array(t), 1)
+    mod.add_function(fn)
+
+    # dealloc
+    fn = Function('dealloc', NONE)
+    t = fn.add_generic('T')
+    fn.add_variable('value', Reference(t, 1))
     mod.add_function(fn)
 
     return mod

@@ -134,19 +134,6 @@ class Generator:
         else:
             self._gen(node.children[1])
 
-    def ALLOC(self, node):
-        self._gen(node.children[1]) # size
-
-        size = node.element_type.size()
-        self._write('const_i', size)
-        self._write('mult_i')
-        self._write('alloc')
-
-    def DEALLOC(self, node):
-        self._gen(node.children[0])
-
-        self._write('dealloc')
-
     def IF(self, node):
         els = self._label('ELSE')
         end = self._label('END_IF')
@@ -223,31 +210,31 @@ class Generator:
         self._cast(node)
 
     def CALL(self, node):
-        for c in node.children[0].children:
-            self._gen(c)
+        if node.function.ancestor(Symbol.Module).name != '':
+            for c in node.children:
+                self._gen(c)
 
-        self._write('call', node.function.fullpath(), node.arg_size)
+            self._write('call', node.function.fullpath(), node.arg_size)
 
-        self._cast(node)
+            self._cast(node)
+            return
 
-    def METHOD(self, node):
-        self._gen(node.children[0])
-        for c in node.children[1].children:
-            self._gen(c)
-
-        self._write('call', node.function.fullpath(), node.arg_size)
-
-        self._cast(node)
-
-    def MEMBER(self, node):
-        self._gen(node.children[0])
-
-        self._write('offset', node.field.offset)
-
-        self._cast(node)
-
-    def OP(self, node):
         val = node.value
+
+        if val == 'alloc':
+            self._gen(node.children[0]) # size
+
+            size = node.match.gens['T'].size()
+            self._write('const_i', size)
+            self._write('mult_i')
+            self._write('alloc')
+            return
+
+        if val == 'dealloc':
+            self._gen(node.children[0])
+
+            self._write('dealloc')
+            return
 
         if val == '[]':
             self._gen(node.children[0])
@@ -267,7 +254,7 @@ class Generator:
             elif val == '-':
                 op = 'neg'
             else:
-                assert False, 'unknown operator'
+                assert False, 'unknown operator {}'.format(val)
 
         elif val == '<':
             op = 'lt'
@@ -297,7 +284,7 @@ class Generator:
             elif val == '%':
                 op = 'mod'
             else:
-                assert False, 'unknown operator'
+                assert False, 'unknown operator {}'.format(val)
 
         self._gen(node.children[0])
 
@@ -316,6 +303,13 @@ class Generator:
 
         if assn:
             self._write('store', size)
+
+        self._cast(node)
+
+    def MEMBER(self, node):
+        self._gen(node.children[0])
+
+        self._write('offset', node.field.offset)
 
         self._cast(node)
 

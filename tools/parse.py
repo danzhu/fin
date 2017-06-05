@@ -28,6 +28,22 @@ class Parser:
         raise SyntaxError(msg
                 + '\nat line {0.line}, col {0.column}'.format(self._lookahead))
 
+    def _args(self):
+        children = []
+        self._expect('LPAREN') # LPAREN
+        if self._lookahead.type == 'RPAREN':
+            self._next() # RPAREN
+        else:
+            while True:
+                children.append(self._test())
+
+                tp = self._lookahead.type
+                self._expect('COMMA', 'RPAREN')
+                if tp == 'RPAREN':
+                    break
+
+        return children
+
     def _empty(self):
         return Node('EMPTY', ())
 
@@ -213,21 +229,6 @@ class Parser:
         self._next()
         return Node('BLOCK', stmts)
 
-    def _args(self):
-        children = []
-        self._expect('LPAREN') # LPAREN
-        if self._lookahead.type == 'RPAREN':
-            self._next() # RPAREN
-        else:
-            while True:
-                children.append(self._test())
-
-                tp = self._lookahead.type
-                self._expect('COMMA', 'RPAREN')
-                if tp == 'RPAREN':
-                    break
-        return Node('ARGS', children)
-
     def _test(self):
         node = self._or_test()
 
@@ -238,7 +239,7 @@ class Parser:
             op = self._lookahead.value
             self._next() # INC_ASSN
             val = self._test()
-            return Node('OP', (node, val), op)
+            return Node('CALL', (node, val), op)
 
         lvl = 0
         while self._lookahead.type == 'COLON':
@@ -272,7 +273,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             r = self._expr()
-            node = Node('OP', (node, r), op)
+            node = Node('CALL', (node, r), op)
         return node
 
     def _expr(self):
@@ -281,7 +282,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             r = self._term()
-            node = Node('OP', (node, r), op)
+            node = Node('CALL', (node, r), op)
         return node
 
     def _term(self):
@@ -290,7 +291,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             r = self._factor()
-            node = Node('OP', (node, r), op)
+            node = Node('CALL', (node, r), op)
         return node
 
     def _factor(self):
@@ -298,7 +299,7 @@ class Parser:
             op = self._lookahead.value
             self._next()
             val = self._factor()
-            return Node('OP', (val,), op)
+            return Node('CALL', (val,), op)
         else:
             return self._atom_expr()
 
@@ -313,7 +314,7 @@ class Parser:
                 if self._lookahead.type == 'LPAREN':
                     # method call
                     args = self._args()
-                    node = Node('METHOD', (node, args), name)
+                    node = Node('CALL', [node] + args, name)
                 else:
                     # member access
                     node = Node('MEMBER', (node,), name)
@@ -322,7 +323,7 @@ class Parser:
                 self._next() # LBRACKET
                 idx = self._test()
                 self._expect('RBRACKET')
-                node = Node('OP', (node, idx), '[]')
+                node = Node('CALL', (node, idx), '[]')
 
             else:
                 break
@@ -336,7 +337,7 @@ class Parser:
 
             if self._lookahead.type == 'LPAREN':
                 args = self._args()
-                return Node('CALL', (args,), name)
+                return Node('CALL', args, name)
             else:
                 return Node('VAR', (), name)
 
@@ -351,20 +352,6 @@ class Parser:
             test = self._test()
             self._expect('RPAREN')
             return test
-
-        elif self._lookahead.type == 'ALLOC':
-            self._next()
-            tp = self._type()
-
-            self._expect('LBRACKET')
-            length = self._test()
-            self._expect('RBRACKET')
-            return Node('ALLOC', (tp, length))
-
-        elif self._lookahead.type == 'DEALLOC':
-            self._next()
-            val = self._test()
-            return Node('DEALLOC', (val,))
 
         elif self._lookahead.type == 'IF':
             return self._if()

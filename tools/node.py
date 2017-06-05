@@ -45,8 +45,14 @@ class Node:
 
     def _error(self, msg, *args):
         msg = msg.format(*args)
+
+        if self.type == 'CALL':
+            msg += '\n  in {}({}) {}'.format(self.value,
+                    ', '.join(str(a) for a in self.args),
+                    self.target_type)
+
         msg += '\n  in node {}'.format(self)
-        raise RuntimeError(msg)
+        raise Exception(msg)
 
     def _expect_type(self, tp):
         if self.expr_type is not None:
@@ -106,29 +112,39 @@ class Node:
 
             return Array(tp)
 
-    def _resolve_overload(self, refs):
+    def _resolve_overload(self, refs, required=False):
         if self.function is not None:
             return
 
-        args = [c.expr_type for c in self.args]
-        ret = self.target_type
+        self.args = [c.expr_type for c in self.children]
 
-        self.overloads = symbols.resolve_overload(self.overloads, args, ret)
+        self.matches = symbols.resolve_overload(
+                self.matches,
+                self.args,
+                self.target_type)
 
-        if len(self.overloads) == 0:
-            fn = '{}({}) {}'.format(self.value,
-                    ', '.join(str(a) for a in args),
-                    ret)
-            self._error('no viable function overload for:\n  ' + fn)
+        if len(self.matches) == 0:
+            self._error('no viable function overload')
 
-        if len(self.overloads) > 1:
-            return
+        if len(self.matches) > 1:
+            if not required:
+                return
 
-        overload = self.overloads.pop()
-        self.function = overload.function
-        self.expr_type = self.function.ret.resolve(overload.gens)
-        self.params = [p.type.resolve(overload.gens) for p in
-                self.function.params]
+            self._error('cannot resolve function overload between\n{}',
+                    '\n'.join('  ' + str(fn) for fn in self.matches))
+
+        match = next(iter(self.matches))
+
+        self.expr_type, self.params = match.resolve()
+
+        if self.expr_type is None:
+            if not required:
+                return
+
+            self._error('cannot resolve generic parameters\n  {}', match)
+
+        self.function = match.function
+        self.match = match
         self.arg_size = sum(p.size() for p in self.params)
 
     def _analyze_acquire(self, mod_name, syms, refs):
@@ -170,33 +186,13 @@ class Node:
         elif self.type == 'TEST':
             self.expr_type = symbols.BOOL
 
-        elif self.type == 'OP':
-            self.expr_type = symbols.UNKNOWN
-            self.target_type = symbols.UNKNOWN
-            self.overloads = syms.overloads(self.value)
-            self.args = self.children
-
-            self._resolve_overload(refs)
-
         elif self.type == 'CALL':
             self.expr_type = symbols.UNKNOWN
             self.target_type = symbols.UNKNOWN
-            self.overloads = syms.overloads(self.value)
-            self.args = self.children[0].children
+            self.matches = syms.overloads(self.value)
 
-            if len(self.overloads) == 0:
+            if len(self.matches) == 0:
                 self._error('no function "{}" defined', self.value)
-
-            self._resolve_overload(refs)
-
-        elif self.type == 'METHOD':
-            self.expr_type = symbols.UNKNOWN
-            self.target_type = symbols.UNKNOWN
-            self.overloads = syms.overloads(self.value)
-            self.args = [self.children[0]] + self.children[1].children
-
-            if len(self.overloads) == 0:
-                self._error('no method "{}" defined', self.value)
 
             self._resolve_overload(refs)
 
@@ -211,10 +207,6 @@ class Node:
 
         elif self.type == 'BLOCK':
             self.expr_type = self.children[-1].expr_type
-
-        elif self.type == 'ALLOC':
-            self.element_type = self.children[0]._type(syms)
-            self.expr_type = Reference(Array(self.element_type), 1)
 
         elif self.type == 'IF':
             tps = [c.expr_type for c in self.children[1:]]
@@ -237,7 +229,7 @@ class Node:
 
             self.sym = syms.add_variable(name, tp)
 
-        elif self.type in ['ASSN', 'DEALLOC', 'WHILE', 'EMPTY']:
+        elif self.type in ['ASSN', 'WHILE', 'EMPTY']:
             self.expr_type = symbols.NONE
 
     def _analyze_expect(self, refs):
@@ -252,18 +244,15 @@ class Node:
             tp = symbols.to_level(self.children[0].expr_type, self.level)
             self.children[1]._expect_type(tp)
 
-        elif self.type in ['CALL', 'METHOD', 'OP']:
-            self._resolve_overload(refs)
-
-            if self.function is None:
-                self._error('cannot resolve function overload between:\n{}',
-                        '\n'.join('  ' + str(fn) for fn in self.overloads))
+        elif self.type == 'CALL':
+            self._resolve_overload(refs, True)
 
             # record usage for ref generation
-            if self.type in ['CALL', 'METHOD']:
+            # FIXME: alloc / dealloc
+            if self.function.ancestor(Symbol.Module).name != '':
                 refs.add(self.function)
 
-            for c, p in zip(self.args, self.params):
+            for c, p in zip(self.children, self.params):
                 c._expect_type(p)
 
         elif self.type == 'MEMBER':
@@ -284,15 +273,6 @@ class Node:
             self.expr_type = self.target_type
 
             self.children[-1]._expect_type(self.expr_type)
-
-        elif self.type == 'ALLOC':
-            self.children[1]._expect_type(symbols.INT)
-
-        elif self.type == 'DEALLOC':
-            tp = self.children[0].expr_type
-            if type(tp) is not Reference:
-                self._error('expecting reference type')
-            self.children[0]._expect_type(Reference(tp.type, 1))
 
         elif self.type == 'IF':
             self.children[0]._expect_type(symbols.BOOL)

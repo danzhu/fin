@@ -1,28 +1,63 @@
-def fib(n Int) Int
-    let arr [Int]& := alloc Int[n + 1]
+struct List
+    content [Int]&
+    size Int
+    capacity Int
 
-    arr[0] = 0
-    arr[1] = 1
+def new() List
+    let list List
+    list.size = 0
+    list.capacity = 0
+    list
 
-    let i = 2
-    while i < n + 1
-        arr[i] = arr[i - 2] + arr[i - 1]
+def grow(list List&)
+    let nonempty = list.capacity != 0
+
+    if nonempty
+        list.capacity *= 2
+    else
+        list.capacity = 5
+
+    let content [Int]& := alloc(list.capacity)
+
+    let i = 0
+    while i < list.size
+        content[i] = list.content[i]
         i += 1
 
-    let res = arr[n]
-    dealloc arr
-    res
+    if nonempty
+        dealloc(list.content)
 
-def f(n Int) Int
-    if n == 0
-        0
-    elif n == 1
-        1
-    else
-        f(n - 2) + f(n - 1)
+    list.content := content
 
-def test(n Int)
-    fib(n).print()
-    f(n).print()
+def append(list List&, val Int)
+    if list.size == list.capacity
+        list.grow()
 
-test(30)
+    list.content[list.size] = val
+    list.size += 1
+
+def pop(list List&) Int
+    list.size -= 1
+    list.content[list.size]
+
+def at(list List&, idx Int) Int&
+    list.content[idx]
+
+def drop(list List&)
+    dealloc(list.content)
+
+def test()
+    let list List = new()
+
+    let i = 0
+    while i < 25
+        list.append(i)
+        i += 1
+
+    list.pop().print()
+    list.at(2).print()
+    list.capacity.print()
+
+    list.drop()
+
+test()
