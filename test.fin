@@ -9,29 +9,14 @@ def new() List
     list.capacity = 0
     list
 
-def grow(list List&)
-    let nonempty = list.capacity != 0
-
-    if nonempty
-        list.capacity *= 2
-    else
-        list.capacity = 5
-
-    let content [Int]& := alloc(list.capacity)
-
-    let i = 0
-    while i < list.size
-        content[i] = list.content[i]
-        i += 1
-
-    if nonempty
-        dealloc(list.content)
-
-    list.content := content
-
 def append(list List&, val Int)
     if list.size == list.capacity
-        list.grow()
+        if list.capacity != 0
+            list.capacity *= 2
+            realloc(list.content, list.capacity)
+        else
+            list.capacity = 5
+            list.content := alloc(list.capacity)
 
     list.content[list.size] = val
     list.size += 1
@@ -56,6 +41,7 @@ def test()
 
     list.pop().print()
     list.at(2).print()
+    list.size.print()
     list.capacity.print()
 
     list.drop()

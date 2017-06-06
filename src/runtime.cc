@@ -230,6 +230,15 @@ void Fin::Runtime::execute()
                 alloc.dealloc(opStack.pop<Ptr>());
                 continue;
 
+            case Opcode::Realloc:
+                {
+                    auto size = opStack.pop<int32_t>();
+                    auto ptr = opStack.top<Ptr>();
+
+                    alloc.realloc(ptr, size);
+                }
+                continue;
+
             case Opcode::Push:
                 {
                     auto size = readConst<uint16_t>();

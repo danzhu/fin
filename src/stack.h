@@ -99,6 +99,19 @@ namespace Fin
             return val;
         }
 
+        template<typename T> T top()
+        {
+            if (_size < sizeof(T))
+                throw std::runtime_error{"accessing at negative index"};
+
+            auto val = at<T>(_size - sizeof(T));
+
+            LOG(2) << std::endl << "  ^ " << val;
+            LOG(2) << " [" << _size << ", " << sizeof(T) << "]";
+
+            return val;
+        }
+
         template<typename T> void push(T val)
         {
             if (_size + sizeof(T) > _cap)

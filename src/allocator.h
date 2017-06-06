@@ -58,7 +58,12 @@ namespace Fin
         {
             // TODO: reuse deallocated ptrs
             auto ptr = static_cast<Ptr>(heap.size()) << 32;
-            heap.emplace_back(Block{State::Allocated, new char[size], size});
+            auto mem = static_cast<char *>(std::malloc(size));
+
+            if (!mem)
+                throw std::runtime_error{"failed to allocate"};
+
+            heap.emplace_back(Block{State::Allocated, mem, size});
             return ptr;
         }
 
@@ -75,10 +80,26 @@ namespace Fin
             auto &val = heap.at(blk);
 
             if (val.state != State::Allocated)
-                throw std::runtime_error{"invalid free"};
+                throw std::runtime_error{"invalid deallocation"};
 
-            delete[] val.value;
+            std::free(val.value);
             val.state = State::Freed;
+        }
+
+        void realloc(Ptr ptr, uint32_t size)
+        {
+            uint32_t blk = ptr >> 32;
+            auto &val = heap.at(blk);
+
+            if (val.state != State::Allocated)
+                throw std::runtime_error{"invalid reallocation"};
+
+            val.value = static_cast<char *>(std::realloc(val.value, size));
+
+            if (!val.value)
+                throw std::runtime_error{"failed to reallocate"};
+
+            val.size = size;
         }
 
         void remove(Ptr ptr)

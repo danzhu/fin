@@ -592,7 +592,14 @@ def load_builtins():
     # dealloc
     fn = Function('dealloc', NONE)
     t = fn.add_generic('T')
-    fn.add_variable('value', Reference(t, 1))
+    fn.add_variable('reference', Reference(t, 1))
+    mod.add_function(fn)
+
+    # realloc
+    fn = Function('realloc', NONE)
+    t = fn.add_generic('T')
+    fn.add_variable('array', Reference(Array(t), 1))
+    fn.add_variable('length', INT)
     mod.add_function(fn)
 
     return mod

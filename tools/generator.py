@@ -236,6 +236,16 @@ class Generator:
             self._write('dealloc')
             return
 
+        if val == 'realloc':
+            self._gen(node.children[0])
+            self._gen(node.children[1])
+
+            size = node.match.gens['T'].size()
+            self._write('const_i', size)
+            self._write('mult_i')
+            self._write('realloc')
+            return
+
         if val == '[]':
             self._gen(node.children[0])
             self._gen(node.children[1])

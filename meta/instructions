@@ -42,6 +42,9 @@ alloc
 dealloc
     Pop pointer from stack and deallocate memory used by that pointer.
 
+realloc
+    Pop pointer and int from stack, and reallocate the pointer to that size.
+
 push amount:H
     Push `amount` bytes onto stack.
 
