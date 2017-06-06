@@ -68,7 +68,9 @@ class Generator:
         ref_list = []
         for ref in self.refs:
             mod = ref.ancestor(Symbol.Module)
-            if mod != node.module:
+
+            # don't ref current module / builtin
+            if mod != node.module and mod.name != '':
                 ref_list.append((mod, ref.fullname()))
 
         ref_list.sort()
@@ -210,11 +212,11 @@ class Generator:
         self._cast(node)
 
     def CALL(self, node):
-        if node.function.ancestor(Symbol.Module).name != '':
+        if node.match.function.ancestor(Symbol.Module).name != '':
             for c in node.children:
                 self._gen(c)
 
-            self._write('call', node.function.fullpath(), node.arg_size)
+            self._write('call', node.match.function.fullpath(), node.arg_size)
 
             self._cast(node)
             return

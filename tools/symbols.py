@@ -205,6 +205,8 @@ class Struct(SymbolTable):
         return self.name
 
     def size(self):
+        if self._size == -1:
+            raise TypeError('struct is unsized')
         return self._size
 
     def fullname(self):
@@ -361,7 +363,8 @@ class Match:
     def __str__(self):
         return '{} {}{}'.format(self.function,
                 self.levels,
-                ''.join('\n    where {}'.format(g) for g in self.gens))
+                ''.join(', {} = {}'.format(k, g)
+                    for k, g in self.gens.items()))
 
     def update(self, args, ret):
         self.levels, self.gens = self.function.match(args, ret)
@@ -651,7 +654,7 @@ def accept_type(self, other, gens):
         if not match_type(self.type, other.type, gens):
             return None
 
-        return MATCH_PERFECT - self.level / other.level
+        return MATCH_PERFECT - 1.0 + self.level / other.level
 
     if type(other) is Reference:
         # auto reduction to level 0

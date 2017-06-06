@@ -12,13 +12,16 @@ class Node:
         self.level = lvl
 
         self.function = None
+        self.match = None
         self.expr_type = None
         self.target_type = None
 
     def __str__(self):
         content = self.type
 
-        if self.function:
+        if self.match:
+            content += ' {}'.format(self.match)
+        elif self.function:
             content += ' {}'.format(self.function)
         elif self.value:
             content += ' {}'.format(self.value)
@@ -113,7 +116,7 @@ class Node:
             return Array(tp)
 
     def _resolve_overload(self, refs, required=False):
-        if self.function is not None:
+        if self.match is not None:
             return
 
         self.args = [c.expr_type for c in self.children]
@@ -143,7 +146,6 @@ class Node:
 
             self._error('cannot resolve generic parameters\n  {}', match)
 
-        self.function = match.function
         self.match = match
         self.arg_size = sum(p.size() for p in self.params)
 
@@ -248,9 +250,7 @@ class Node:
             self._resolve_overload(refs, True)
 
             # record usage for ref generation
-            # FIXME: alloc / dealloc
-            if self.function.ancestor(Symbol.Module).name != '':
-                refs.add(self.function)
+            refs.add(self.match.function)
 
             for c, p in zip(self.children, self.params):
                 c._expect_type(p)
