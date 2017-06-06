@@ -222,11 +222,13 @@ class Generator:
         val = node.value
 
         if val == 'alloc':
-            self._gen(node.children[0]) # size
-
             size = node.match.gens['T'].size()
             self._write('const_i', size)
-            self._write('mult_i')
+
+            if len(node.children) > 0:
+                self._gen(node.children[0]) # size
+                self._write('mult_i')
+
             self._write('alloc')
             return
 

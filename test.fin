@@ -32,7 +32,8 @@ def drop(list List&)
     dealloc(list.content)
 
 def test()
-    let list List = new()
+    let list List& := alloc()
+    list = new()
 
     let i = 0
     while i < 25
@@ -45,5 +46,6 @@ def test()
     list.capacity.print()
 
     list.drop()
+    dealloc(list)
 
 test()

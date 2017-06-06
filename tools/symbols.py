@@ -585,6 +585,11 @@ def load_builtins():
     # alloc
     fn = Function('alloc', None)
     t = fn.add_generic('T')
+    fn.ret = Reference(t, 1)
+    mod.add_function(fn)
+
+    fn = Function('alloc', None)
+    t = fn.add_generic('T')
     fn.add_variable('length', INT)
     fn.ret = Reference(Array(t), 1)
     mod.add_function(fn)
