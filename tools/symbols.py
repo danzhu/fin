@@ -18,11 +18,6 @@ class Symbol(Enum):
     Constant = 4
 
 
-MATCH_PERFECT = 4.0
-MATCH_GENERIC = 2.0
-MATCH_TO_NONE = 1.0
-
-
 class Variable:
     TYPE = Symbol.Variable
 
@@ -350,6 +345,10 @@ class Match:
     def __lt__(self, other):
         assert len(self.levels) == len(other.levels)
 
+        if len(self.function.generics) == 0 \
+                and len(other.function.generics) > 0:
+            return False
+
         less = False
         for s, o in zip(self.levels, other.levels):
             if s > o:
@@ -447,6 +446,9 @@ UNKNOWN = Struct('?', -1)
 
 TRUE = Constant('TRUE', BOOL, True)
 FALSE = Constant('FALSE', BOOL, False)
+
+MATCH_PERFECT = 3.0
+MATCH_TO_NONE = 1.0
 
 def load_builtins():
     mod = Module('')
@@ -631,14 +633,14 @@ def accept_type(self, other, gens):
     if type(other) is Generic:
         if other.name not in gens:
             gens[other.name] = self
-            return MATCH_GENERIC
+            return MATCH_PERFECT
 
         other = gens[other.name]
 
     if type(self) is Generic:
         if self.name not in gens:
             gens[self.name] = other
-            return MATCH_GENERIC
+            return MATCH_PERFECT
 
         self = gens[self.name]
 
