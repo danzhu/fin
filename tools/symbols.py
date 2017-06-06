@@ -18,8 +18,8 @@ class Symbol(Enum):
     Constant = 4
 
 
-MATCH_PERFECT = 3.0
-MATCH_REDUCTION = 2.0
+MATCH_PERFECT = 4.0
+MATCH_GENERIC = 2.0
 MATCH_TO_NONE = 1.0
 
 
@@ -63,21 +63,6 @@ class Generic:
 
     def size(self):
         assert False, 'should not use size on generic'
-
-    def match(self, other, gens):
-        if self.name in gens:
-            return gens[self.name].match(other, gens)
-        else:
-            gens[self.name] = other
-            return True
-
-    def accept(self, other, gens):
-        if self.name in gens:
-            return gens[self.name].accept(other, gens)
-
-        else:
-            gens[self.name] = other
-            return MATCH_PERFECT
 
     def resolve(self, gens):
         return gens[self.name]
@@ -241,38 +226,6 @@ class Struct(SymbolTable):
 
         return var
 
-    def match(self, other, gens):
-        if type(other) is Generic:
-            gens[other.name] = self
-            return MATCH_PERFECT
-        else:
-            return self == other
-
-    def accept(self, other, gens):
-        if self == UNKNOWN or other == UNKNOWN:
-            return math.nan
-
-        # if reference, reduce to level 0
-        ref = type(other) is Reference
-        if ref:
-            other = other.type
-
-        elif type(other) is Generic:
-            gens[other.name] = self
-            return MATCH_PERFECT
-
-        elif type(other) is not Struct:
-            # does not accept other types
-            return None
-
-        if self == other:
-            # score is lower if there's level reduction
-            return MATCH_REDUCTION if ref else MATCH_PERFECT
-        elif self == NONE:
-            return MATCH_TO_NONE
-        else:
-            return None
-
     def interpolate(self, other):
         if type(other) is Reference:
             other = other.type
@@ -354,10 +307,10 @@ class Function(SymbolTable):
         # nan: unknown
 
         gens = {}
-        lvls = [p.type.accept(a, gens) for p, a in zip(self.params, args)]
+        lvls = [accept_type(p.type, a, gens) for p, a in zip(self.params, args)]
 
         if ret is not None:
-            lvls.append(ret.accept(self.ret, gens))
+            lvls.append(accept_type(ret, self.ret, gens))
         else:
             lvls.append(math.nan)
 
@@ -444,31 +397,6 @@ class Reference:
     def size(self):
         return 8 # size of pointer
 
-    def match(self, other, gens):
-        if type(other) is not Reference:
-            return False
-        return self.level == other.level and self.type.match(other.type, gens)
-
-    def accept(self, other, gens):
-        if self == UNKNOWN or other == UNKNOWN:
-            return math.nan
-
-        if type(other) is not Reference:
-            other = Reference(other, 0)
-
-        if self.level > other.level:
-            if type(other.type) is Generic:
-                gens[other.type.name] = to_level(self.type,
-                        self.level - other.level)
-                return MATCH_PERFECT
-            else:
-                return None
-
-        if self.type.match(other.type, gens):
-            return MATCH_REDUCTION + self.level / other.level
-        else:
-            return None
-
     def interpolate(self, other):
         if other == UNKNOWN:
             return UNKNOWN
@@ -506,20 +434,6 @@ class Array:
         if self._size == -1:
             raise TypeError('array is unsized')
         return self._size
-
-    def match(self, other, gens):
-        if type(other) is not Array:
-            return False
-        return self.type.match(other.type, gens)
-
-    def accept(self, other, gens):
-        if self == UNKNOWN or other == UNKNOWN:
-            return math.nan
-
-        if type(other) is not Array:
-            return None
-
-        return self.type == other.type
 
     def resolve(self, gens):
         return Array(self.type.resolve(gens))
@@ -681,3 +595,82 @@ def resolve_overload(overloads, args, ret):
             res.add(match)
 
     return res
+
+def match_type(self, other, gens):
+    if type(other) is Generic:
+        if other.name not in gens:
+            gens[other.name] = self
+            return True
+
+        other = gens[other.name]
+
+    if type(self) is Generic:
+        if self.name not in gens:
+            gens[self.name] = other
+            return True
+
+        self = gens[self.name]
+
+    if type(self) is not type(other):
+        return False
+
+    if type(self) is Reference:
+        return self.level == other.level \
+                and match_type(self.type, other.type, gens)
+
+    if type(self) is Array:
+        return match_type(self.type, other.type, gens)
+
+    if type(self) is Struct:
+        return self == other
+
+def accept_type(self, other, gens):
+    if self == UNKNOWN or other == UNKNOWN:
+        return math.nan
+
+    if type(other) is Generic:
+        if other.name not in gens:
+            gens[other.name] = self
+            return MATCH_GENERIC
+
+        other = gens[other.name]
+
+    if type(self) is Generic:
+        if self.name not in gens:
+            gens[self.name] = other
+            return MATCH_GENERIC
+
+        self = gens[self.name]
+
+    if type(self) is Reference:
+        if type(other) is not Reference or self.level > other.level:
+            return None
+
+        if not match_type(self.type, other.type, gens):
+            return None
+
+        return MATCH_PERFECT - self.level / other.level
+
+    if type(other) is Reference:
+        # auto reduction to level 0
+        other = other.type
+        reduction = 1.0
+    else:
+        reduction = 0.0
+
+    if type(self) is not type(other):
+        return None
+
+    if type(self) is Array:
+        if not match_type(self.type, other.type, gens):
+            return None
+
+        return MATCH_PERFECT - reduction
+
+    if type(self) is Struct:
+        if self == other:
+            return MATCH_PERFECT - reduction
+        elif self == NONE:
+            return MATCH_TO_NONE
+        else:
+            return None

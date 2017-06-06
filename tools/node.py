@@ -57,7 +57,7 @@ class Node:
     def _expect_type(self, tp):
         if self.expr_type is not None:
             gens = {}
-            if tp.accept(self.expr_type, gens) is None:
+            if symbols.accept_type(tp, self.expr_type, gens) is None:
                 self._error('{} cannot be converted to {}', self.expr_type, tp)
 
         self.target_type = tp
