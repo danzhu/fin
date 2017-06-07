@@ -260,12 +260,20 @@ class Parser:
         return node
 
     def _and_test(self):
-        node = self._comp()
+        node = self._not_test()
         while self._lookahead.type == 'AND':
             self._next()
-            r = self._comp()
+            r = self._not_test()
             node = Node('TEST', (node, r), 'AND')
         return node
+
+    def _not_test(self):
+        if self._lookahead.type == 'NOT':
+            self._next()
+            val = self._not_test()
+            return Node('TEST', (val,), 'NOT')
+        else:
+            return self._comp()
 
     def _comp(self):
         node = self._expr()

@@ -64,3 +64,4 @@ keyword begin BEGIN
 keyword return RETURN
 keyword and AND
 keyword or OR
+keyword not NOT

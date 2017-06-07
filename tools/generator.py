@@ -175,6 +175,12 @@ class Generator:
             self._write('return_val', node.children[0].target_type.size())
 
     def TEST(self, node):
+        if node.value == 'NOT':
+            self._gen(node.children[0])
+            self._write('not')
+            self._cast(node)
+            return
+
         jump = self._label('SHORT_CIRCUIT')
         end = self._label('END_TEST')
 

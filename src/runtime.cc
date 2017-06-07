@@ -340,6 +340,10 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
+            case Opcode::Not:
+                opStack.push(!opStack.pop<bool>());
+                continue;
+
             case Opcode::ConstFalse:
                 opStack.push(false);
                 continue;

@@ -80,6 +80,9 @@ br_false offset:h
 br_true offset:h
     Pop boolean from stack and branch if true.
 
+not
+    Invert the boolean value on top of stack.
+
 const_false
     Load constant false onto stack.
 

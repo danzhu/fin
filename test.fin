@@ -11,7 +11,7 @@ def new() List
 
 def append(list List&, val Int)
     if list.size == list.capacity
-        if list.capacity != 0
+        if not list.capacity == 0
             list.capacity *= 2
             realloc(list.content, list.capacity)
         else

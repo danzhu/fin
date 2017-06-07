@@ -236,8 +236,8 @@ class Node:
 
     def _analyze_expect(self, refs):
         if self.type == 'TEST':
-            self.children[0]._expect_type(symbols.BOOL)
-            self.children[1]._expect_type(symbols.BOOL)
+            for c in self.children:
+                c._expect_type(symbols.BOOL)
 
         elif self.type == 'ASSN':
             tp = symbols.to_level(self.children[0].expr_type, self.level + 1)
