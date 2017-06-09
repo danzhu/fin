@@ -108,6 +108,9 @@ class SymbolTable:
 
         raise LookupError('no ancestor of type {}'.format(sym))
 
+    def module(self):
+        return self.parent.ancestor(Symbol.Module)
+
     def overloads(self, name):
         if self.parent is not None:
             res = self.parent.overloads(name)
@@ -213,7 +216,7 @@ class Struct(SymbolTable):
         return self.name
 
     def fullpath(self):
-        return self.ancestor(Symbol.Module).path() + self.fullname()
+        return self.module().path() + self.fullname()
 
     def add_variable(self, name, tp):
         var = Variable(name, tp, Location.Struct, self._size)
@@ -268,7 +271,7 @@ class Function(SymbolTable):
                 self.ret.fullpath() if self.ret != NONE else '')
 
     def fullpath(self):
-        return self.ancestor(Symbol.Module).path() + self.fullname()
+        return self.module().path() + self.fullname()
 
     def add_variable(self, name, tp):
         assert type(name) is str

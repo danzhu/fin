@@ -373,6 +373,11 @@ class Parser:
         elif self._lookahead.type == 'RETURN':
             return self._return()
 
+        elif self._lookahead.type in ['BREAK', 'CONTINUE', 'REDO']:
+            tp = self._lookahead.type
+            self._next()
+            return Node(tp, ())
+
         else:
             self._expect()
 

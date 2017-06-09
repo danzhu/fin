@@ -5,16 +5,26 @@ from symbols import Symbol, Module, Function, Struct, Block, Reference, Array
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=None):
+        # basic data
         self.type = tp
         self.children = children
         self.value = val
         # TODO: maybe this should be stored somewhere else?
         self.level = lvl
 
+        self.parent = None
+        for c in children:
+            c.parent = self
+
+        # semantic analysis
         self.function = None
         self.match = None
         self.expr_type = None
         self.target_type = None
+        self.stack_start = None
+
+        # code generation
+        self.context = None
 
     def __str__(self):
         content = self.type
@@ -35,6 +45,9 @@ class Node:
         if self.level:
             content += ' {}'.format(self.level)
 
+        if self.stack_start:
+            content += ' [[{} ]]'.format(format_list(self.stack_start))
+
         return content
 
     def print(self, indent=0):
@@ -44,7 +57,15 @@ class Node:
 
     def analyze(self, mod_name, syms, refs):
         self._analyze_acquire(mod_name, syms, refs)
-        self._analyze_expect(refs)
+        self._analyze_expect(refs, None)
+
+    def ancestor(self, tp):
+        if self.type == tp:
+            return self
+        elif self.parent is not None:
+            return self.parent.ancestor(tp)
+        else:
+            raise LookupError(tp)
 
     def _error(self, msg, *args):
         msg = msg.format(*args)
@@ -215,7 +236,6 @@ class Node:
             self.expr_type = symbols.interpolate_types(tps)
 
         elif self.type == 'RETURN':
-            self.return_type = syms.ancestor(Symbol.Function).ret
             self.expr_type = symbols.NONE
 
         elif self.type == 'LET':
@@ -234,7 +254,14 @@ class Node:
         elif self.type in ['ASSN', 'WHILE', 'EMPTY']:
             self.expr_type = symbols.NONE
 
-    def _analyze_expect(self, refs):
+        elif self.type in ['BREAK', 'CONTINUE', 'REDO']:
+            # TODO: diverging type
+            self.expr_type = symbols.NONE
+
+    def _analyze_expect(self, refs, stack):
+        self.stack_start = stack
+        self.stack_next = stack
+
         if self.type == 'TEST':
             for c in self.children:
                 c._expect_type(symbols.BOOL)
@@ -287,7 +314,8 @@ class Node:
             self.children[1]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
-            self.children[0]._expect_type(self.return_type)
+            tp = self.ancestor('DEF').function.ret
+            self.children[0]._expect_type(tp)
 
         elif self.type == 'LET':
             if self.children[1].type != 'EMPTY':
@@ -299,9 +327,33 @@ class Node:
                 if lvl != self.level:
                     self._error('initialization level mismatch')
 
-                tp = symbols.to_level(self.sym.type, lvl)
-                self.children[1]._expect_type(tp)
+                self.children[1]._expect_type(self.sym.type)
+
+            self.stack_next = (self.sym.type, stack)
+
+        if self.target_type is not None \
+                and self.target_type != symbols.NONE:
+            self.stack_next = (self.target_type, stack)
 
         # recurse
-        for c in self.children:
-            c._analyze_expect(refs)
+        # FIXME: incremental assignment has different stack rules
+        if self.type in ['IF', 'WHILE', 'TEST']:
+            # these nodes don't leave data on the stack
+            for c in self.children:
+                c._analyze_expect(refs, stack)
+
+            # the result stack after children is the same as final result stack
+            self.stack_end = self.stack_next
+        else:
+            for c in self.children:
+                c._analyze_expect(refs, stack)
+                stack = c.stack_next
+
+            self.stack_end = stack
+
+
+def format_list(l):
+    if l is None:
+        return ''
+
+    return '{} {}'.format(format_list(l[1]), l[0])

@@ -59,8 +59,11 @@ keyword let LET
 keyword if IF
 keyword elif ELIF
 keyword else ELSE
-keyword while WHILE
 keyword begin BEGIN
+keyword while WHILE
+keyword break BREAK
+keyword continue CONTINUE
+keyword redo REDO
 keyword return RETURN
 keyword and AND
 keyword or OR

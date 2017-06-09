@@ -32,11 +32,16 @@ class Generator:
         self._write('# {}'.format(node))
 
         self.indent += 1
+
         self._gens[node.type](node)
+        self._cast(node)
+
         self.indent -= 1
 
     def _cast(self, node):
-        assert node.expr_type is not None
+        if node.expr_type is None:
+            return
+
         assert node.target_type is not None
 
         if node.target_type == symbols.NONE:
@@ -59,6 +64,32 @@ class Generator:
             tp = symbols.to_level(node.expr_type, lvl)
             self._write('load', tp.size())
 
+    def _pop_size(self, stack, target):
+        size = 0
+        while stack is not target:
+            tp_size = stack[0].size()
+
+            assert tp_size > 0
+            size += tp_size
+            stack = stack[1]
+
+        return size
+
+    def _exit(self, stack, target):
+        amount = self._pop_size(stack, target)
+        if amount > 0:
+            self._write('pop', amount)
+
+    def _reduce(self, stack, target):
+        assert symbols.match_type(stack[0], target[0], {})
+
+        size = stack[0].size()
+        amount = self._pop_size(stack[1], target[1])
+
+        assert size > 0
+        if amount > 0:
+            self._write('reduce', size, amount)
+
     def _label(self, name):
         count = self._labels[name] if name in self._labels else 0
         self._labels[name] = count + 1
@@ -67,7 +98,7 @@ class Generator:
     def FILE(self, node):
         ref_list = []
         for ref in self.refs:
-            mod = ref.ancestor(Symbol.Module)
+            mod = ref.module()
 
             # don't ref current module / builtin
             if mod != node.module and mod.name != '':
@@ -98,7 +129,6 @@ class Generator:
     def IMPORT(self, node):
         # TODO
         assert False
-        pass
 
     def DEF(self, node):
         end = 'END_FN_' + node.function.fullname()
@@ -119,16 +149,10 @@ class Generator:
             self._gen(c)
             self._write('')
 
-        self._cast(node)
-
-        # pop variables declared in block
-        size = node.block.offset
-        if size == 0:
-            pass
-        elif node.target_type.size() == 0:
-            self._write('pop', size)
+        if node.target_type == symbols.NONE:
+            self._exit(node.stack_end, node.parent.stack_end)
         else:
-            self._write('reduce', node.target_type.size(), size)
+            self._reduce(node.stack_end, node.parent.stack_end)
 
     def LET(self, node):
         if node.children[1].type == 'EMPTY':
@@ -150,11 +174,16 @@ class Generator:
             self._gen(node.children[2])
         self._write(end + ':')
 
-        self._cast(node)
-
     def WHILE(self, node):
         start = self._label('WHILE')
         cond = self._label('COND')
+        end = self._label('END_WHILE')
+
+        node.context = {
+                'break': end,
+                'continue': cond,
+                'redo': start
+                }
 
         self._write('br', cond)
         self._write(start + ':')
@@ -162,23 +191,37 @@ class Generator:
         self._write(cond + ':')
         self._gen(node.children[0]) # comp
         self._write('br_true', start)
+        self._write(end + ':')
 
-        self._cast(node)
+    def BREAK(self, node):
+        tar = node.ancestor('WHILE')
+        self._exit(node.stack_end, tar.stack_end)
+        self._write('br', tar.context['break'])
+
+    def CONTINUE(self, node):
+        tar = node.ancestor('WHILE')
+        self._exit(node.stack_end, tar.stack_start)
+        self._write('br', tar.context['continue'])
+
+    def REDO(self, node):
+        tar = node.ancestor('WHILE')
+        self._exit(node.stack_end, tar.stack_start)
+        self._write('br', tar.context['redo'])
 
     def RETURN(self, node):
-        self._cast(node)
-
+        tar = node.ancestor('DEF')
         if len(node.children) == 0:
+            self._exit(node.stack_end, tar.stack_end)
             self._write('return')
         else:
             self._gen(node.children[0])
+            self._reduce(node.stack_end, tar.stack_end)
             self._write('return_val', node.children[0].target_type.size())
 
     def TEST(self, node):
         if node.value == 'NOT':
             self._gen(node.children[0])
             self._write('not')
-            self._cast(node)
             return
 
         jump = self._label('SHORT_CIRCUIT')
@@ -202,8 +245,6 @@ class Generator:
 
         self._write(end + ':')
 
-        self._cast(node)
-
     def ASSN(self, node):
         self._gen(node.children[0])
         self._gen(node.children[1])
@@ -211,20 +252,12 @@ class Generator:
         size = node.children[1].target_type.size()
         self._write('store', size)
 
-        self._cast(node)
-
-    def INC_ASSN(self, node):
-
-        self._cast(node)
-
     def CALL(self, node):
-        if node.match.function.ancestor(Symbol.Module).name != '':
+        if node.match.function.module().name != '':
             for c in node.children:
                 self._gen(c)
 
             self._write('call', node.match.function.fullpath(), node.arg_size)
-
-            self._cast(node)
             return
 
         val = node.value
@@ -262,8 +295,6 @@ class Generator:
 
             tp = symbols.to_level(node.expr_type, node.expr_type.level - 1)
             self._write('addr_offset', tp.size())
-
-            self._cast(node)
             return
 
         assn = False
@@ -324,28 +355,20 @@ class Generator:
         if assn:
             self._write('store', size)
 
-        self._cast(node)
-
     def MEMBER(self, node):
         self._gen(node.children[0])
 
         self._write('offset', node.field.offset)
 
-        self._cast(node)
-
     def NUM(self, node):
         self._write('const_i', node.value)
-
-        self._cast(node)
 
     def FLOAT(self, node):
         self._write('const_f', node.value)
 
-        self._cast(node)
-
     def VAR(self, node):
         if node.sym.TYPE == Symbol.Constant:
-            if node.sym == symbols.BOOL:
+            if node.sym.type == symbols.BOOL:
                 if node.sym.value:
                     self._write('const_true')
                 else:
@@ -366,5 +389,3 @@ class Generator:
 
         else:
             assert False
-
-        self._cast(node)

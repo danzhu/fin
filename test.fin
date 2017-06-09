@@ -1,51 +1,24 @@
-struct List
-    content [Int]&
-    size Int
-    capacity Int
-
-def new() List
-    let list List
-    list.size = 0
-    list.capacity = 0
-    list
-
-def append(list List&, val Int)
-    if list.size == list.capacity
-        if not list.capacity == 0
-            list.capacity *= 2
-            realloc(list.content, list.capacity)
-        else
-            list.capacity = 5
-            list.content := alloc(list.capacity)
-
-    list.content[list.size] = val
-    list.size += 1
-
-def pop(list List&) Int
-    list.size -= 1
-    list.content[list.size]
-
-def at(list List&, idx Int) Int&
-    list.content[idx]
-
-def drop(list List&)
-    dealloc(list.content)
-
-def test()
-    let list List& := alloc()
-    list = new()
-
+def test() Int
     let i = 0
-    while i < 25
-        list.append(i)
+    while i < 100
+        if i % 3 == 0
+            i += 1
+            redo
+
+        let rem = i % 5
+
         i += 1
+        if rem == 0
+            continue
 
-    list.pop().print()
-    list.at(2).print()
-    list.size.print()
-    list.capacity.print()
+        i.print()
 
-    list.drop()
-    dealloc(list)
+        if i == 1
+            return i
+
+        if i > 10
+            break
+
+    i
 
 test()
