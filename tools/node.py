@@ -233,7 +233,7 @@ class Node:
 
         elif self.type == 'IF':
             tps = [c.expr_type for c in self.children[1:]]
-            self.expr_type = symbols.interpolate_types(tps)
+            self.expr_type = symbols.interpolate_types(tps, {})
 
         elif self.type == 'RETURN':
             self.expr_type = symbols.NONE

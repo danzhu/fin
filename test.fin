@@ -1,24 +1,8 @@
-def test() Int
-    let i = 0
-    while i < 100
-        if i % 3 == 0
-            i += 1
-            redo
-
-        let rem = i % 5
-
-        i += 1
-        if rem == 0
-            continue
-
-        i.print()
-
-        if i == 1
-            return i
-
-        if i > 10
-            break
-
-    i
+def test()
+    let j = 2
+    let i = if TRUE
+        j
+    else
+        2
 
 test()

@@ -226,18 +226,6 @@ class Struct(SymbolTable):
 
         return var
 
-    def interpolate(self, other):
-        if type(other) is Reference:
-            other = other.type
-
-        if self == UNKNOWN or other == UNKNOWN:
-            return UNKNOWN
-
-        if self != other:
-            return NONE
-
-        return self
-
     def resolve(self, gens):
         return self
 
@@ -402,21 +390,6 @@ class Reference:
     def size(self):
         return 8 # size of pointer
 
-    def interpolate(self, other):
-        if other == UNKNOWN:
-            return UNKNOWN
-
-        if type(other) is not Reference:
-            other = Reference(other, 0)
-
-        tp = self.type.interpolate(other.type)
-
-        lvl = min(self.level, other.level)
-        if lvl > 0:
-            tp = Reference(tp, lvl)
-
-        return tp
-
     def resolve(self, gens):
         return Reference(self.type.resolve(gens), self.level)
 
@@ -559,10 +532,30 @@ def to_ref(tp):
 
     return tp
 
-def interpolate_types(tps):
+def interpolate_types(tps, gens):
+    assert len(tps) > 0
+
+    if UNKNOWN in tps:
+        return UNKNOWN
+
     res = tps[0]
-    for tp in tps[1:]:
-        res = res.interpolate(tp)
+    for other in tps[1:]:
+        if type(res) is Reference:
+            if type(other) is not Reference:
+                other = Reference(other, 0)
+
+            if not match_type(res.type, other.type, gens):
+                return NONE
+
+            lvl = min(res.level, other.level)
+            res = to_level(res.type, lvl)
+
+        elif match_type(res, other, gens):
+            pass
+
+        else:
+            return NONE
+
     return res
 
 def load_module(mod_name, glob):
