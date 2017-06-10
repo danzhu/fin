@@ -1,7 +1,7 @@
 def test()
-    let j = 2
+    let _j = 2
     let i = if TRUE
-        j
+        _j
     else
         2
 
