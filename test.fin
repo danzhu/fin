@@ -1,12 +1,17 @@
 def test()
     let i = 1
+    let res Int
     while TRUE
         if i > 100
-            break i
+            break res = i
 
         i *= 2
     else
         -1
-    .print()
+
+    res.print()
+    return res
+
+    print(-1)
 
 test()

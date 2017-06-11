@@ -156,6 +156,9 @@ class Generator:
         else:
             self._reduce(node.stack_end, node.parent.stack_end)
 
+    def EMPTY(self, node):
+        pass
+
     def LET(self, node):
         if node.children[1].type == 'EMPTY':
             self._write('push', node.sym.type.size())
@@ -199,10 +202,11 @@ class Generator:
     def BREAK(self, node):
         tar = node.ancestor('WHILE')
 
-        if node.children[0].type == 'EMPTY':
+        self._gen(node.children[0])
+
+        if node.children[0].target_type.size() == 0:
             self._exit(node.stack_end, tar.stack_start)
         else:
-            self._gen(node.children[0])
             self._reduce(node.stack_end, tar.stack_end)
 
         self._write('br', tar.context['break'])
@@ -219,11 +223,13 @@ class Generator:
 
     def RETURN(self, node):
         tar = node.ancestor('DEF')
-        if node.children.type != 'EMPTY':
+
+        self._gen(node.children[0])
+
+        if node.children[0].target_type.size() == 0:
             self._exit(node.stack_end, tar.stack_end)
             self._write('return')
         else:
-            self._gen(node.children[0])
             self._reduce(node.stack_end, tar.stack_end)
             self._write('return_val', node.children[0].target_type.size())
 
