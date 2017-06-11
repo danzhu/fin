@@ -67,6 +67,8 @@ class Generator:
     def _pop_size(self, stack, target):
         size = 0
         while stack is not target:
+            assert stack is not None, 'cannot match stack'
+
             tp_size = stack[0].size()
 
             assert tp_size > 0
@@ -150,7 +152,7 @@ class Generator:
             self._write('')
 
         if node.target_type == symbols.NONE:
-            self._exit(node.stack_end, node.parent.stack_end)
+            self._exit(node.stack_end, node.parent.stack_start)
         else:
             self._reduce(node.stack_end, node.parent.stack_end)
 
@@ -191,11 +193,18 @@ class Generator:
         self._write(cond + ':')
         self._gen(node.children[0]) # comp
         self._write('br_true', start)
+        self._gen(node.children[2]) # else
         self._write(end + ':')
 
     def BREAK(self, node):
         tar = node.ancestor('WHILE')
-        self._exit(node.stack_end, tar.stack_end)
+
+        if len(node.children) == 0:
+            self._exit(node.stack_end, tar.stack_start)
+        else:
+            self._gen(node.children[0])
+            self._reduce(node.stack_end, tar.stack_end)
+
         self._write('br', tar.context['break'])
 
     def CONTINUE(self, node):

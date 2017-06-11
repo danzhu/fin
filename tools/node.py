@@ -22,6 +22,7 @@ class Node:
         self.expr_type = None
         self.target_type = None
         self.stack_start = None
+        self.stack_end = None
 
         # code generation
         self.context = None
@@ -45,8 +46,8 @@ class Node:
         if self.level:
             content += ' {}'.format(self.level)
 
-        if self.stack_start:
-            content += ' [[{} ]]'.format(format_list(self.stack_start))
+        if self.stack_end:
+            content += ' [[{} ]]'.format(format_list(self.stack_end))
 
         return content
 
@@ -60,12 +61,23 @@ class Node:
         self._analyze_expect(refs, None)
 
     def ancestor(self, tp):
-        if self.type == tp:
-            return self
-        elif self.parent is not None:
-            return self.parent.ancestor(tp)
-        else:
+        if self.parent is None:
             raise LookupError(tp)
+
+        if self.parent.type == tp:
+            return self.parent
+        else:
+            return self.parent.ancestor(tp)
+
+    def decedents(self, tp):
+        res = set()
+        for c in self.children:
+            if c.type == tp:
+                res.add(c)
+
+            res |= c.decedents(tp)
+
+        return res
 
     def _error(self, msg, *args):
         msg = msg.format(*args)
@@ -79,6 +91,8 @@ class Node:
         raise Exception(msg)
 
     def _expect_type(self, tp):
+        assert tp is not None
+
         if self.expr_type is not None:
             gens = {}
             if symbols.accept_type(tp, self.expr_type, gens) is None:
@@ -252,7 +266,14 @@ class Node:
             self.sym = syms.add_variable(name, tp)
             self.expr_type = symbols.NONE
 
-        elif self.type in ['ASSN', 'WHILE', 'EMPTY']:
+        elif self.type == 'WHILE':
+            bks = self.children[1].decedents('BREAK')
+            tps = {node.children[0].expr_type for node in bks}
+            tps.add(self.children[2].expr_type) # else
+
+            self.expr_type = symbols.interpolate_types(tps, {})
+
+        elif self.type in ['ASSN', 'EMPTY']:
             self.expr_type = symbols.NONE
 
         elif self.type in ['BREAK', 'CONTINUE', 'REDO']:
@@ -295,11 +316,10 @@ class Node:
             self.children[2]._expect_type(self.function.ret)
 
         elif self.type == 'BLOCK':
-            for c in self.children[:-1]:
-                c._expect_type(symbols.NONE)
-
             self.expr_type = self.target_type
 
+            for c in self.children[:-1]:
+                c._expect_type(symbols.NONE)
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
@@ -311,11 +331,18 @@ class Node:
             self.children[2]._expect_type(self.expr_type)
 
         elif self.type == 'WHILE':
+            self.expr_type = self.target_type
+
             self.children[0]._expect_type(symbols.BOOL)
-            self.children[1]._expect_type(self.expr_type)
+            self.children[1]._expect_type(symbols.NONE)
+            self.children[2]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
             tp = self.ancestor('DEF').function.ret
+            self.children[0]._expect_type(tp)
+
+        elif self.type == 'BREAK':
+            tp = self.ancestor('WHILE').target_type
             self.children[0]._expect_type(tp)
 
         elif self.type == 'LET':

@@ -1,8 +1,12 @@
 def test()
-    let _j = 2
-    let i = if TRUE
-        _j
+    let i = 1
+    while TRUE
+        if i > 100
+            break i
+
+        i *= 2
     else
-        2
+        -1
+    .print()
 
 test()

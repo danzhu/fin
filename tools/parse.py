@@ -181,7 +181,15 @@ class Parser:
         cond = self._test()
         self._expect('EOL')
         cont = self._block()
-        return Node('WHILE', (cond, cont))
+
+        if self._lookahead.type == 'ELSE':
+            self._next()
+            self._expect('EOL')
+            fail = self._block()
+        else:
+            fail = self._empty()
+
+        return Node('WHILE', (cond, cont, fail))
 
     def _begin(self):
         self._expect('BEGIN')
@@ -373,7 +381,16 @@ class Parser:
         elif self._lookahead.type == 'RETURN':
             return self._return()
 
-        elif self._lookahead.type in ['BREAK', 'CONTINUE', 'REDO']:
+        elif self._lookahead.type == 'BREAK':
+            self._next()
+            if self._lookahead.type != 'EOL':
+                val = self._test()
+            else:
+                val = self._empty()
+
+            return Node('BREAK', (val,))
+
+        elif self._lookahead.type in ['CONTINUE', 'REDO']:
             tp = self._lookahead.type
             self._next()
             return Node(tp, ())

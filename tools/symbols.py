@@ -100,16 +100,16 @@ class SymbolTable:
         return sym
 
     def ancestor(self, sym):
-        if self.TYPE == sym:
-            return self
+        if self.parent is None:
+            raise LookupError('no ancestor of type {}'.format(sym))
 
-        if self.parent is not None:
+        if self.parent.TYPE == sym:
+            return self.parent
+        else:
             return self.parent.ancestor(sym)
 
-        raise LookupError('no ancestor of type {}'.format(sym))
-
     def module(self):
-        return self.parent.ancestor(Symbol.Module)
+        return self.ancestor(Symbol.Module)
 
     def overloads(self, name):
         if self.parent is not None:
@@ -535,11 +535,16 @@ def to_ref(tp):
 def interpolate_types(tps, gens):
     assert len(tps) > 0
 
-    if UNKNOWN in tps:
-        return UNKNOWN
+    res = None
+    for other in tps:
+        if res is None:
+            # first type
+            res = other
+            continue
 
-    res = tps[0]
-    for other in tps[1:]:
+        if other == UNKNOWN:
+            return UNKNOWN
+
         if type(res) is Reference:
             if type(other) is not Reference:
                 other = Reference(other, 0)
@@ -549,11 +554,13 @@ def interpolate_types(tps, gens):
 
             lvl = min(res.level, other.level)
             res = to_level(res.type, lvl)
+            continue
 
-        elif match_type(res, other, gens):
-            pass
+        if type(other) is Reference:
+            other = other.type
+            continue
 
-        else:
+        if not match_type(res, other, gens):
             return NONE
 
     return res
