@@ -199,7 +199,7 @@ class Generator:
     def BREAK(self, node):
         tar = node.ancestor('WHILE')
 
-        if len(node.children) == 0:
+        if node.children[0].type == 'EMPTY':
             self._exit(node.stack_end, tar.stack_start)
         else:
             self._gen(node.children[0])
