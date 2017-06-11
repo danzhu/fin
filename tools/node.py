@@ -104,8 +104,7 @@ class Node:
                     ', '.join(str(a) for a in self.args),
                     self.target_type)
 
-        raise AnalyzerError(msg,
-                self.token.line, self.token.column, self.token.src) from None
+        raise AnalyzerError(msg, self.token) from None
 
     @error
     def _expect_type(self, tp):

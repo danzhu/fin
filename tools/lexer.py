@@ -87,13 +87,15 @@ class Lexer:
 
             if new_indent > indent:
                 if (new_indent - indent) % ind_amount != 0:
-                    raise LexerError('wrong indent', ln, new_indent, line)
+                    raise LexerError('wrong indent',
+                            Token('INDENT', line, ln, new_indent))
                 for i in range((new_indent - indent) // ind_amount):
                     yield Token('INDENT', line, ln)
 
             elif new_indent < indent:
                 if (indent - new_indent) % ind_amount != 0:
-                    raise LexerError('wrong dedent', ln, new_indent, line)
+                    raise LexerError('wrong dedent',
+                            Token('DEDENT', line, ln, new_indent))
 
                 # end all blocks except the last one
                 for i in range((indent - new_indent) // ind_amount - 1):
@@ -128,13 +130,13 @@ class Lexer:
 
                 if state == self.start:
                     raise LexerError("unrecognized character '{}'".format(c),
-                        ln, start + 1, line)
+                        Token(state.name, line, ln, start + 1))
 
                 val = line[start:end]
 
                 if not state.accept:
                     raise LexerError("invalid token '{}'".format(val),
-                            ln, start + 1, line)
+                            Token(state.name, line, ln, start + 1))
 
                 if val in self.keywords:
                     tp = self.keywords[val]

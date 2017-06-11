@@ -24,10 +24,7 @@ class Parser:
         self._next()
 
     def _error(self, msg):
-        raise ParserError(msg,
-                self._lookahead.line,
-                self._lookahead.column,
-                self._lookahead.src)
+        raise ParserError(msg, self._lookahead)
 
     def _args(self):
         children = []

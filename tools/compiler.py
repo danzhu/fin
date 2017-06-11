@@ -55,7 +55,7 @@ class Compiler:
             if stage == 'exec':
                 return
 
-        raise CompilerError('invalid stage', -1, -1, '')
+        raise CompilerError('invalid stage', None)
 
 
 def main():
