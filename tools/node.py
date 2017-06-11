@@ -91,12 +91,11 @@ class Node:
         raise Exception(msg)
 
     def _expect_type(self, tp):
+        assert self.expr_type is not None
         assert tp is not None
 
-        if self.expr_type is not None:
-            gens = {}
-            if symbols.accept_type(tp, self.expr_type, gens) is None:
-                self._error('{} cannot be converted to {}', self.expr_type, tp)
+        if symbols.accept_type(tp, self.expr_type, {}) is None:
+            self._error('{} cannot be converted to {}', self.expr_type, tp)
 
         self.target_type = tp
 
@@ -273,7 +272,7 @@ class Node:
 
             self.expr_type = symbols.interpolate_types(tps, {})
 
-        elif self.type in ['ASSN', 'EMPTY']:
+        elif self.type in ['DEF', 'STRUCT', 'ASSN', 'EMPTY']:
             self.expr_type = symbols.NONE
 
         elif self.type in ['BREAK', 'CONTINUE', 'REDO']:
