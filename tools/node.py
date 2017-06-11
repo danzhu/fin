@@ -250,6 +250,7 @@ class Node:
                 tp = symbols.to_level(tp, self.level)
 
             self.sym = syms.add_variable(name, tp)
+            self.expr_type = symbols.NONE
 
         elif self.type in ['ASSN', 'WHILE', 'EMPTY']:
             self.expr_type = symbols.NONE
