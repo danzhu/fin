@@ -45,12 +45,14 @@
 - [x] ~~prevent calls to functions defined later~~
 - [x] indent scope
 - [x] function overloads
-  - [ ] operator overloads
+  - [x] operator overloads
+  - [ ] fix inc assignment
 - [x] generate global code after function defs
 - [x] loop control
   - [x] `continue` / `break`
-  - [ ] `else`
+  - [x] `else`
   - [x] `redo`
+  - [x] `break ...`
 - [ ] levelled equality comparison
 - [x] unify module / struct / function to symbol table
   - [x] remove context in symbol table

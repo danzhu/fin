@@ -1,11 +1,11 @@
 > start [ALPHA]_ ID
 > start 0 ZERO
 > start 123456789 NUM
-> start + ADD
-> start - SUB
-> start * MULT
-> start / DIV
-> start % MOD
+> start + PLUS
+> start - MINUS
+> start * MULTIPLIES
+> start / DIVIDES
+> start % MODULUS
 > start = ASSN
 > start & AMP
 > start ! EXCL
@@ -29,11 +29,11 @@
 > NUM . FLOAT
 > NUM [NUM] NUM
 > FLOAT [NUM] FLOAT
-> ADD = ADD_ASSN
-> SUB = SUB_ASSN
-> MULT = MULT_ASSN
-> DIV = DIV_ASSN
-> MOD = MOD_ASSN
+> PLUS = PLUS_ASSN
+> MINUS = MINUS_ASSN
+> MULTIPLIES = MULTIPLIES_ASSN
+> DIVIDES = DIVIDES_ASSN
+> MODULUS = MODULUS_ASSN
 > ASSN = EQ
 > EXCL = NE
 > LT = LE
@@ -41,11 +41,11 @@
 > comment [ANY] comment
 > comment [LF] start
 type ZERO NUM
-type ADD_ASSN INC_ASSN
-type SUB_ASSN INC_ASSN
-type MULT_ASSN INC_ASSN
-type DIV_ASSN INC_ASSN
-type MOD_ASSN INC_ASSN
+type PLUS_ASSN INC_ASSN
+type MINUS_ASSN INC_ASSN
+type MULTIPLIES_ASSN INC_ASSN
+type DIVIDES_ASSN INC_ASSN
+type MODULUS_ASSN INC_ASSN
 type EQ COMP
 type NE COMP
 type GT COMP

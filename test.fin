@@ -1,17 +1,25 @@
+struct Vec
+    x Float
+    y Float
+
+def new(x Float, y Float) Vec
+    let v Vec
+    v.x = x
+    v.y = y
+    v
+
+def plus(self Vec, other Vec) Vec
+    self.x += other.x
+    self.y += other.y
+    self
+
+def less(self Vec, other Vec) Bool
+    self.x < other.x and self.y < other.y
+
 def test()
-    let i = 1
-    let res Int
-    while TRUE
-        if i > 100
-            break res = i
-
-        i *= 2
-    else
-        -1
-
-    res.print()
-    return res
-
-    print(-1)
+    let v = new(1., 2.) + new(2., 3.)
+    v.x.print()
+    v.y.print()
+    print(v < v)
 
 test()

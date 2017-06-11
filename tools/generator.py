@@ -313,24 +313,24 @@ class Generator:
         assn = False
 
         if len(node.children) == 1:
-            if val == '+':
+            if val == 'pos':
                 raise NotImplementedError('unary + not implemented')
-            elif val == '-':
+            elif val == 'neg':
                 op = 'neg'
             else:
                 assert False, 'unknown operator {}'.format(val)
 
-        elif val == '<':
+        elif val == 'less':
             op = 'lt'
-        elif val == '>':
+        elif val == 'greater':
             op = 'gt'
-        elif val == '<=':
+        elif val == 'lessEqual':
             op = 'le'
-        elif val == '>=':
+        elif val == 'greaterEqual':
             op = 'ge'
-        elif val == '==':
+        elif val == 'equal':
             op = 'eq'
-        elif val == '!=':
+        elif val == 'notEqual':
             op = 'ne'
         else:
             if val[-1] == '=':

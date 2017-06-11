@@ -466,20 +466,21 @@ def load_builtins():
     # builtin operations
     for tp in { INT, FLOAT }:
         # binary
-        for op in ['+', '-', '*', '/', '%']:
+        for op in ['plus', 'minus', 'multiplies', 'divides', 'modulus']:
             fn = Function(op, tp)
             fn.add_variable('left', tp)
             fn.add_variable('right', tp)
             mod.add_function(fn)
 
         # unary
-        for op in ['+', '-']:
+        for op in ['pos', 'neg']:
             fn = Function(op, tp)
             fn.add_variable('value', tp)
             mod.add_function(fn)
 
         # comparison
-        for op in ['<', '<=', '>', '>=', '==', '!=']:
+        for op in ['equal', 'notEqual', 'less', 'lessEqual', 'greater',
+                'greaterEqual']:
             fn = Function(op, BOOL)
             fn.add_variable('left', tp)
             fn.add_variable('right', tp)

@@ -306,7 +306,20 @@ class Parser:
         node = self._expr()
         if self._lookahead.type == 'COMP':
             token = self._lookahead
-            op = self._lookahead.value
+            if self._lookahead.variant == 'EQ':
+                op = 'equal'
+            elif self._lookahead.variant == 'NE':
+                op = 'notEqual'
+            elif self._lookahead.variant == 'LT':
+                op = 'less'
+            elif self._lookahead.variant == 'LE':
+                op = 'lessEqual'
+            elif self._lookahead.variant == 'GT':
+                op = 'greater'
+            elif self._lookahead.variant == 'GE':
+                op = 'greaterEqual'
+            else:
+                assert False
             self._next()
             r = self._expr()
             node = Node('CALL', token, (node, r), op)
@@ -314,9 +327,9 @@ class Parser:
 
     def _expr(self):
         node = self._term()
-        while self._lookahead.type in ['ADD', 'SUB']:
+        while self._lookahead.type in ['PLUS', 'MINUS']:
             token = self._lookahead
-            op = self._lookahead.value
+            op = self._lookahead.type.lower()
             self._next()
             r = self._term()
             node = Node('CALL', token, (node, r), op)
@@ -324,18 +337,23 @@ class Parser:
 
     def _term(self):
         node = self._factor()
-        while self._lookahead.type in ['MULT', 'DIV', 'MOD']:
+        while self._lookahead.type in ['MULTIPLIES', 'DIVIDES', 'MODULUS']:
             token = self._lookahead
-            op = self._lookahead.value
+            op = self._lookahead.type.lower()
             self._next()
             r = self._factor()
             node = Node('CALL', token, (node, r), op)
         return node
 
     def _factor(self):
-        if self._lookahead.type in ['ADD', 'SUB']:
+        if self._lookahead.type in ['PLUS', 'MINUS']:
             token = self._lookahead
-            op = self._lookahead.value
+            if self._lookahead.type == 'PLUS':
+                op = 'pos'
+            elif self._lookahead.type == 'MINUS':
+                op = 'neg'
+            else:
+                assert False
             self._next()
             val = self._factor()
             return Node('CALL', token, (val,), op)
