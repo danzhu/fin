@@ -55,7 +55,7 @@ class Compiler:
             if stage == 'exec':
                 return
 
-        raise ValueError('invalid stage')
+        raise CompilerError('invalid stage', -1, -1, '')
 
 
 def main():
@@ -77,7 +77,6 @@ def main():
     try:
         compiler.compile(args.src, args.out, args.name, args.stage)
     except CompilerError as e:
-        print('The following error occurred when compiling the program:')
         print('{}: {}'.format(type(e).__name__, e))
         exit(1)
 

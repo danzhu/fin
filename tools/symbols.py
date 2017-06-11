@@ -69,7 +69,7 @@ class SymbolTable:
 
     def _check_exists(self, name):
         if name in self.symbols:
-            raise KeyError("symbol '{}' exists as {}".format(
+            raise LookupError("symbol '{}' exists as {}".format(
                 name, self.symbols[name]))
 
     def _add_symbol(self, sym):
@@ -89,17 +89,22 @@ class SymbolTable:
         sym = self.find(name)
 
         if sym is None:
-            raise LookupError('cannot find symbol "{}"'.format(name))
+            raise LookupError("cannot find {} '{}'".format(
+                ' or '.join(t.name for t in tps),
+                name))
 
         if sym.TYPE not in tps:
-            raise LookupError('expected {}, but got {} "{}"'.format(
-                ' or '.join(str(t) for t in tps), sym.TYPE, name))
+            raise LookupError("expecting {}, but got {} '{}'".format(
+                ' or '.join(t.name for t in tps),
+                sym.TYPE.name,
+                name))
 
         return sym
 
     def ancestor(self, sym):
         if self.parent is None:
-            raise LookupError('no ancestor of type {}'.format(sym))
+            raise LookupError('cannot find ancestor of type {}'.format(
+                sym.name))
 
         if self.parent.TYPE == sym:
             return self.parent
@@ -118,12 +123,13 @@ class SymbolTable:
         if name in self.symbols:
             fns = self.symbols[name]
 
-            if type(fns) is not set:
-                raise LookupError('{} "{}" is not a function'.format(
-                    fns.TYPE,
-                    name))
+            if fns.TYPE != Symbol.Function:
+                raise LookupError("expecting {}, but got {} '{}'".format(
+                    Symbol.Function.name,
+                    fns.TYPE.name,
+                    fns))
 
-            res |= {Match(fn) for fn in fns}
+            res |= {Match(fn) for fn in fns.functions}
 
         return res
 
@@ -137,6 +143,9 @@ class Module(SymbolTable):
 
         # TODO: version
         self.name = name
+
+    def __str__(self):
+        return self.name
 
     def __lt__(self, other):
         return self.name < other.name
@@ -171,15 +180,17 @@ class Module(SymbolTable):
 
     def add_function(self, fn):
         if fn.name not in self.symbols:
-            group = set()
+            group = FunctionGroup(fn.name)
             self.symbols[fn.name] = group
-
-        elif type(self.symbols[fn.name]) is not set:
-            # TODO: better way to check
-            raise ValueError('redefining non-function as function')
 
         else:
             group = self.symbols[fn.name]
+
+            if group.TYPE != Symbol.Function:
+                raise LookupError("redefining {} '{}' as {}".format(
+                    group.TYPE.name,
+                    group,
+                    Symbol.Function.name))
 
         group.add(fn)
         fn.parent = self
@@ -367,6 +378,20 @@ class Match:
         ret = self.function.ret.resolve(self.gens)
         params = [p.type.resolve(self.gens) for p in self.function.params]
         return ret, params
+
+
+class FunctionGroup:
+    TYPE = Symbol.Function
+
+    def __init__(self, name):
+        self.name = name
+        self.functions = set()
+
+    def __str__(self):
+        return self.name
+
+    def add(self, fn):
+        self.functions.add(fn)
 
 
 class Reference:

@@ -12,8 +12,9 @@ class State:
 
 
 class Token:
-    def __init__(self, tp, line, col = 0, val = None, var = None):
+    def __init__(self, tp, src, line, col = 0, val = None, var = None):
         self.type = tp
+        self.src = src
         self.line = line
         self.column = col
         self.value = val
@@ -86,23 +87,23 @@ class Lexer:
 
             if new_indent > indent:
                 if (new_indent - indent) % ind_amount != 0:
-                    raise LexerError('wrong indent', ln, new_indent)
+                    raise LexerError('wrong indent', ln, new_indent, line)
                 for i in range((new_indent - indent) // ind_amount):
-                    yield Token('INDENT', ln)
+                    yield Token('INDENT', line, ln)
 
             elif new_indent < indent:
                 if (indent - new_indent) % ind_amount != 0:
-                    raise LexerError('wrong dedent', ln, new_indent)
+                    raise LexerError('wrong dedent', ln, new_indent, line)
 
                 # end all blocks except the last one
                 for i in range((indent - new_indent) // ind_amount - 1):
-                    yield Token('DEDENT', ln)
-                    yield Token('EOL', ln)
+                    yield Token('DEDENT', line, ln)
+                    yield Token('EOL', line, ln)
 
                 # also end the last block if followed by an empty line
-                yield Token('DEDENT', ln)
+                yield Token('DEDENT', line, ln)
                 if prevEmpty:
-                    yield Token('EOL', ln)
+                    yield Token('EOL', line, ln)
 
             indent = new_indent
             prevEmpty = False
@@ -125,11 +126,15 @@ class Lexer:
 
                     continue
 
-                if not state.accept:
-                    raise LexerError('invalid token {}'.format(state.name),
-                            ln, start + 1)
+                if state == self.start:
+                    raise LexerError("unrecognized character '{}'".format(c),
+                        ln, start + 1, line)
 
                 val = line[start:end]
+
+                if not state.accept:
+                    raise LexerError("invalid token '{}'".format(val),
+                            ln, start + 1, line)
 
                 if val in self.keywords:
                     tp = self.keywords[val]
@@ -141,16 +146,17 @@ class Lexer:
                     tp = state.name
                     var = tp
 
-                yield Token(tp, ln, start + 1, val, var)
+                yield Token(tp, line, ln, start + 1, val, var)
 
                 start = end
                 state = self.start
 
-            yield Token('EOL', ln, len(line), '\n')
+            # since '\n' is part of line, len(line) is exactly the column of EOL
+            yield Token('EOL', line, ln, len(line), '\n')
 
         if ind_amount > 0:
             for i in range(indent // ind_amount):
-                yield Token('DEDENT', ln)
-                yield Token('EOL', ln)
+                yield Token('DEDENT', line, ln)
+                yield Token('EOL', line, ln)
 
-        yield Token('EOF', ln)
+        yield Token('EOF', line, ln)

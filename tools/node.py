@@ -2,17 +2,26 @@ import symbols
 from symbols import Symbol, Module, Function, Struct, Block, Reference, Array
 from error import AnalyzerError
 
+def error(fn):
+    def dec(self, *args, **kargs):
+        try:
+            ret = fn(self, *args, **kargs)
+        except (LookupError, TypeError) as e:
+            self._error('{}', e)
+
+        return ret
+
+    return dec
+
 class Node:
-    def __init__(self, tp, children, val=None, lvl=None):
+    def __init__(self, tp, token, children, val=None, lvl=None):
         # basic data
         self.type = tp
+        self.token = token
         self.children = children
         self.value = val
         # TODO: maybe this should be stored somewhere else?
         self.level = lvl
-
-        self.line = None
-        self.column = None
 
         self.parent = None
         for c in children:
@@ -20,6 +29,7 @@ class Node:
 
         # semantic analysis
         self.function = None
+        self.args = None
         self.match = None
         self.expr_type = None
         self.target_type = None
@@ -86,22 +96,18 @@ class Node:
     def _error(self, msg, *args):
         msg = msg.format(*args)
 
+        msg += '\n  in {}'.format(self)
         if self.type == 'CALL':
-            msg += '\n  in {}({}) {}'.format(self.value,
+            if self.args is None:
+                self.args = [c.expr_type for c in self.children]
+            msg += '\n    {}({}) {}'.format(self.value,
                     ', '.join(str(a) for a in self.args),
                     self.target_type)
 
-        msg += '\n  in node {}'.format(self)
-        raise AnalyzerError(msg, self.line, self.column) from None
+        raise AnalyzerError(msg,
+                self.token.line, self.token.column, self.token.src) from None
 
-    def _get_sym(self, syms, name, *tps):
-        try:
-            sym = syms.get(name, *tps)
-        except LookupError as e:
-            self._error('{}', e)
-
-        return sym
-
+    @error
     def _expect_type(self, tp):
         assert self.expr_type is not None
         assert tp is not None
@@ -111,6 +117,7 @@ class Node:
 
         self.target_type = tp
 
+    @error
     def _decl(self, mod):
         if self.type == 'DEF':
             name = self.value
@@ -141,12 +148,13 @@ class Node:
         else:
             assert False, 'unknown declaration'
 
+    @error
     def _type(self, syms):
         if self.type == 'EMPTY':
             return None
 
         if self.type == 'TYPE':
-            return self._get_sym(syms, self.value, Symbol.Struct)
+            return syms.get(self.value, Symbol.Struct)
 
         elif self.type == 'REF':
             tp = self.children[0]._type(syms)
@@ -161,6 +169,7 @@ class Node:
 
             return Array(tp)
 
+    @error
     def _resolve_overload(self, refs, required=False):
         if self.match is not None:
             return
@@ -180,7 +189,7 @@ class Node:
                 return
 
             self._error('cannot resolve function overload between\n{}',
-                    '\n'.join('  ' + str(fn) for fn in self.matches))
+                    '\n'.join('    ' + str(fn) for fn in self.matches))
 
         match = next(iter(self.matches))
 
@@ -195,6 +204,7 @@ class Node:
         self.match = match
         self.arg_size = sum(p.size() for p in self.params)
 
+    @error
     def _analyze_acquire(self, mod_name, syms, refs):
         # symbol table
         if self.type == 'FILE':
@@ -222,10 +232,7 @@ class Node:
 
         # expr type
         if self.type == 'VAR':
-            self.sym = self._get_sym(
-                    syms,
-                    self.value,
-                    Symbol.Variable, Symbol.Constant)
+            self.sym = syms.get(self.value, Symbol.Variable, Symbol.Constant)
             self.expr_type = self.sym.var_type()
 
         elif self.type == 'NUM':
@@ -243,7 +250,7 @@ class Node:
             self.matches = syms.overloads(self.value)
 
             if len(self.matches) == 0:
-                self._error('no function "{}" defined', self.value)
+                self._error("no function '{}' defined", self.value)
 
             self._resolve_overload(refs)
 
@@ -291,6 +298,7 @@ class Node:
             # TODO: diverging type
             self.expr_type = symbols.NONE
 
+    @error
     def _analyze_expect(self, refs, stack):
         self.stack_start = stack
         self.stack_next = stack
