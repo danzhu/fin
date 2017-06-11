@@ -248,9 +248,6 @@ class Node:
             tps = [c.expr_type for c in self.children[1:]]
             self.expr_type = symbols.interpolate_types(tps, {})
 
-        elif self.type == 'RETURN':
-            self.expr_type = symbols.NONE
-
         elif self.type == 'LET':
             name = self.value
             tp = self.children[0]._type(syms)
@@ -275,7 +272,7 @@ class Node:
         elif self.type in ['DEF', 'STRUCT', 'ASSN', 'EMPTY']:
             self.expr_type = symbols.NONE
 
-        elif self.type in ['BREAK', 'CONTINUE', 'REDO']:
+        elif self.type in ['BREAK', 'CONTINUE', 'REDO', 'RETURN']:
             # TODO: diverging type
             self.expr_type = symbols.NONE
 

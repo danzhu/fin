@@ -219,7 +219,7 @@ class Generator:
 
     def RETURN(self, node):
         tar = node.ancestor('DEF')
-        if len(node.children) == 0:
+        if node.children.type != 'EMPTY':
             self._exit(node.stack_end, tar.stack_end)
             self._write('return')
         else:

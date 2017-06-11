@@ -198,11 +198,12 @@ class Parser:
 
     def _return(self):
         self._expect('RETURN')
-        if self._lookahead.type == 'EOL':
-            children = ()
+        if self._lookahead.type != 'EOL':
+            val = self._test()
         else:
-            children = (self._test(),)
-        return Node('RETURN', children)
+            val = self._empty()
+
+        return Node('RETURN', (val,))
 
     def _param(self):
         name = self._name()
