@@ -8,6 +8,7 @@ from generator import Generator
 from asm import Assembler
 import symbols
 from symbols import Location, Module
+from error import CompilerError
 
 class Compiler:
     def __init__(self, lex):
@@ -72,7 +73,13 @@ def main():
     args = parser.parse_args()
 
     compiler = Compiler('meta/lex')
-    compiler.compile(args.src, args.out, args.name, args.stage)
+
+    try:
+        compiler.compile(args.src, args.out, args.name, args.stage)
+    except CompilerError as e:
+        print('The following error occurred when compiling the program:')
+        print('{}: {}'.format(type(e).__name__, e))
+        exit(1)
 
 if __name__ == '__main__':
     main()

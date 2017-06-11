@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
-
 import symbols
 from symbols import Symbol, Module, Function, Struct, Block, Reference, Array
+from error import AnalyzerError
 
 class Node:
     def __init__(self, tp, children, val=None, lvl=None):
@@ -11,6 +10,9 @@ class Node:
         self.value = val
         # TODO: maybe this should be stored somewhere else?
         self.level = lvl
+
+        self.line = None
+        self.column = None
 
         self.parent = None
         for c in children:
@@ -61,13 +63,15 @@ class Node:
         self._analyze_expect(refs, None)
 
     def ancestor(self, tp):
-        if self.parent is None:
-            raise LookupError(tp)
+        node = self.parent
 
-        if self.parent.type == tp:
-            return self.parent
-        else:
-            return self.parent.ancestor(tp)
+        while node is not None:
+            if node.type == tp:
+                return node
+
+            node = node.parent
+
+        self._error('cannot find ancestor {}', tp)
 
     def decedents(self, tp):
         res = set()
@@ -88,7 +92,15 @@ class Node:
                     self.target_type)
 
         msg += '\n  in node {}'.format(self)
-        raise Exception(msg)
+        raise AnalyzerError(msg, self.line, self.column) from None
+
+    def _get_sym(self, syms, name, *tps):
+        try:
+            sym = syms.get(name, *tps)
+        except LookupError as e:
+            self._error('{}', e)
+
+        return sym
 
     def _expect_type(self, tp):
         assert self.expr_type is not None
@@ -134,7 +146,7 @@ class Node:
             return None
 
         if self.type == 'TYPE':
-            return syms.get(self.value, Symbol.Struct)
+            return self._get_sym(syms, self.value, Symbol.Struct)
 
         elif self.type == 'REF':
             tp = self.children[0]._type(syms)
@@ -210,7 +222,10 @@ class Node:
 
         # expr type
         if self.type == 'VAR':
-            self.sym = syms.get(self.value, Symbol.Variable, Symbol.Constant)
+            self.sym = self._get_sym(
+                    syms,
+                    self.value,
+                    Symbol.Variable, Symbol.Constant)
             self.expr_type = self.sym.var_type()
 
         elif self.type == 'NUM':

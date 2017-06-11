@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from enum import Enum
 import math
 
@@ -91,10 +89,10 @@ class SymbolTable:
         sym = self.find(name)
 
         if sym is None:
-            raise KeyError('cannot find symbol "{}"'.format(name))
+            raise LookupError('cannot find symbol "{}"'.format(name))
 
         if sym.TYPE not in tps:
-            raise TypeError('expected {}, but got {} "{}"'.format(
+            raise LookupError('expected {}, but got {} "{}"'.format(
                 ' or '.join(str(t) for t in tps), sym.TYPE, name))
 
         return sym
@@ -178,7 +176,7 @@ class Module(SymbolTable):
 
         elif type(self.symbols[fn.name]) is not set:
             # TODO: better way to check
-            raise KeyError('redefining non-function as function')
+            raise ValueError('redefining non-function as function')
 
         else:
             group = self.symbols[fn.name]

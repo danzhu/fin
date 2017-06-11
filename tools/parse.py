@@ -1,8 +1,20 @@
-#!/usr/bin/env python3
-
 import sys
 from lexer import Lexer
 from node import Node
+from error import ParserError
+
+def node(fn):
+    def dec(self):
+        ln = self._lookahead.line
+        col = self._lookahead.column
+
+        node = fn(self)
+
+        node.line = ln
+        node.column = col
+        return node
+
+    return dec
 
 class Parser:
     def parse(self, src):
@@ -25,8 +37,7 @@ class Parser:
         self._next()
 
     def _error(self, msg):
-        raise SyntaxError(msg
-                + '\nat line {0.line}, col {0.column}'.format(self._lookahead))
+        raise ParserError(msg, self._lookahead.line, self._lookahead.column)
 
     def _args(self):
         children = []
@@ -44,9 +55,11 @@ class Parser:
 
         return children
 
+    @node
     def _empty(self):
         return Node('EMPTY', ())
 
+    @node
     def _file(self):
         children = []
         while self._lookahead.type != 'EOF':
@@ -60,12 +73,14 @@ class Parser:
                 children.append(self._stmt())
         return Node('FILE', children)
 
+    @node
     def _import(self):
         self._expect('IMPORT')
         name = self._name()
         self._expect('EOL')
         return Node('IMPORT', (), name)
 
+    @node
     def _struct(self):
         self._expect('STRUCT')
         name = self._name()
@@ -80,12 +95,14 @@ class Parser:
 
         return Node('STRUCT', children, name)
 
+    @node
     def _field(self):
         name = self._name()
         tp = self._type()
         self._expect('EOL')
         return Node('FIELD', (tp,), name)
 
+    @node
     def _def(self):
         self._expect('DEF')
 
@@ -103,6 +120,7 @@ class Parser:
         self._expect('EOL')
         return Node('DEF', (params, ret, cont), name)
 
+    @node
     def _params(self):
         self._expect('LPAREN')
         children = []
@@ -118,6 +136,7 @@ class Parser:
                     break
         return Node('PARAMS', children)
 
+    @node
     def _stmt(self):
         if self._lookahead.type == 'LET':
             node = self._let()
@@ -126,6 +145,7 @@ class Parser:
         self._expect('EOL')
         return node
 
+    @node
     def _let(self):
         self._expect('LET')
         name = self._name()
@@ -151,6 +171,7 @@ class Parser:
 
         return Node('LET', (tp, val), name, lvl)
 
+    @node
     def _if(self):
         self._expect('IF')
         cond = self._test()
@@ -159,6 +180,7 @@ class Parser:
         fail = self._else()
         return Node('IF', (cond, succ, fail))
 
+    @node
     def _else(self):
         if self._lookahead.type == 'ELIF':
             self._next()
@@ -176,6 +198,7 @@ class Parser:
         else:
             return self._empty()
 
+    @node
     def _while(self):
         self._expect('WHILE')
         cond = self._test()
@@ -191,11 +214,13 @@ class Parser:
 
         return Node('WHILE', (cond, cont, fail))
 
+    @node
     def _begin(self):
         self._expect('BEGIN')
         self._expect('EOL')
         return self._block()
 
+    @node
     def _return(self):
         self._expect('RETURN')
         if self._lookahead.type != 'EOL':
@@ -205,11 +230,13 @@ class Parser:
 
         return Node('RETURN', (val,))
 
+    @node
     def _param(self):
         name = self._name()
         tp = self._type()
         return Node('PARAM', (tp,), name)
 
+    @node
     def _type(self):
         if self._lookahead.type == 'LBRACKET':
             self._next() # LBRACKET
@@ -230,6 +257,7 @@ class Parser:
 
         return node
 
+    @node
     def _block(self):
         stmts = []
         self._expect('INDENT')
@@ -238,6 +266,7 @@ class Parser:
         self._next()
         return Node('BLOCK', stmts)
 
+    @node
     def _test(self):
         node = self._or_test()
 
@@ -260,6 +289,7 @@ class Parser:
         val = self._test()
         return Node('ASSN', (node, val), op, lvl)
 
+    @node
     def _or_test(self):
         node = self._and_test()
         while self._lookahead.type == 'OR':
@@ -268,6 +298,7 @@ class Parser:
             node = Node('TEST', (node, r), 'OR')
         return node
 
+    @node
     def _and_test(self):
         node = self._not_test()
         while self._lookahead.type == 'AND':
@@ -276,6 +307,7 @@ class Parser:
             node = Node('TEST', (node, r), 'AND')
         return node
 
+    @node
     def _not_test(self):
         if self._lookahead.type == 'NOT':
             self._next()
@@ -284,6 +316,7 @@ class Parser:
         else:
             return self._comp()
 
+    @node
     def _comp(self):
         node = self._expr()
         if self._lookahead.type == 'COMP':
@@ -293,6 +326,7 @@ class Parser:
             node = Node('CALL', (node, r), op)
         return node
 
+    @node
     def _expr(self):
         node = self._term()
         while self._lookahead.type in ['ADD', 'SUB']:
@@ -302,6 +336,7 @@ class Parser:
             node = Node('CALL', (node, r), op)
         return node
 
+    @node
     def _term(self):
         node = self._factor()
         while self._lookahead.type in ['MULT', 'DIV', 'MOD']:
@@ -311,6 +346,7 @@ class Parser:
             node = Node('CALL', (node, r), op)
         return node
 
+    @node
     def _factor(self):
         if self._lookahead.type in ['ADD', 'SUB']:
             op = self._lookahead.value
@@ -320,6 +356,7 @@ class Parser:
         else:
             return self._atom_expr()
 
+    @node
     def _atom_expr(self):
         node = self._atom()
 
@@ -348,6 +385,7 @@ class Parser:
         return node
 
 
+    @node
     def _atom(self):
         if self._lookahead.type == 'ID':
             name = self._name()

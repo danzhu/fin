@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
-
 import sys
 import string
 from enum import Enum
+from error import LexerError
 
 class State:
     def __init__(self, name):
@@ -87,13 +86,13 @@ class Lexer:
 
             if new_indent > indent:
                 if (new_indent - indent) % ind_amount != 0:
-                    raise Exception('wrong indent')
+                    raise LexerError('wrong indent', ln, new_indent)
                 for i in range((new_indent - indent) // ind_amount):
                     yield Token('INDENT', ln)
 
             elif new_indent < indent:
                 if (indent - new_indent) % ind_amount != 0:
-                    raise Exception('wrong dedent')
+                    raise LexerError('wrong dedent', ln, new_indent)
 
                 # end all blocks except the last one
                 for i in range((indent - new_indent) // ind_amount - 1):
@@ -127,8 +126,8 @@ class Lexer:
                     continue
 
                 if not state.accept:
-                    raise Exception('invalid token {} at line {}, col {}'
-                            .format(state.name, ln, start + 1))
+                    raise LexerError('invalid token {}'.format(state.name),
+                            ln, start + 1)
 
                 val = line[start:end]
 
@@ -147,7 +146,7 @@ class Lexer:
                 start = end
                 state = self.start
 
-            yield Token('EOL', ln, len(line) + 1, '\n')
+            yield Token('EOL', ln, len(line), '\n')
 
         if ind_amount > 0:
             for i in range(indent // ind_amount):
