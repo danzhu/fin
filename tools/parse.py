@@ -259,10 +259,10 @@ class Parser:
 
         if self._lookahead.type == 'INC_ASSN':
             token = self._lookahead
-            op = self._lookahead.value
+            op = self._lookahead.variant.split('_', 1)[0].lower()
             self._next() # INC_ASSN
             val = self._test()
-            return Node('CALL', token, (node, val), op)
+            return Node('INC_ASSN', token, (node, val), op)
 
         token = self._lookahead
         lvl = 0

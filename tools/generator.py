@@ -32,34 +32,34 @@ class Generator:
         self.indent += 1
 
         self._gens[node.type](node)
-        self._cast(node)
+        self._cast(node.expr_type, node.target_type)
 
         self.indent -= 1
 
-    def _cast(self, node):
-        if node.expr_type is None:
+    def _cast(self, tp, tar):
+        if tp is None:
             return
 
-        assert node.target_type is not None
+        assert tar is not None
 
-        if node.target_type == symbols.NONE:
-            if node.expr_type.size() > 0:
-                self._write('pop', node.expr_type.size())
+        if tar == symbols.NONE:
+            if tp.size() > 0:
+                self._write('pop', tp.size())
 
             return
 
-        assert node.expr_type != symbols.NONE
+        assert tp != symbols.NONE
 
         # TODO: need to change when cast is more than level reduction
-        if type(node.expr_type) is not Reference:
+        if type(tp) is not Reference:
             return
 
-        lvl = node.expr_type.level
-        tar = symbols.to_ref(node.target_type).level
+        lvl = tp.level
+        tar = symbols.to_ref(tar).level
 
         while lvl > tar:
             lvl -= 1
-            tp = symbols.to_level(node.expr_type, lvl)
+            tp = symbols.to_level(tp, lvl)
             self._write('load', tp.size())
 
     def _pop_size(self, stack, target):
@@ -94,6 +94,75 @@ class Generator:
         count = self._labels[name] if name in self._labels else 0
         self._labels[name] = count + 1
         return '{}_{}'.format(name, count)
+
+    def _call(self, node):
+        # user-defined function
+        if node.match.function.module().name != '':
+            arg_size = sum(p.size() for p in node.match.params)
+            self._write('call', node.match.function.fullpath(), arg_size)
+            return
+
+        if node.value == 'alloc':
+            size = node.match.gens['T'].size()
+            self._write('const_i', size)
+
+            if len(node.children) > 0:
+                self._write('mult_i')
+
+            self._write('alloc')
+            return
+
+        if node.value == 'dealloc':
+            self._write('dealloc')
+            return
+
+        if node.value == 'realloc':
+            size = node.match.gens['T'].size()
+            self._write('const_i', size)
+            self._write('mult_i')
+            self._write('realloc')
+            return
+
+        if node.value == '[]':
+            tp = symbols.to_level(node.expr_type, node.expr_type.level - 1)
+            self._write('addr_offset', tp.size())
+            return
+
+        if len(node.children) == 1:
+            if node.value == 'pos':
+                raise NotImplementedError('unary + not implemented')
+            elif node.value == 'neg':
+                op = 'neg'
+            else:
+                assert False, 'unknown operator {}'.format(node.value)
+
+        elif node.value == 'less':
+            op = 'lt'
+        elif node.value == 'greater':
+            op = 'gt'
+        elif node.value == 'lessEqual':
+            op = 'le'
+        elif node.value == 'greaterEqual':
+            op = 'ge'
+        elif node.value == 'equal':
+            op = 'eq'
+        elif node.value == 'notEqual':
+            op = 'ne'
+        elif node.value == 'plus':
+            op = 'add'
+        elif node.value == 'minus':
+            op = 'sub'
+        elif node.value == 'multiplies':
+            op = 'mult'
+        elif node.value == 'divides':
+            op = 'div'
+        elif node.value == 'modulus':
+            op = 'mod'
+        else:
+            assert False, 'unknown operator {}'.format(node.value)
+
+        tp = node.children[0].target_type.fullname()[0].lower()
+        self._write('{}_{}'.format(op, tp))
 
     def FILE(self, node):
         ref_list = []
@@ -266,107 +335,27 @@ class Generator:
         self._write('store', size)
 
     def CALL(self, node):
-        if node.match.function.module().name != '':
-            for c in node.children:
-                self._gen(c)
+        for c in node.children:
+            self._gen(c)
 
-            self._write('call', node.match.function.fullpath(), node.arg_size)
-            return
+        self._call(node)
 
-        val = node.value
-
-        if val == 'alloc':
-            size = node.match.gens['T'].size()
-            self._write('const_i', size)
-
-            if len(node.children) > 0:
-                self._gen(node.children[0]) # size
-                self._write('mult_i')
-
-            self._write('alloc')
-            return
-
-        if val == 'dealloc':
-            self._gen(node.children[0])
-
-            self._write('dealloc')
-            return
-
-        if val == 'realloc':
-            self._gen(node.children[0])
-            self._gen(node.children[1])
-
-            size = node.match.gens['T'].size()
-            self._write('const_i', size)
-            self._write('mult_i')
-            self._write('realloc')
-            return
-
-        if val == '[]':
-            self._gen(node.children[0])
-            self._gen(node.children[1])
-
-            tp = symbols.to_level(node.expr_type, node.expr_type.level - 1)
-            self._write('addr_offset', tp.size())
-            return
-
-        assn = False
-
-        if len(node.children) == 1:
-            if val == 'pos':
-                raise NotImplementedError('unary + not implemented')
-            elif val == 'neg':
-                op = 'neg'
-            else:
-                assert False, 'unknown operator {}'.format(val)
-
-        elif val == 'less':
-            op = 'lt'
-        elif val == 'greater':
-            op = 'gt'
-        elif val == 'lessEqual':
-            op = 'le'
-        elif val == 'greaterEqual':
-            op = 'ge'
-        elif val == 'equal':
-            op = 'eq'
-        elif val == 'notEqual':
-            op = 'ne'
-        else:
-            if val[-1] == '=':
-                assn = True
-                val = val[:-1]
-
-            if val == '+':
-                op = 'add'
-            elif val == '-':
-                op = 'sub'
-            elif val == '*':
-                op = 'mult'
-            elif val == '/':
-                op = 'div'
-            elif val == '%':
-                op = 'mod'
-            else:
-                assert False, 'unknown operator {}'.format(val)
-
+    def INC_ASSN(self, node):
+        # left
         self._gen(node.children[0])
+        self._write('dup', node.children[0].target_type.size())
+        self._cast(node.children[0].target_type, node.match.params[0])
 
-        if assn:
-            tp = node.children[0].target_type
-            size = tp.type.size()
+        # right
+        self._gen(node.children[1])
 
-            self._write('dup', tp.size())
-            self._write('load', size)
+        # call
+        self._call(node)
 
-        if len(node.children) > 1:
-            self._gen(node.children[1])
-
-        tp = node.children[0].target_type.fullname()[0].lower()
-        self._write('{}_{}'.format(op, tp))
-
-        if assn:
-            self._write('store', size)
+        # assn
+        ret = symbols.to_level(node.children[0].target_type, 0)
+        self._cast(node.match.ret, ret)
+        self._write('store', ret.size())
 
     def MEMBER(self, node):
         self._gen(node.children[0])

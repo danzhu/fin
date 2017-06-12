@@ -46,7 +46,7 @@
 - [x] indent scope
 - [x] function overloads
   - [x] operator overloads
-  - [ ] fix inc assignment
+  - [x] fix inc assignment
 - [x] generate global code after function defs
 - [x] loop control
   - [x] `continue` / `break`

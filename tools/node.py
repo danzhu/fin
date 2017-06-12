@@ -169,16 +169,14 @@ class Node:
             return Array(tp)
 
     @error
-    def _resolve_overload(self, refs, required=False):
+    def _resolve_overload(self, refs, args, ret, required=False):
         if self.match is not None:
             return
 
-        self.args = [c.expr_type for c in self.children]
-
         self.matches = symbols.resolve_overload(
                 self.matches,
-                self.args,
-                self.target_type)
+                args,
+                ret)
 
         if len(self.matches) == 0:
             self._error('no viable function overload')
@@ -192,16 +190,13 @@ class Node:
 
         match = next(iter(self.matches))
 
-        self.expr_type, self.params = match.resolve()
-
-        if self.expr_type is None:
+        if not match.resolve():
             if not required:
                 return
 
             self._error('cannot resolve generic parameters\n  {}', match)
 
         self.match = match
-        self.arg_size = sum(p.size() for p in self.params)
 
     @error
     def _analyze_acquire(self, mod_name, syms, refs):
@@ -251,7 +246,23 @@ class Node:
             if len(self.matches) == 0:
                 self._error("no function '{}' defined", self.value)
 
-            self._resolve_overload(refs)
+            self.args = [c.expr_type for c in self.children]
+            self._resolve_overload(refs, self.args, self.target_type)
+
+            if self.match is not None:
+                self.expr_type = self.match.ret
+
+        elif self.type == 'INC_ASSN':
+            assert len(self.children) == 2
+
+            self.expr_type = symbols.NONE
+            self.matches = syms.overloads(self.value)
+
+            # no need to check empty since there are always operator overloads
+
+            self.args = [c.expr_type for c in self.children]
+            ret = symbols.to_level(self.args[0], 0)
+            self._resolve_overload(refs, self.args, ret)
 
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 0)
@@ -314,13 +325,26 @@ class Node:
             self.children[1]._expect_type(tp)
 
         elif self.type == 'CALL':
-            self._resolve_overload(refs, True)
+            self.args = [c.expr_type for c in self.children]
+            self._resolve_overload(refs, self.args, self.target_type, True)
 
             # record usage for ref generation
             refs.add(self.match.function)
 
-            for c, p in zip(self.children, self.params):
+            self.expr_type = self.match.ret
+            for c, p in zip(self.children, self.match.params):
                 c._expect_type(p)
+
+        elif self.type == 'INC_ASSN':
+            self.args = [c.expr_type for c in self.children]
+            ret = symbols.to_level(self.args[0], 0)
+            self._resolve_overload(refs, self.args, ret, True)
+
+            refs.add(self.match.function)
+
+            tp = symbols.to_level(self.match.params[0], 1)
+            self.children[0]._expect_type(tp)
+            self.children[1]._expect_type(self.match.params[1])
 
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 1)

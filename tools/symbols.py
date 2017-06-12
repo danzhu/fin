@@ -371,13 +371,12 @@ class Match:
         return self.levels is not None
 
     def resolve(self):
-        for gen in self.function.generics:
-            if gen.name not in self.gens:
-                return None, None
+        if len(self.gens) != len(self.function.generics):
+            return False
 
-        ret = self.function.ret.resolve(self.gens)
-        params = [p.type.resolve(self.gens) for p in self.function.params]
-        return ret, params
+        self.ret = self.function.ret.resolve(self.gens)
+        self.params = [p.type.resolve(self.gens) for p in self.function.params]
+        return True
 
 
 class FunctionGroup:
@@ -484,13 +483,6 @@ def load_builtins():
             fn = Function(op, BOOL)
             fn.add_variable('left', tp)
             fn.add_variable('right', tp)
-            mod.add_function(fn)
-
-        # incremental assignment
-        for op in ['+=', '-=', '*=', '/=', '%=']:
-            fn = Function(op, NONE)
-            fn.add_variable('self', Reference(tp, 1))
-            fn.add_variable('value', tp)
             mod.add_function(fn)
 
     # array subscript
