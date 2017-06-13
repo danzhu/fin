@@ -406,7 +406,6 @@ class Node:
             self.stack_next = (self.target_type, stack)
 
         # recurse
-        # FIXME: incremental assignment has different stack rules
         if self.type in ['IF', 'WHILE', 'TEST']:
             # these nodes don't leave data on the stack
             for c in self.children:
@@ -414,6 +413,15 @@ class Node:
 
             # the result stack after children is the same as final result stack
             self.stack_end = self.stack_next
+        elif self.type == 'INC_ASSN':
+            self.children[0]._analyze_expect(refs, stack)
+
+            # the ref is duplicated on the stack and loaded
+            stack = (self.match.params[0], self.children[0].stack_next)
+
+            self.children[1]._analyze_expect(refs, stack)
+
+            self.stack_end = self.children[1].stack_next
         else:
             for c in self.children:
                 c._analyze_expect(refs, stack)

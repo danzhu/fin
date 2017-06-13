@@ -72,7 +72,7 @@
 - [x] dynamic (heap) allocation
   - [x] array allocation
   - [x] struct (single instance) allocation
-- [ ] fix incremental assignment stack inaccuracy
+- [x] fix incremental assignment stack inaccuracy
 
 ## Runtime
 
