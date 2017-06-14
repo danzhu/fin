@@ -433,7 +433,7 @@ class Generic:
         return self.name
 
     def size(self):
-        assert False, 'generic {} does not have a size'.format(self.name)
+        assert False, 'should not use size on generic'
 
     def resolve(self, gens):
         return gens[self.name]
@@ -447,7 +447,7 @@ class Special:
         return self.name
 
     def size(self):
-        assert False, '{} does not have a size'.format(self.name)
+        assert False, 'should not use size on special'
 
     def resolve(self, gens):
         return self
@@ -722,8 +722,8 @@ BOOL = Struct('Bool', 1)
 INT = Struct('Int', 4)
 FLOAT = Struct('Float', 4)
 UNKNOWN = Special('?')
-DIVERGE = Special('!')
-VOID = Special('/')
+DIVERGE = Special('Diverge')
+VOID = Special('Void')
 
 TRUE = Constant('TRUE', BOOL, True)
 FALSE = Constant('FALSE', BOOL, False)

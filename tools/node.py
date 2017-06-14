@@ -49,7 +49,7 @@ class Node:
         elif self.value:
             content += ' {}'.format(self.value)
 
-        if self.expr_type:
+        if self.expr_type and self.expr_type != symbols.VOID:
             content += ' <{}'.format(self.expr_type)
             if self.target_type:
                 content += ' -> {}'.format(self.target_type)
@@ -284,10 +284,13 @@ class Node:
             name = self.value
             tp = self.children[0]._type(syms)
             if tp is None:
+                if self.children[1].type == 'EMPTY':
+                    self._error('type is required when not assigning a value')
+
                 tp = self.children[1].expr_type
 
-                if tp is None:
-                    self._error('type is required when no initialization')
+                if type(tp) is symbols.Special:
+                    self._error('cannot create variable of type {}', tp)
 
                 tp = symbols.to_level(tp, self.level)
 

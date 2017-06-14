@@ -9,8 +9,12 @@ class CompilerError(Exception):
             val += '\n  at line {}, column {}:'.format(
                     self.token.line,
                     self.token.column)
-            val += '\n\n    ' + self.token.src
-            val += '    ' + ' ' * (self.token.column - 1) + '^' * len(self.token.value)
+
+            line = self.token.src.lstrip()
+            indent = len(self.token.src) - len(line)
+            val += '\n\n    ' + line
+            val += '    ' + ' ' * (self.token.column - 1 - indent)
+            val += '^' * len(self.token.value)
 
         return val
 
