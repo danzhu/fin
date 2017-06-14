@@ -47,20 +47,6 @@ class Constant:
         return self.type
 
 
-class Generic:
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return self.name
-
-    def size(self):
-        assert False, 'should not use size on generic'
-
-    def resolve(self, gens):
-        return gens[self.name]
-
-
 class SymbolTable:
     def __init__(self, parent=None):
         self.parent = parent
@@ -258,14 +244,14 @@ class Function(SymbolTable):
                 '{' + ', '.join(str(g) for g in self.generics) + '}'
                     if self.generics else '',
                 ', '.join(str(p) for p in self.params),
-                ' ' + str(self.ret) if self.ret != NONE else '')
+                ' ' + str(self.ret) if self.ret != VOID else '')
 
     def fullname(self):
         # TODO: generic parameters
         return '{}({}){}'.format(
                 self.name,
                 ','.join(p.type.fullpath() for p in self.params),
-                self.ret.fullpath() if self.ret != NONE else '')
+                self.ret.fullpath() if self.ret != VOID else '')
 
     def fullpath(self):
         return self.module().path() + self.fullname()
@@ -439,23 +425,39 @@ class Array:
         return Array(self.type.resolve(gens))
 
 
-NONE = Struct('None', 0)
-BOOL = Struct('Bool', 1)
-INT = Struct('Int', 4)
-FLOAT = Struct('Float', 4)
-UNKNOWN = Struct('?', -1)
+class Generic:
+    def __init__(self, name):
+        self.name = name
 
-TRUE = Constant('TRUE', BOOL, True)
-FALSE = Constant('FALSE', BOOL, False)
+    def __str__(self):
+        return self.name
 
-MATCH_PERFECT = 3.0
-MATCH_TO_NONE = 1.0
+    def size(self):
+        assert False, 'generic {} does not have a size'.format(self.name)
+
+    def resolve(self, gens):
+        return gens[self.name]
+
+
+class Special:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def size(self):
+        assert False, '{} does not have a size'.format(self.name)
+
+    def resolve(self, gens):
+        return self
+
 
 def load_builtins():
     mod = Module('')
 
     # classes
-    for struct in { NONE, BOOL, INT, FLOAT }:
+    for struct in { BOOL, INT, FLOAT }:
         mod.add_struct(struct)
 
     # constants
@@ -506,13 +508,13 @@ def load_builtins():
     mod.add_function(fn)
 
     # dealloc
-    fn = Function('dealloc', NONE)
+    fn = Function('dealloc', VOID)
     t = fn.add_generic('T')
     fn.add_variable('reference', Reference(t, 1))
     mod.add_function(fn)
 
     # realloc
-    fn = Function('realloc', NONE)
+    fn = Function('realloc', VOID)
     t = fn.add_generic('T')
     fn.add_variable('array', Reference(Array(t), 1))
     fn.add_variable('length', INT)
@@ -551,22 +553,24 @@ def to_ref(tp):
 def interpolate_types(tps, gens):
     assert len(tps) > 0
 
-    res = None
+    res = DIVERGE
     for other in tps:
-        if res is None:
-            # first type
-            res = other
-            continue
-
         if other == UNKNOWN:
             return UNKNOWN
+
+        # diverge does not affect any type
+        if res == DIVERGE:
+            res = other
+            continue
+        elif other == DIVERGE:
+            continue
 
         if type(res) is Reference:
             if type(other) is not Reference:
                 other = Reference(other, 0)
 
             if not match_type(res.type, other.type, gens):
-                return NONE
+                return VOID
 
             lvl = min(res.level, other.level)
             res = to_level(res.type, lvl)
@@ -577,7 +581,7 @@ def interpolate_types(tps, gens):
             continue
 
         if not match_type(res, other, gens):
-            return NONE
+            return VOID
 
     return res
 
@@ -588,10 +592,18 @@ def load_module(mod_name, glob):
     glob.add_module(mod)
     with open(filename) as f:
         for line in f:
-            [tp, name, *params, ret] = line.split()
+            segs = line.split()
+            tp = segs[0]
 
             if tp == 'def':
-                fn = Function(name, to_type(ret, mod))
+                if len(segs) % 2 == 0: # void
+                    [tp, name, *params] = segs
+                    ret = VOID
+                else:
+                    [tp, name, *params, ret] = segs
+                    ret = to_type(ret, mod)
+
+                fn = Function(name, ret)
                 for i in range(len(params) // 2):
                     name = params[i * 2]
                     tp = to_type(params[i * 2 + 1], mod)
@@ -649,8 +661,17 @@ def match_type(self, other, gens):
         return self == other
 
 def accept_type(self, other, gens):
+    if other == DIVERGE:
+        return MATCH_PERFECT
+
     if self == UNKNOWN or other == UNKNOWN:
         return math.nan
+
+    if self == VOID:
+        if other == VOID:
+            return MATCH_PERFECT
+        else:
+            return MATCH_TO_VOID
 
     if type(other) is Generic:
         if other.name not in gens:
@@ -694,7 +715,18 @@ def accept_type(self, other, gens):
     if type(self) is Struct:
         if self == other:
             return MATCH_PERFECT - reduction
-        elif self == NONE:
-            return MATCH_TO_NONE
         else:
             return None
+
+BOOL = Struct('Bool', 1)
+INT = Struct('Int', 4)
+FLOAT = Struct('Float', 4)
+UNKNOWN = Special('?')
+DIVERGE = Special('!')
+VOID = Special('/')
+
+TRUE = Constant('TRUE', BOOL, True)
+FALSE = Constant('FALSE', BOOL, False)
+
+MATCH_PERFECT = 3.0
+MATCH_TO_VOID = 1.0

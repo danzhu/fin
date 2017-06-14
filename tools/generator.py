@@ -37,18 +37,22 @@ class Generator:
         self.indent -= 1
 
     def _cast(self, tp, tar):
-        if tp is None:
+        # diverge will never return so we can ignore casting
+        if tp is None or tp == symbols.DIVERGE:
             return
 
         assert tar is not None
+        assert tar != symbols.UNKNOWN
+        assert tar != symbols.DIVERGE
 
-        if tar == symbols.NONE:
-            if tp.size() > 0:
+        if tar == symbols.VOID:
+            if tp != symbols.VOID and tp.size() > 0:
                 self._write('pop', tp.size())
 
             return
 
-        assert tp != symbols.NONE
+        assert tp != symbols.UNKNOWN
+        assert tp != symbols.VOID
 
         # TODO: need to change when cast is more than level reduction
         if type(tp) is not Reference:
@@ -205,7 +209,7 @@ class Generator:
         self._write('function', node.function.fullname(), end)
         self._gen(node.children[2])
 
-        if node.function.ret.size() == 0:
+        if node.function.ret == symbols.VOID:
             self._write('return')
         else:
             self._write('return_val', node.function.ret.size())
@@ -218,7 +222,7 @@ class Generator:
             self._gen(c)
             self._write('')
 
-        if node.target_type == symbols.NONE:
+        if node.target_type == symbols.VOID:
             self._exit(node.stack_end, node.parent.stack_start)
         else:
             self._reduce(node.stack_end, node.parent.stack_end)
@@ -271,7 +275,7 @@ class Generator:
 
         self._gen(node.children[0])
 
-        if node.children[0].target_type.size() == 0:
+        if node.children[0].target_type == symbols.VOID:
             self._exit(node.stack_end, tar.stack_start)
         else:
             self._reduce(node.stack_end, tar.stack_end)
@@ -293,7 +297,7 @@ class Generator:
 
         self._gen(node.children[0])
 
-        if node.children[0].target_type.size() == 0:
+        if node.children[0].target_type == symbols.VOID:
             self._exit(node.stack_end, tar.stack_end)
             self._write('return')
         else:

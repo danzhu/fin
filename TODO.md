@@ -1,23 +1,23 @@
 # Fin Project Todo List
 
-## Prototype
-
-- [ ] tuple parameter
-- [ ] static (stack) allocation
-- [ ] invariant validation
-
 ## Language
 
-- [ ] cast operator
-- [ ] reference assignment
-  - [x] ~~assign / rebind~~
+- [x] functions
+  - [x] function overloading
+  - [x] operator overloading
+  - [ ] cast operator
+- [x] type inference
+  - [x] functions
+  - [x] control flow
+- [x] structs
+- [x] assignment
   - [x] level-based assignment
-  - [ ] tuple assignment
-  - [ ] fix level ambiguity in generics
-- [ ] exception / error handling
-- [ ] owner
+  - [ ] deconstruct assignment
+- [ ] error handling
+- [ ] ownership
   - [ ] copy / move assignment
   - [ ] optional ownership
+  - [ ] RAII
 - [ ] library
   - [ ] library version
 - [ ] modules
@@ -27,6 +27,7 @@
   - [ ] function
 - [ ] iterators
   - [ ] continuation-based iteration
+- [ ] traits
 
 ## Compiler
 
@@ -35,11 +36,11 @@
 - [x] unary operations
 - [x] expression statements
 - [x] `let ... =`
-- [ ] implicit conversion
+- implicit conversion
   - [x] level reduction
   - [ ] level promotion
-  - [ ] remove conversion to `None`
-  - [ ] diverging type
+  - [x] remove conversion to `None`
+  - [x] diverging type
 - [x] type checks
 - [ ] include paths
 - [x] ~~prevent calls to functions defined later~~
@@ -48,7 +49,7 @@
   - [x] operator overloads
   - [x] fix inc assignment
 - [x] generate global code after function defs
-- [x] loop control
+- loop control
   - [x] `continue` / `break`
   - [x] `else`
   - [x] `redo`
@@ -56,12 +57,13 @@
 - [ ] levelled equality comparison
 - [x] unify module / struct / function to symbol table
   - [x] remove context in symbol table
-- [ ] struct
+- structs
   - [x] declaration
   - [x] field access
-  - [ ] inline initialization
+  - [ ] inline construction
   - [ ] destructor
-- [ ] member function
+  - [ ] partial replacement construction
+- member function
   - [x] member call syntax
   - [ ] member call scope limit
 - [x] symbol full path
@@ -69,10 +71,11 @@
 - [x] `let` type inference
 - [x] function group no override
 - [x] partial order overload
-- [x] dynamic (heap) allocation
+- dynamic (heap) allocation
   - [x] array allocation
   - [x] struct (single instance) allocation
 - [x] fix incremental assignment stack inaccuracy
+- [ ] fix level ambiguity in generics
 
 ## Runtime
 

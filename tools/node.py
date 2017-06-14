@@ -122,7 +122,7 @@ class Node:
             name = self.value
             ret = self.children[1]._type(mod)
             if ret is None:
-                ret = symbols.NONE
+                ret = symbols.VOID
 
             self.function = Function(name, ret)
 
@@ -255,7 +255,7 @@ class Node:
         elif self.type == 'INC_ASSN':
             assert len(self.children) == 2
 
-            self.expr_type = symbols.NONE
+            self.expr_type = symbols.VOID
             self.matches = syms.overloads(self.value)
 
             # no need to check empty since there are always operator overloads
@@ -292,7 +292,7 @@ class Node:
                 tp = symbols.to_level(tp, self.level)
 
             self.sym = syms.add_variable(name, tp)
-            self.expr_type = symbols.NONE
+            self.expr_type = symbols.VOID
 
         elif self.type == 'WHILE':
             bks = self.children[1].decedents('BREAK')
@@ -302,11 +302,10 @@ class Node:
             self.expr_type = symbols.interpolate_types(tps, {})
 
         elif self.type in ['DEF', 'STRUCT', 'ASSN', 'EMPTY']:
-            self.expr_type = symbols.NONE
+            self.expr_type = symbols.VOID
 
         elif self.type in ['BREAK', 'CONTINUE', 'REDO', 'RETURN']:
-            # TODO: diverging type
-            self.expr_type = symbols.NONE
+            self.expr_type = symbols.DIVERGE
 
     @error
     def _analyze_expect(self, refs, stack):
@@ -352,7 +351,7 @@ class Node:
 
         elif self.type == 'FILE':
             for c in self.children:
-                c._expect_type(symbols.NONE)
+                c._expect_type(symbols.VOID)
 
         elif self.type == 'DEF':
             self.children[2]._expect_type(self.function.ret)
@@ -361,7 +360,7 @@ class Node:
             self.expr_type = self.target_type
 
             for c in self.children[:-1]:
-                c._expect_type(symbols.NONE)
+                c._expect_type(symbols.VOID)
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
@@ -376,7 +375,7 @@ class Node:
             self.expr_type = self.target_type
 
             self.children[0]._expect_type(symbols.BOOL)
-            self.children[1]._expect_type(symbols.NONE)
+            self.children[1]._expect_type(symbols.VOID)
             self.children[2]._expect_type(self.expr_type)
 
         elif self.type == 'RETURN':
@@ -402,7 +401,7 @@ class Node:
             self.stack_next = (self.sym.type, stack)
 
         if self.target_type is not None \
-                and self.target_type != symbols.NONE:
+                and self.target_type != symbols.VOID:
             self.stack_next = (self.target_type, stack)
 
         # recurse

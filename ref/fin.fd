@@ -1,7 +1,7 @@
-def print val Int None
-def print val Float None
-def print val Bool None
+def print val Int
+def print val Float
+def print val Bool
 def input Int
 def input Float
 def input Bool
-def backtrace None
+def backtrace
