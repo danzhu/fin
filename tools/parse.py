@@ -235,8 +235,18 @@ class Parser:
         if self._lookahead.type == 'LBRACKET':
             self._next() # LBRACKET
             node = self._type()
+
+            if self._lookahead.type == 'SEMICOLON':
+                self._next()
+
+                num = self._lookahead
+                self._expect('NUM')
+                size = Node(num.type, num, (), num.value)
+            else:
+                size = self._empty()
+
             self._expect('RBRACKET')
-            return Node('ARRAY', token, (node,))
+            return Node('ARRAY', token, (node, size))
 
         if self._lookahead.type == 'ID':
             name = self._name()

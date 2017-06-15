@@ -85,7 +85,7 @@ class Generator:
             self._write('pop', amount)
 
     def _reduce(self, stack, target):
-        assert symbols.match_type(stack[0], target[0], {})
+        assert symbols.match_type(target[0], stack[0], {})
 
         size = stack[0].size()
         amount = self._pop_size(stack[1], target[1])

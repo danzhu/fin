@@ -104,7 +104,7 @@ class Node:
                     ', '.join(str(a) for a in self.args),
                     self.target_type)
 
-        raise AnalyzerError(msg, self.token) from None
+        raise AnalyzerError(msg, self.token)
 
     @error
     def _expect_type(self, tp):
@@ -166,7 +166,11 @@ class Node:
         elif self.type == 'ARRAY':
             tp = self.children[0]._type(syms)
 
-            return Array(tp)
+            if self.children[1].type != 'EMPTY':
+                size = int(self.children[1].value)
+                return Array(tp, size)
+            else:
+                return Array(tp)
 
     @error
     def _resolve_overload(self, refs, args, ret, required=False):

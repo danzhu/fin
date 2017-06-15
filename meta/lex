@@ -19,6 +19,7 @@
 > start \ BACKSLASH
 > start . DOT
 > start , COMMA
+> start ; SEMICOLON
 > start [SPACE] start
 > start # comment
 > ID [ALPHA][NUM]_ ID

@@ -3,7 +3,7 @@ def test()
     let j &Int := i
     j.print()
 
-    let arr &[Int] := alloc(10)
+    let arr [Int; 2]
     arr[0] = i
     arr[0].print()
 

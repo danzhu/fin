@@ -11,7 +11,7 @@
   - [x] control flow
 - [x] structs
 - [x] arrays
-  - [ ] sized arrays
+  - [x] sized arrays
   - [x] unsized arrays
 - [ ] tuples
 - [x] assignment
@@ -45,6 +45,7 @@
   - [ ] level promotion
   - [x] remove conversion to `None`
   - [x] diverging type
+  - [x] sized to unsized array
 - [x] type checks
 - [ ] include paths
 - [x] ~~prevent calls to functions defined later~~
@@ -58,6 +59,8 @@
   - [x] `else`
   - [x] `redo`
   - [x] `break ...`
+  - [ ] disallow jumps inside condition and else
+  - [ ] loop labels
 - [ ] levelled equality comparison
 - [x] unify module / struct / function to symbol table
   - [x] remove context in symbol table

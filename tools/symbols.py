@@ -386,14 +386,17 @@ class Reference:
         self.type = tp
         self.level = lvl
 
+    def __format(self, tp):
+        return '{}{}'.format('&' * self.level, tp)
+
     def __str__(self):
-        return '&' * self.level + str(self.type)
+        return self.__format(self.type)
 
     def fullname(self):
-        return '&' * self.level + self.type.fullname()
+        return self.__format(self.type.fullname())
 
     def fullpath(self):
-        return '&' * self.level + self.type.fullpath()
+        return self.__format(self.type.fullpath())
 
     def size(self):
         return 8 # size of pointer
@@ -403,23 +406,29 @@ class Reference:
 
 
 class Array:
-    def __init__(self, tp, size=-1):
+    def __init__(self, tp, size=None):
         self.type = tp
         self._size = size
 
+    def __format(self, tp):
+        if self._size is None:
+            return '[{}]'.format(tp)
+        else:
+            return '[{}; {}]'.format(tp, self._size)
+
     def __str__(self):
-        return '[{}]'.format(self.type)
+        return self.__format(self.type)
 
     def fullname(self):
-        return '[{}]'.format(self.type.fullname())
+        return self.__format(self.type.fullname())
 
     def fullpath(self):
-        return '[{}]'.format(self.type.fullpath())
+        return self.__format(self.type.fullpath())
 
     def size(self):
-        if self._size == -1:
+        if self._size is None:
             raise TypeError('array is unsized')
-        return self._size
+        return self.type.size() * self._size
 
     def resolve(self, gens):
         return Array(self.type.resolve(gens))
@@ -523,14 +532,21 @@ def load_builtins():
     return mod
 
 def to_type(val, syms):
-    name = val.rstrip('&')
-    tp = syms.get(name, Symbol.Struct)
+    if val[0] == '&':
+        sub = val.lstrip('&')
 
-    lvl = len(val) - len(name)
-    if lvl > 0:
-        tp = Reference(tp, lvl)
+        tp = to_type(sub, syms)
+        lvl = len(val) - len(sub)
+        return Reference(tp, lvl)
+    elif val[0] == '[':
+        sub = val[1:-1]
 
-    return tp
+        # TODO: sized arrays
+        # maybe we should use the lexer for this
+        tp = to_type(sub, syms)
+        return Array(tp)
+    else:
+        return syms.get(val, Symbol.Struct)
 
 def to_level(tp, lvl):
     if tp == UNKNOWN:
@@ -554,9 +570,11 @@ def interpolate_types(tps, gens):
     assert len(tps) > 0
 
     res = DIVERGE
+    unknown = False
     for other in tps:
         if other == UNKNOWN:
-            return UNKNOWN
+            unknown = True
+            continue
 
         # diverge does not affect any type
         if res == DIVERGE:
@@ -578,10 +596,12 @@ def interpolate_types(tps, gens):
 
         if type(other) is Reference:
             other = other.type
-            continue
 
         if not match_type(res, other, gens):
             return VOID
+
+    if unknown:
+        return UNKNOWN
 
     return res
 
@@ -652,13 +672,23 @@ def match_type(self, other, gens):
 
     if type(self) is Reference:
         return self.level == other.level \
-                and match_type(self.type, other.type, gens)
+                and match_unsized(self.type, other.type, gens)
 
     if type(self) is Array:
-        return match_type(self.type, other.type, gens)
+        return self._size == other._size \
+                and match_type(self.type, other.type, gens)
 
     if type(self) is Struct:
         return self == other
+
+def match_unsized(self, other, gens):
+    if type(self) is Array and type(other) is Array:
+        if not match_type(self.type, other.type, gens):
+            return False
+
+        return self._size is None or self._size == other._size
+
+    return match_type(self, other, gens)
 
 def accept_type(self, other, gens):
     if other == DIVERGE:
@@ -691,7 +721,7 @@ def accept_type(self, other, gens):
         if type(other) is not Reference or self.level > other.level:
             return None
 
-        if not match_type(self.type, other.type, gens):
+        if not match_unsized(self.type, other.type, gens):
             return None
 
         return MATCH_PERFECT - 1.0 + self.level / other.level
