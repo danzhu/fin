@@ -387,13 +387,13 @@ class Reference:
         self.level = lvl
 
     def __str__(self):
-        return str(self.type) + '&' * self.level
+        return '&' * self.level + str(self.type)
 
     def fullname(self):
-        return self.type.fullname() + '&' * self.level
+        return '&' * self.level + self.type.fullname()
 
     def fullpath(self):
-        return self.type.fullpath() + '&' * self.level
+        return '&' * self.level + self.type.fullpath()
 
     def size(self):
         return 8 # size of pointer

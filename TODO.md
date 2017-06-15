@@ -10,6 +10,10 @@
   - [x] functions
   - [x] control flow
 - [x] structs
+- [x] arrays
+  - [ ] sized arrays
+  - [x] unsized arrays
+- [ ] tuples
 - [x] assignment
   - [x] level-based assignment
   - [ ] deconstruct assignment
@@ -76,6 +80,7 @@
   - [x] struct (single instance) allocation
 - [x] fix incremental assignment stack inaccuracy
 - [ ] fix level ambiguity in generics
+- [x] change postfix to prefix for reference
 
 ## Runtime
 

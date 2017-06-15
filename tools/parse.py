@@ -222,25 +222,27 @@ class Parser:
 
     def _type(self):
         token = self._lookahead
-        if self._lookahead.type == 'LBRACKET':
-            self._next() # LBRACKET
-            node = self._type()
-            self._expect('RBRACKET')
-            node = Node('ARRAY', token, (node,))
-        else:
-            name = self._name()
-            node = Node('TYPE', token, (), name)
 
         if self._lookahead.type == 'AMP':
-            token = self._lookahead
             lvl = 0
             while self._lookahead.type == 'AMP':
                 self._next()
                 lvl += 1
 
-            node = Node('REF', token, (node,), None, lvl)
+            node = self._type()
+            return Node('REF', token, (node,), None, lvl)
 
-        return node
+        if self._lookahead.type == 'LBRACKET':
+            self._next() # LBRACKET
+            node = self._type()
+            self._expect('RBRACKET')
+            return Node('ARRAY', token, (node,))
+
+        if self._lookahead.type == 'ID':
+            name = self._name()
+            return Node('TYPE', token, (), name)
+
+        self._expect()
 
     def _block(self):
         token = self._lookahead

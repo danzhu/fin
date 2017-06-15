@@ -1,13 +1,10 @@
 def test()
-    let i = 1
-    while TRUE
-        i = if i > 10
-            break
-        else
-            i + 1
-    else
-        break
+    let i = 0
+    let j &Int := i
+    j.print()
 
-    i.print()
+    let arr &[Int] := alloc(10)
+    arr[0] = i
+    arr[0].print()
 
 test()
