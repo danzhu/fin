@@ -84,6 +84,7 @@
 - [x] fix incremental assignment stack inaccuracy
 - [ ] fix level ambiguity in generics
 - [x] change postfix to prefix for reference
+- [ ] show token of unsized type error
 
 ## Runtime
 

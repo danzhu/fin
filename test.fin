@@ -1,10 +1,10 @@
-def test()
-    let i = 0
-    let j &Int := i
-    j.print()
+struct Tree
+    value Int
+    left &Tree
+    right &Tree
 
-    let arr [Int; 2]
-    arr[0] = i
-    arr[0].print()
+struct A
+    ref &B
 
-test()
+struct B
+    ref &A

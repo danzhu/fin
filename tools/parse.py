@@ -46,7 +46,6 @@ class Parser:
         return Node('EMPTY', self._lookahead, ())
 
     def _file(self):
-        token = self._lookahead
         children = []
         while self._lookahead.type != 'EOF':
             if self._lookahead.type == 'IMPORT':
@@ -57,7 +56,7 @@ class Parser:
                 children.append(self._struct())
             else:
                 children.append(self._stmt())
-        return Node('FILE', token, children)
+        return Node('FILE', None, children)
 
     def _import(self):
         token = self._lookahead

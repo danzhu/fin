@@ -56,7 +56,7 @@ class SymbolTable:
     def _check_exists(self, name):
         if name in self.symbols:
             raise LookupError("symbol '{}' exists as {}".format(
-                name, self.symbols[name]))
+                name, self.symbols[name].TYPE.name))
 
     def _add_symbol(self, sym):
         self._check_exists(sym.name)
@@ -193,10 +193,11 @@ class Struct(SymbolTable):
     LOCATION = Location.Struct
     TYPE = Symbol.Struct
 
-    def __init__(self, name, size=0):
+    def __init__(self, name, size=None):
         super().__init__()
 
         self.name = name
+        self.fields = []
         self._size = size
 
     def __str__(self):
@@ -204,7 +205,18 @@ class Struct(SymbolTable):
 
     def size(self):
         if self._size == -1:
-            raise TypeError('struct is unsized')
+            raise TypeError("struct '{}' is unsized".format(self))
+
+        if self._size is None:
+            # prevent circular definition
+            self._size = -1
+
+            size = 0
+            for f in self.fields:
+                size += f.type.size()
+
+            self._size = size
+
         return self._size
 
     def fullname(self):
@@ -215,10 +227,8 @@ class Struct(SymbolTable):
 
     def add_variable(self, name, tp):
         var = Variable(name, tp, Location.Struct, self._size)
-        self._size += tp.size()
-
+        self.fields.append(var)
         self._add_symbol(var)
-
         return var
 
     def resolve(self, gens):

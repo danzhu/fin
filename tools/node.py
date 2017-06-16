@@ -29,6 +29,7 @@ class Node:
 
         # semantic analysis
         self.function = None
+        self.struct = None
         self.args = None
         self.match = None
         self.expr_type = None
@@ -55,6 +56,9 @@ class Node:
                 content += ' -> {}'.format(self.target_type)
             content += '>'
 
+        if self.struct:
+            content += ' [{}]'.format(self.struct.size())
+
         if self.level:
             content += ' {}'.format(self.level)
 
@@ -69,7 +73,14 @@ class Node:
             c.print(indent + 1)
 
     def analyze(self, mod_name, syms, refs):
-        self._analyze_acquire(mod_name, syms, refs)
+        assert self.type == 'FILE'
+
+        self.module = Module(mod_name)
+        syms.add_module(self.module)
+        syms = self.module
+
+        self._analyze_declare()
+        self._analyze_acquire(syms, refs)
         self._analyze_expect(refs, None)
 
     def ancestor(self, tp):
@@ -117,7 +128,12 @@ class Node:
         self.target_type = tp
 
     @error
-    def _decl(self, mod):
+    def _declare(self, mod):
+        self.struct = Struct(self.value)
+        mod.add_struct(self.struct)
+
+    @error
+    def _define(self, mod):
         if self.type == 'DEF':
             name = self.value
             ret = self.children[1]._type(mod)
@@ -134,15 +150,10 @@ class Node:
             mod.add_function(self.function)
 
         elif self.type == 'STRUCT':
-            name = self.value
-            self.struct = Struct(name)
-
             for f in self.children:
                 name = f.value
                 tp = f.children[0]._type(mod)
                 self.struct.add_variable(name, tp)
-
-            mod.add_struct(self.struct)
 
         else:
             assert False, 'unknown declaration'
@@ -203,18 +214,28 @@ class Node:
         self.match = match
 
     @error
-    def _analyze_acquire(self, mod_name, syms, refs):
+    def _analyze_declare(self):
+        # structs must be declared first for recursive definition
+        for c in self.children:
+            if c.type == 'STRUCT':
+                c._declare(self.module)
+
+        # define structs and declare functions next so they can be used anywhere
+        # in functions
+        for c in self.children:
+            if c.type in ['DEF', 'STRUCT']:
+                c._define(self.module)
+
+        for c in self.children:
+            if c.type == 'STRUCT':
+                # force lazy size calculation to run
+                # TODO: make error message appear on correct token
+                c.struct.size()
+
+    @error
+    def _analyze_acquire(self, syms, refs):
         # symbol table
-        if self.type == 'FILE':
-            self.module = Module(mod_name)
-            syms.add_module(self.module)
-            syms = self.module
-
-            for c in self.children:
-                if c.type in ['DEF', 'STRUCT']:
-                    c._decl(syms)
-
-        elif self.type == 'DEF':
+        if self.type == 'DEF':
             syms = self.function
 
         elif self.type == 'STRUCT':
@@ -226,7 +247,7 @@ class Node:
 
         # process children
         for c in self.children:
-            c._analyze_acquire(mod_name, syms, refs)
+            c._analyze_acquire(syms, refs)
 
         # expr type
         if self.type == 'VAR':
