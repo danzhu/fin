@@ -27,7 +27,7 @@
 - [ ] modules
   - [ ] encapsulation (import / export)
 - [ ] generics
-  - [ ] struct
+  - [x] struct
   - [ ] function
 - [ ] iterators
   - [ ] continuation-based iteration
@@ -85,6 +85,7 @@
 - [ ] fix level ambiguity in generics
 - [x] change postfix to prefix for reference
 - [ ] show token of unsized type error
+  - [ ] first bring back recursive definition check
 
 ## Runtime
 

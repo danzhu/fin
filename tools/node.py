@@ -1,5 +1,5 @@
 import symbols
-from symbols import Symbol, Module, Function, Struct, Block, Reference, Array
+from symbols import Symbol, Module, Function, Struct, Block, Reference, Array, Construct
 from error import AnalyzerError
 
 def error(fn):
@@ -29,7 +29,6 @@ class Node:
 
         # semantic analysis
         self.function = None
-        self.struct = None
         self.args = None
         self.match = None
         self.expr_type = None
@@ -55,9 +54,6 @@ class Node:
             if self.target_type:
                 content += ' -> {}'.format(self.target_type)
             content += '>'
-
-        if self.struct:
-            content += ' [{}]'.format(self.struct.size())
 
         if self.level:
             content += ' {}'.format(self.level)
@@ -150,9 +146,12 @@ class Node:
             mod.add_function(self.function)
 
         elif self.type == 'STRUCT':
-            for f in self.children:
+            for g in self.children[0].children:
+                self.struct.add_generic(g.value)
+
+            for f in self.children[1].children:
                 name = f.value
-                tp = f.children[0]._type(mod)
+                tp = f.children[0]._type(self.struct)
                 self.struct.add_variable(name, tp)
 
         else:
@@ -164,7 +163,20 @@ class Node:
             return None
 
         if self.type == 'TYPE':
-            return syms.get(self.value, Symbol.Struct)
+            tp = syms.get(self.value, Symbol.Struct, Symbol.Generic)
+
+            if tp.TYPE == Symbol.Generic:
+                if len(self.children) != 0:
+                    self._error('generic type cannot have generic arguments')
+
+                return tp
+
+            if len(self.children) != len(tp.generics):
+                self._error('unmatched generic arguments')
+
+            gens = {g.name: c._type(syms) for g, c in zip(tp.generics, self.children)}
+            tp = Construct(tp).resolve(gens)
+            return tp
 
         elif self.type == 'REF':
             tp = self.children[0]._type(syms)
@@ -226,12 +238,6 @@ class Node:
             if c.type in ['DEF', 'STRUCT']:
                 c._define(self.module)
 
-        for c in self.children:
-            if c.type == 'STRUCT':
-                # force lazy size calculation to run
-                # TODO: make error message appear on correct token
-                c.struct.size()
-
     @error
     def _analyze_acquire(self, syms, refs):
         # symbol table
@@ -255,13 +261,13 @@ class Node:
             self.expr_type = self.sym.var_type()
 
         elif self.type == 'NUM':
-            self.expr_type = symbols.INT
+            self.expr_type = Construct(symbols.INT)
 
         elif self.type == 'FLOAT':
-            self.expr_type = symbols.FLOAT
+            self.expr_type = Construct(symbols.FLOAT)
 
         elif self.type == 'TEST':
-            self.expr_type = symbols.BOOL
+            self.expr_type = Construct(symbols.BOOL)
 
         elif self.type == 'CALL':
             self.expr_type = symbols.UNKNOWN
@@ -292,10 +298,10 @@ class Node:
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 0)
 
-            if type(tp) is not Struct:
+            if type(tp) is not Construct:
                 self._error('member access requires struct type')
 
-            self.field = tp.get(self.value, Symbol.Variable)
+            self.field = tp.member(self.value)
             self.expr_type = self.field.var_type()
 
         elif self.type == 'BLOCK':

@@ -1,10 +1,16 @@
-struct Tree
-    value Int
-    left &Tree
-    right &Tree
+struct Pair{Key, Val}
+    key Key
+    val Val
 
-struct A
-    ref &B
+def pair() Pair{Int, Float}
+    let l Pair{Int, Float}
+    l.key = 1
+    l.val = 2.4
+    l
 
-struct B
-    ref &A
+def test()
+    let l = pair()
+    l.key.print()
+    l.val.print()
+
+test()

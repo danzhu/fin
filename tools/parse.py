@@ -27,18 +27,19 @@ class Parser:
         raise ParserError(msg, self._lookahead)
 
     def _args(self):
-        children = []
-        self._expect('LPAREN') # LPAREN
+        self._expect('LPAREN')
         if self._lookahead.type == 'RPAREN':
-            self._next() # RPAREN
-        else:
-            while True:
-                children.append(self._test())
+            self._next()
+            return []
 
-                tp = self._lookahead.type
-                self._expect('COMMA', 'RPAREN')
-                if tp == 'RPAREN':
-                    break
+        children = []
+        while True:
+            children.append(self._test())
+
+            tp = self._lookahead.type
+            self._expect('COMMA', 'RPAREN')
+            if tp == 'RPAREN':
+                break
 
         return children
 
@@ -69,16 +70,49 @@ class Parser:
         token = self._lookahead
         self._expect('STRUCT')
         name = self._name()
+
+        if self._lookahead.type == 'LBRACE':
+            gens = self._gens()
+        else:
+            gens = self._empty()
+
         self._expect('EOL')
 
+        fields = self._fields()
+        self._expect('EOL')
+
+        return Node('STRUCT', token, (gens, fields), name)
+
+    def _gens(self):
+        children = []
+        self._expect('LBRACE')
+
+        while True:
+            children.append(self._gen())
+
+            tp = self._lookahead.type
+            self._expect('COMMA', 'RBRACE')
+
+            if tp == 'RBRACE':
+                break
+
+        return Node('GENS', None, children)
+
+    def _gen(self):
+        token = self._lookahead
+        self._expect('ID')
+        return Node('GEN', token, (), token.value)
+
+    def _fields(self):
         self._expect('INDENT')
+
         children = []
         while self._lookahead.type != 'DEDENT':
             children.append(self._field())
-        self._next() # DEDENT
-        self._expect('EOL')
 
-        return Node('STRUCT', token, children, name)
+        self._next() # DEDENT
+
+        return Node('FIELDS', None, children)
 
     def _field(self):
         token = self._lookahead
@@ -249,7 +283,20 @@ class Parser:
 
         if self._lookahead.type == 'ID':
             name = self._name()
-            return Node('TYPE', token, (), name)
+
+            children = []
+            if self._lookahead.type == 'LBRACE':
+                self._next()
+
+                while True:
+                    children.append(self._type())
+
+                    tp = self._lookahead.type
+                    self._expect('COMMA', 'RBRACE')
+                    if tp == 'RBRACE':
+                        break
+
+            return Node('TYPE', token, children, name)
 
         self._expect()
 

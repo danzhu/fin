@@ -14,7 +14,7 @@ class CompilerError(Exception):
             indent = len(self.token.src) - len(line)
             val += '\n\n    ' + line
             val += '    ' + ' ' * (self.token.column - 1 - indent)
-            val += '^' * len(self.token.value)
+            val += '^' * len(self.token.value or ' ')
 
         return val
 

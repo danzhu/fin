@@ -11,9 +11,10 @@ class Location(Enum):
 class Symbol(Enum):
     Module   = 0
     Struct   = 1
-    Function = 2
-    Variable = 3
-    Constant = 4
+    Generic  = 2
+    Function = 3
+    Variable = 4
+    Constant = 5
 
 
 class Variable:
@@ -45,6 +46,22 @@ class Constant:
 
     def var_type(self):
         return self.type
+
+
+class Generic:
+    TYPE = Symbol.Generic
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def size(self):
+        assert False, 'should not use size on generic'
+
+    def resolve(self, gens):
+        return gens[self.name]
 
 
 class SymbolTable:
@@ -188,36 +205,20 @@ class Module(SymbolTable):
         self._add_symbol(const)
 
 
-
 class Struct(SymbolTable):
     LOCATION = Location.Struct
     TYPE = Symbol.Struct
 
-    def __init__(self, name, size=None):
+    def __init__(self, name, size=0):
         super().__init__()
 
         self.name = name
+        self.generics = []
         self.fields = []
         self._size = size
 
     def __str__(self):
         return self.name
-
-    def size(self):
-        if self._size == -1:
-            raise TypeError("struct '{}' is unsized".format(self))
-
-        if self._size is None:
-            # prevent circular definition
-            self._size = -1
-
-            size = 0
-            for f in self.fields:
-                size += f.type.size()
-
-            self._size = size
-
-        return self._size
 
     def fullname(self):
         return self.name
@@ -225,14 +226,17 @@ class Struct(SymbolTable):
     def fullpath(self):
         return self.module().path() + self.fullname()
 
+    def add_generic(self, name):
+        gen = Generic(name)
+        self.generics.append(gen)
+        self._add_symbol(gen)
+        return gen
+
     def add_variable(self, name, tp):
         var = Variable(name, tp, Location.Struct, self._size)
         self.fields.append(var)
         self._add_symbol(var)
         return var
-
-    def resolve(self, gens):
-        return self
 
 
 class Function(SymbolTable):
@@ -438,24 +442,78 @@ class Array:
     def size(self):
         if self._size is None:
             raise TypeError('array is unsized')
+
         return self.type.size() * self._size
 
     def resolve(self, gens):
         return Array(self.type.resolve(gens))
 
 
-class Generic:
-    def __init__(self, name):
-        self.name = name
+class Construct:
+    def __init__(self, struct, fields=None, gens=None):
+        self.struct = struct
+        self.fields = fields
+        self.generics = gens
+
+        if self.fields is None:
+            self.fields = struct.fields
+
+        if self.generics is None:
+            self.generics = struct.generics
+
+        self.symbols = {}
+        for f in self.fields:
+            self.symbols[f.name] = f
 
     def __str__(self):
-        return self.name
+        res = str(self.struct)
+        if len(self.generics) > 0:
+            res += '{' + ', '.join(str(g) for g in self.generics) + '}'
+
+        return res
+
+    def fullname(self):
+        res = self.struct.fullname()
+        if len(self.generics) > 0:
+            res += '{' + ','.join(g.fullname() for g in self.generics) + '}'
+
+        return res
+
+    def fullpath(self):
+        res = self.struct.fullpath()
+        if len(self.generics) > 0:
+            res += '{' + ','.join(g.fullpath() for g in self.generics) + '}'
+
+        return res
+
+    def member(self, name):
+        if name not in self.symbols:
+            raise LookupError("field '{}' does not exist in struct '{}'".format(
+                name, self.struct))
+
+        return self.symbols[name]
 
     def size(self):
-        assert False, 'should not use size on generic'
+        return self.struct._size + sum(f.type.size() for f in self.fields)
 
     def resolve(self, gens):
-        return gens[self.name]
+        fields = []
+        size = 0
+        for f in self.fields:
+            var = Variable(f.name, f.type.resolve(gens), Location.Struct, size)
+            size += var.type.size()
+            fields.append(var)
+
+        gen_args = []
+        for g in self.generics:
+            if type(g) is Generic:
+                gen_args.append(gens[g.name])
+            else:
+                gen_args.append(g)
+
+        return Construct(self.struct,
+                fields,
+                gen_args)
 
 
 class Special:
@@ -485,6 +543,8 @@ def load_builtins():
 
     # builtin operations
     for tp in { INT, FLOAT }:
+        tp = Construct(tp)
+
         # binary
         for op in ['plus', 'minus', 'multiplies', 'divides', 'modulus']:
             fn = Function(op, tp)
@@ -510,7 +570,7 @@ def load_builtins():
     fn = Function('[]', None)
     t = fn.add_generic('T')
     fn.add_variable('arr', Reference(Array(t), 1))
-    fn.add_variable('index', INT)
+    fn.add_variable('index', Construct(INT))
     fn.ret = Reference(t, 1)
     mod.add_function(fn)
 
@@ -522,7 +582,7 @@ def load_builtins():
 
     fn = Function('alloc', None)
     t = fn.add_generic('T')
-    fn.add_variable('length', INT)
+    fn.add_variable('length', Construct(INT))
     fn.ret = Reference(Array(t), 1)
     mod.add_function(fn)
 
@@ -536,7 +596,7 @@ def load_builtins():
     fn = Function('realloc', VOID)
     t = fn.add_generic('T')
     fn.add_variable('array', Reference(Array(t), 1))
-    fn.add_variable('length', INT)
+    fn.add_variable('length', Construct(INT))
     mod.add_function(fn)
 
     return mod
@@ -556,7 +616,7 @@ def to_type(val, syms):
         tp = to_type(sub, syms)
         return Array(tp)
     else:
-        return syms.get(val, Symbol.Struct)
+        return Construct(syms.get(val, Symbol.Struct))
 
 def to_level(tp, lvl):
     if tp == UNKNOWN:
@@ -688,8 +748,17 @@ def match_type(self, other, gens):
         return self._size == other._size \
                 and match_type(self.type, other.type, gens)
 
-    if type(self) is Struct:
-        return self == other
+    if type(self) is Construct:
+        if self.struct != other.struct:
+            return False
+
+        for f, o in zip(self.fields, other.fields):
+            if not match_type(f.type, o.type, gens):
+                return False
+
+        return True
+
+    assert False, 'unknown type'
 
 def match_unsized(self, other, gens):
     if type(self) is Array and type(other) is Array:
@@ -746,17 +815,13 @@ def accept_type(self, other, gens):
     if type(self) is not type(other):
         return None
 
-    if type(self) is Array:
-        if not match_type(self.type, other.type, gens):
+    if type(self) is Array or type(self) is Construct:
+        if not match_type(self, other, gens):
             return None
 
         return MATCH_PERFECT - reduction
 
-    if type(self) is Struct:
-        if self == other:
-            return MATCH_PERFECT - reduction
-        else:
-            return None
+    assert False, 'unknown type'
 
 BOOL = Struct('Bool', 1)
 INT = Struct('Int', 4)
