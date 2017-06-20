@@ -2,15 +2,10 @@ struct Pair{Key, Val}
     key Key
     val Val
 
-def pair() Pair{Int, Float}
-    let l Pair{Int, Float}
-    l.key = 1
-    l.val = 2.4
-    l
-
 def test()
-    let l = pair()
-    l.key.print()
-    l.val.print()
+    let i = 2
+    let l = Pair(Pair(1, i), 2.4)
+    i = 3
+    l.key.val.print()
 
 test()

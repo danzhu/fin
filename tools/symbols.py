@@ -20,7 +20,7 @@ class Symbol(Enum):
 class Variable:
     TYPE = Symbol.Variable
 
-    def __init__(self, name, tp, loc, off):
+    def __init__(self, name, tp, loc, off=None):
         self.name = name
         self.type = tp
         self.location = loc
@@ -79,6 +79,13 @@ class SymbolTable:
         self._check_exists(sym.name)
         self.symbols[sym.name] = sym
 
+    def _check_type(self, sym, tps):
+        if sym.TYPE not in tps:
+            raise LookupError("expecting {}, but got {} '{}'".format(
+                ' or '.join(t.name for t in tps),
+                sym.TYPE.name,
+                sym))
+
     def find(self, name):
         if name in self.symbols:
             return self.symbols[name]
@@ -96,11 +103,7 @@ class SymbolTable:
                 ' or '.join(t.name for t in tps),
                 name))
 
-        if sym.TYPE not in tps:
-            raise LookupError("expecting {}, but got {} '{}'".format(
-                ' or '.join(t.name for t in tps),
-                sym.TYPE.name,
-                name))
+        self._check_type(sym, tps)
 
         return sym
 
@@ -126,13 +129,12 @@ class SymbolTable:
         if name in self.symbols:
             fns = self.symbols[name]
 
-            if fns.TYPE != Symbol.Function:
-                raise LookupError("expecting {}, but got {} '{}'".format(
-                    Symbol.Function.name,
-                    fns.TYPE.name,
-                    fns))
+            self._check_type(fns, [Symbol.Function, Symbol.Struct])
 
-            res |= {Match(fn) for fn in fns.functions}
+            if fns.TYPE == Symbol.Function:
+                res |= {Match(fn) for fn in fns.functions}
+            else:
+                res.add(Match(fns))
 
         return res
 
@@ -215,7 +217,7 @@ class Struct(SymbolTable):
         self.name = name
         self.generics = []
         self.fields = []
-        self._size = size
+        self.size = size
 
     def __str__(self):
         return self.name
@@ -233,10 +235,33 @@ class Struct(SymbolTable):
         return gen
 
     def add_variable(self, name, tp):
-        var = Variable(name, tp, Location.Struct, self._size)
+        var = Variable(name, tp, Location.Struct)
         self.fields.append(var)
         self._add_symbol(var)
         return var
+
+    def match(self, args, ret):
+        if len(self.fields) != len(args):
+            return None, None
+
+        gens = {}
+        lvls = [accept_type(p.type, a, gens) for p, a in zip(self.fields, args)]
+
+        if ret is not None:
+            cons = Construct(self)
+            lvls.append(accept_type(ret, cons, gens))
+        else:
+            lvls.append(math.nan)
+
+        if None in lvls:
+            return None, None
+
+        return lvls, gens
+
+    def resolve(self, gens):
+        params = [p.type.resolve(gens) for p in self.fields]
+        ret = Construct(self).resolve(gens)
+        return params, ret
 
 
 class Function(SymbolTable):
@@ -316,6 +341,11 @@ class Function(SymbolTable):
 
         return lvls, gens
 
+    def resolve(self, gens):
+        params = [p.type.resolve(gens) for p in self.params]
+        ret = self.ret.resolve(gens)
+        return params, ret
+
 
 class Block(SymbolTable):
     LOCATION = Location.Local
@@ -341,14 +371,15 @@ class Block(SymbolTable):
 
 
 class Match:
-    def __init__(self, fn):
-        self.function = fn
+    def __init__(self, src):
+        self.source = src
 
     def __lt__(self, other):
         assert len(self.levels) == len(other.levels)
 
-        if len(self.function.generics) == 0 \
-                and len(other.function.generics) > 0:
+        # generic has lower precedence
+        if len(self.source.generics) == 0 \
+                and len(other.source.generics) > 0:
             return False
 
         less = False
@@ -361,21 +392,21 @@ class Match:
         return less
 
     def __str__(self):
-        return '{} {}{}'.format(self.function,
+        return '{} {}{}'.format(self.source,
                 self.levels,
                 ''.join(', {} = {}'.format(k, g)
                     for k, g in self.gens.items()))
 
     def update(self, args, ret):
-        self.levels, self.gens = self.function.match(args, ret)
+        self.levels, self.gens = self.source.match(args, ret)
         return self.levels is not None
 
     def resolve(self):
-        if len(self.gens) != len(self.function.generics):
+        # check that all generic params are resolved
+        if len(self.gens) != len(self.source.generics):
             return False
 
-        self.ret = self.function.ret.resolve(self.gens)
-        self.params = [p.type.resolve(self.gens) for p in self.function.params]
+        self.params, self.ret = self.source.resolve(self.gens)
         return True
 
 
@@ -461,9 +492,7 @@ class Construct:
         if self.generics is None:
             self.generics = struct.generics
 
-        self.symbols = {}
-        for f in self.fields:
-            self.symbols[f.name] = f
+        self._finalized = False
 
     def __str__(self):
         res = str(self.struct)
@@ -487,6 +516,8 @@ class Construct:
         return res
 
     def member(self, name):
+        self.finalize()
+
         if name not in self.symbols:
             raise LookupError("field '{}' does not exist in struct '{}'".format(
                 name, self.struct))
@@ -494,26 +525,40 @@ class Construct:
         return self.symbols[name]
 
     def size(self):
-        return self.struct._size + sum(f.type.size() for f in self.fields)
+        self.finalize()
+
+        # note: struct size is only for builtins
+        return self.struct.size + sum(f.type.size() for f in self.fields)
 
     def resolve(self, gens):
         fields = []
-        size = 0
         for f in self.fields:
-            var = Variable(f.name, f.type.resolve(gens), Location.Struct, size)
-            size += var.type.size()
+            var = Variable(f.name, f.type.resolve(gens), Location.Struct)
             fields.append(var)
 
         gen_args = []
         for g in self.generics:
             if type(g) is Generic:
-                gen_args.append(gens[g.name])
-            else:
-                gen_args.append(g)
+                g = g.resolve(gens)
+
+            gen_args.append(g)
 
         return Construct(self.struct,
                 fields,
                 gen_args)
+
+    def finalize(self):
+        if self._finalized:
+            return
+
+        size = 0
+        self.symbols = {}
+        for f in self.fields:
+            f.offset = size
+            size += f.type.size()
+            self.symbols[f.name] = f
+
+        self._finalized = True
 
 
 class Special:

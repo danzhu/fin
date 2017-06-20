@@ -67,7 +67,7 @@
 - structs
   - [x] declaration
   - [x] field access
-  - [ ] inline construction
+  - [x] inline construction
   - [ ] destructor
   - [ ] partial replacement construction
 - member function

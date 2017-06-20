@@ -58,8 +58,8 @@ class Node:
         if self.level:
             content += ' {}'.format(self.level)
 
-        if self.stack_end:
-            content += ' [[{} ]]'.format(format_list(self.stack_end))
+        # if self.stack_end:
+        #     content += ' [[{} ]]'.format(format_list(self.stack_end))
 
         return content
 
@@ -321,6 +321,9 @@ class Node:
                 tp = self.children[1].expr_type
 
                 if type(tp) is symbols.Special:
+                    if tp == symbols.UNKNOWN:
+                        self._error('unable to infer type, ' +
+                                'type annotation required')
                     self._error('cannot create variable of type {}', tp)
 
                 tp = symbols.to_level(tp, self.level)
@@ -361,8 +364,13 @@ class Node:
             self.args = [c.expr_type for c in self.children]
             self._resolve_overload(refs, self.args, self.target_type, True)
 
-            # record usage for ref generation
-            refs.add(self.match.function)
+            if self.match.source.TYPE == Symbol.Function:
+                # record usage for ref generation
+                refs.add(self.match.source)
+            elif self.match.source.TYPE == Symbol.Struct:
+                pass
+            else:
+                assert False
 
             self.expr_type = self.match.ret
             for c, p in zip(self.children, self.match.params):

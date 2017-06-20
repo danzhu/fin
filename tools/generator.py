@@ -101,9 +101,9 @@ class Generator:
 
     def _call(self, node):
         # user-defined function
-        if node.match.function.module().name != '':
+        if node.match.source.module().name != '':
             arg_size = sum(p.size() for p in node.match.params)
-            self._write('call', node.match.function.fullpath(), arg_size)
+            self._write('call', node.match.source.fullpath(), arg_size)
             return
 
         if node.value == 'alloc':
@@ -188,6 +188,8 @@ class Generator:
                 module = mod
 
             self._write('ref_function', fn)
+
+        self._write('')
 
         for c in node.children:
             if c.type == 'DEF':
@@ -342,7 +344,12 @@ class Generator:
         for c in node.children:
             self._gen(c)
 
-        self._call(node)
+        if node.match.source.TYPE == Symbol.Function:
+            self._call(node)
+        elif node.match.source.TYPE == Symbol.Struct:
+            pass # struct construction
+        else:
+            assert False
 
     def INC_ASSN(self, node):
         # left
