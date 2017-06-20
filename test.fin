@@ -8,4 +8,7 @@ def test()
     i = 3
     l.key.val.print()
 
+    let arr [Pair{Int, Float}; 10]
+    arr[0] = Pair(2, 4.5)
+
 test()

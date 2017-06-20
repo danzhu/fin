@@ -612,7 +612,7 @@ def load_builtins():
             mod.add_function(fn)
 
     # array subscript
-    fn = Function('[]', None)
+    fn = Function('subscript', None)
     t = fn.add_generic('T')
     fn.add_variable('arr', Reference(Array(t), 1))
     fn.add_variable('index', Construct(INT))

@@ -440,7 +440,7 @@ class Parser:
                 self._next() # LBRACKET
                 idx = self._test()
                 self._expect('RBRACKET')
-                node = Node('CALL', token, (node, idx), '[]')
+                node = Node('CALL', token, (node, idx), 'subscript')
 
             else:
                 break

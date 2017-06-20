@@ -127,7 +127,7 @@ class Generator:
             self._write('realloc')
             return
 
-        if node.value == '[]':
+        if node.value == 'subscript':
             tp = symbols.to_level(node.expr_type, node.expr_type.level - 1)
             self._write('addr_offset', tp.size())
             return
