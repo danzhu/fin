@@ -7,7 +7,6 @@ from parse import Parser
 from generator import Generator
 from asm import Assembler
 import symbols
-from symbols import Location, Module
 from error import CompilerError
 
 class Compiler:
@@ -61,15 +60,15 @@ class Compiler:
 def main():
     parser = argparse.ArgumentParser(description='Fin compiler.')
     parser.add_argument('src', type=argparse.FileType(), metavar='input',
-            help='source file')
+                        help='source file')
     parser.add_argument('-o', dest='out', metavar='<output>',
-            type=argparse.FileType('w'), default='a.fm',
-            help='write output to <output>')
+                        type=argparse.FileType('w'), default='a.fm',
+                        help='write output to <output>')
     parser.add_argument('-n', dest='name', metavar='<name>', default='main',
-            help='name of the module')
+                        help='name of the module')
     parser.add_argument('-s', dest='stage', metavar='<stage>', default='exec',
-            choices=['lex', 'parse', 'ast', 'asm', 'exec'],
-            help='compilation stage')
+                        choices=['lex', 'parse', 'ast', 'asm', 'exec'],
+                        help='compilation stage')
     args = parser.parse_args()
 
     compiler = Compiler('meta/lex')

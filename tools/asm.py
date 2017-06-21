@@ -33,6 +33,7 @@ class Branch:
         self.enc = enc
         self.label = label
         self.size = struct.calcsize(enc)
+        self.location = None
 
     def resolve(self, loc, syms):
         self.location = loc
@@ -58,6 +59,10 @@ class Reference:
 class Assembler:
     def __init__(self):
         self.instrs = {ins.opname: ins for ins in instr.load()}
+        self.tokens = None
+        self.references = None
+        self.ref_module = None
+        self.module = None
 
     def assemble(self, src, out):
         self.tokens = []
@@ -82,7 +87,7 @@ class Assembler:
 
             self.instr(segs[0], *segs[1:])
 
-        refs = { ref: i for i, ref in enumerate(self.references) }
+        refs = {ref: i for i, ref in enumerate(self.references)}
 
         syms = {}
         location = 0
@@ -140,16 +145,14 @@ def encode(fmt, val):
 def main():
     parser = argparse.ArgumentParser(description='Fin assembler.')
     parser.add_argument('src', type=argparse.FileType(), metavar='input',
-            help='assembly source file')
+                        help='assembly source file')
     parser.add_argument('-o', dest='out', metavar='<output>',
-            type=argparse.FileType('w'), default='a.fm',
-            help='write assembler output to <output>')
-    parser.add_argument('-n', dest='name', metavar='<name>', default='test',
-            help='name of the module')
+                        type=argparse.FileType('w'), default='a.fm',
+                        help='write assembler output to <output>')
     args = parser.parse_args()
 
     asm = Assembler()
-    asm.assemble(args.src, args.out.buffer, args.name)
+    asm.assemble(args.src, args.out.buffer)
 
 if __name__ == '__main__':
     main()

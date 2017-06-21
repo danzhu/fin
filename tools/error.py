@@ -7,8 +7,8 @@ class CompilerError(Exception):
         val = super().__str__()
         if self.token is not None:
             val += '\n  at line {}, column {}:'.format(
-                    self.token.line,
-                    self.token.column)
+                self.token.line,
+                self.token.column)
 
             line = self.token.src.lstrip()
             indent = len(self.token.src) - len(line)

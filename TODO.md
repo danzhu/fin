@@ -86,6 +86,7 @@
 - [x] change postfix to prefix for reference
 - [ ] show token of unsized type error
   - [ ] first bring back recursive definition check
+- [ ] optimize `and` / `or` short-circuit
 
 ## Runtime
 

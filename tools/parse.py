@@ -1,9 +1,11 @@
-import sys
-from lexer import Lexer
 from node import Node
 from error import ParserError
 
 class Parser:
+    def __init__(self):
+        self._src = None
+        self._lookahead = None
+
     def parse(self, src):
         self._src = iter(src)
         self._next()
@@ -208,13 +210,12 @@ class Parser:
             fail = self._else()
             return Node('IF', token, (cond, succ, fail))
 
-        elif self._lookahead.type == 'ELSE':
+        if self._lookahead.type == 'ELSE':
             self._next()
             self._expect('EOL')
             return self._block()
 
-        else:
-            return self._empty()
+        return self._empty()
 
     def _while(self):
         token = self._lookahead
@@ -357,8 +358,8 @@ class Parser:
             self._next()
             val = self._not_test()
             return Node('TEST', token, (val,), 'NOT')
-        else:
-            return self._comp()
+
+        return self._comp()
 
     def _comp(self):
         node = self._expr()
@@ -456,8 +457,8 @@ class Parser:
             if self._lookahead.type == 'LPAREN':
                 args = self._args()
                 return Node('CALL', token, args, name)
-            else:
-                return Node('VAR', token, (), name)
+
+            return Node('VAR', token, (), name)
 
         elif self._lookahead.type in ['NUM', 'FLOAT']:
             token = self._lookahead

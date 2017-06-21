@@ -1,6 +1,4 @@
-import sys
 import string
-from enum import Enum
 from error import LexerError
 
 class State:
@@ -12,7 +10,7 @@ class State:
 
 
 class Token:
-    def __init__(self, tp, src, line, col = 0, val = None, var = None):
+    def __init__(self, tp, src, line, col=0, val=None, var=None):
         self.type = tp
         self.src = src
         self.line = line
@@ -50,6 +48,8 @@ class Lexer:
 
         self.start = self.states['start']
 
+        self.ind_amount = None
+
     def _expand(self, trans):
         return trans.replace('[ALPHA]', string.ascii_letters) \
                 .replace('[NUM]', string.digits) \
@@ -63,15 +63,17 @@ class Lexer:
         return self.states[name]
 
     def read(self, src):
-        ind_amount = 0
+        self.ind_amount = None
         indent = 0
         ln = 0
         prevEmpty = False
+
         # TODO: line continuation
+        line = ''
         for line in src:
             ln += 1
 
-            stripped = line.strip()
+            stripped = line.lstrip()
 
             if len(stripped) == 0:
                 prevEmpty = True
@@ -80,25 +82,26 @@ class Lexer:
             if stripped[0] == '#':
                 continue
 
-            new_indent = len(line) - len(line.lstrip())
+            new_indent = len(line) - len(stripped)
 
-            if ind_amount == 0 and new_indent > 0:
-                ind_amount = new_indent
+            if self.ind_amount is None and new_indent > 0:
+                self.ind_amount = new_indent
 
             if new_indent > indent:
-                if (new_indent - indent) % ind_amount != 0:
+                if (new_indent - indent) % self.ind_amount != 0:
                     raise LexerError('wrong indent',
-                            Token('INDENT', line, ln, new_indent))
-                for i in range((new_indent - indent) // ind_amount):
+                                     Token('INDENT', line, ln, new_indent))
+
+                for i in range((new_indent - indent) // self.ind_amount):
                     yield Token('INDENT', line, ln)
 
             elif new_indent < indent:
-                if (indent - new_indent) % ind_amount != 0:
+                if (indent - new_indent) % self.ind_amount != 0:
                     raise LexerError('wrong dedent',
-                            Token('DEDENT', line, ln, new_indent))
+                                     Token('DEDENT', line, ln, new_indent))
 
                 # end all blocks except the last one
-                for i in range((indent - new_indent) // ind_amount - 1):
+                for i in range((indent - new_indent) // self.ind_amount - 1):
                     yield Token('DEDENT', line, ln)
                     yield Token('EOL', line, ln)
 
@@ -130,13 +133,13 @@ class Lexer:
 
                 if state == self.start:
                     raise LexerError("invalid character '{}'".format(c),
-                        Token(state.name, line, ln, start + 1, c))
+                                     Token(state.name, line, ln, start + 1, c))
 
                 val = line[start:end]
 
                 if not state.accept:
                     raise LexerError("invalid token '{}'".format(val),
-                            Token(state.name, line, ln, start + 1, val))
+                                     Token(state.name, line, ln, start + 1, val))
 
                 if val in self.keywords:
                     tp = self.keywords[val]
@@ -156,8 +159,8 @@ class Lexer:
             # since '\n' is part of line, len(line) is exactly the column of EOL
             yield Token('EOL', line, ln, len(line), '\n')
 
-        if ind_amount > 0:
-            for i in range(indent // ind_amount):
+        if self.ind_amount > 0:
+            for i in range(indent // self.ind_amount):
                 yield Token('DEDENT', line, ln)
                 yield Token('EOL', line, ln)
 

@@ -1,5 +1,5 @@
 import symbols
-from symbols import Symbol, Module, Function, Struct, Block, Reference, Array, Construct
+from symbols import Symbol, Module, Function, Struct, Block, Reference, Array, Construct, Special
 from error import AnalyzerError
 
 def error(fn):
@@ -28,13 +28,20 @@ class Node:
             c.parent = self
 
         # semantic analysis
+        self.module = None
         self.function = None
+        self.struct = None
         self.args = None
         self.match = None
+        self.matches = None
         self.expr_type = None
         self.target_type = None
         self.stack_start = None
         self.stack_end = None
+        self.stack_next = None
+        self.sym = None
+        self.block = None
+        self.field = None
 
         # code generation
         self.context = None
@@ -107,9 +114,10 @@ class Node:
         if self.type == 'CALL':
             if self.args is None:
                 self.args = [c.expr_type for c in self.children]
-            msg += '\n    {}({}) {}'.format(self.value,
-                    ', '.join(str(a) for a in self.args),
-                    self.target_type)
+            msg += '\n    {}({}) {}'.format(
+                self.value,
+                ', '.join(str(a) for a in self.args),
+                self.target_type)
 
         raise AnalyzerError(msg, self.token)
 
@@ -192,18 +200,15 @@ class Node:
             if self.children[1].type != 'EMPTY':
                 size = int(self.children[1].value)
                 return Array(tp, size)
-            else:
-                return Array(tp)
+
+            return Array(tp)
 
     @error
     def _resolve_overload(self, refs, args, ret, required=False):
         if self.match is not None:
             return
 
-        self.matches = symbols.resolve_overload(
-                self.matches,
-                args,
-                ret)
+        self.matches = symbols.resolve_overload(self.matches, args, ret)
 
         if len(self.matches) == 0:
             self._error('no viable function overload')
@@ -213,7 +218,7 @@ class Node:
                 return
 
             self._error('cannot resolve function overload between\n{}',
-                    '\n'.join('    ' + str(fn) for fn in self.matches))
+                        '\n'.join('    ' + str(fn) for fn in self.matches))
 
         match = next(iter(self.matches))
 
@@ -298,7 +303,7 @@ class Node:
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 0)
 
-            if type(tp) is not Construct:
+            if not isinstance(tp, Construct):
                 self._error('member access requires struct type')
 
             self.field = tp.member(self.value)
@@ -320,10 +325,10 @@ class Node:
 
                 tp = self.children[1].expr_type
 
-                if type(tp) is symbols.Special:
+                if isinstance(tp, Special):
                     if tp == symbols.UNKNOWN:
                         self._error('unable to infer type, ' +
-                                'type annotation required')
+                                    'type annotation required')
                     self._error('cannot create variable of type {}', tp)
 
                 tp = symbols.to_level(tp, self.level)
@@ -430,7 +435,7 @@ class Node:
 
         elif self.type == 'LET':
             if self.children[1].type != 'EMPTY':
-                if type(self.sym.type) is Reference:
+                if isinstance(self.sym.type, Reference):
                     lvl = self.sym.type.level
                 else:
                     lvl = 0

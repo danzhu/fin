@@ -64,7 +64,7 @@ class Allocator:
         heapq.heappush(self.removed, val)
 
 
-def load(source = 'meta/instructions'):
+def load(source='meta/instructions'):
     # available enum values
     alloc = Allocator(256)
     instrs = []

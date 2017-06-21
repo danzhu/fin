@@ -4,14 +4,14 @@ import math
 class Location(Enum):
     Global = 0
     Struct = 1
-    Param  = 2
-    Local  = 3
+    Param = 2
+    Local = 3
 
 
 class Symbol(Enum):
-    Module   = 0
-    Struct   = 1
-    Generic  = 2
+    Module = 0
+    Struct = 1
+    Generic = 2
     Function = 3
     Variable = 4
     Constant = 5
@@ -27,13 +27,13 @@ class Variable:
         self.offset = off
 
     def __str__(self):
-        return '{} {}'.format(self.name, self.type, self.location)
+        return '{} {}'.format(self.name, self.type)
 
     def var_type(self):
-        if type(self.type) is not Reference:
+        if not isinstance(self.type, Reference):
             return Reference(self.type, 1)
-        else:
-            return Reference(self.type.type, self.type.level + 1)
+
+        return Reference(self.type.type, self.type.level + 1)
 
 
 class Constant:
@@ -79,13 +79,6 @@ class SymbolTable:
         self._check_exists(sym.name)
         self.symbols[sym.name] = sym
 
-    def _check_type(self, sym, tps):
-        if sym.TYPE not in tps:
-            raise LookupError("expecting {}, but got {} '{}'".format(
-                ' or '.join(t.name for t in tps),
-                sym.TYPE.name,
-                sym))
-
     def find(self, name):
         if name in self.symbols:
             return self.symbols[name]
@@ -103,7 +96,7 @@ class SymbolTable:
                 ' or '.join(t.name for t in tps),
                 name))
 
-        self._check_type(sym, tps)
+        check_type(sym, tps)
 
         return sym
 
@@ -114,8 +107,8 @@ class SymbolTable:
 
         if self.parent.TYPE == sym:
             return self.parent
-        else:
-            return self.parent.ancestor(sym)
+
+        return self.parent.ancestor(sym)
 
     def module(self):
         return self.ancestor(Symbol.Module)
@@ -129,7 +122,7 @@ class SymbolTable:
         if name in self.symbols:
             fns = self.symbols[name]
 
-            self._check_type(fns, [Symbol.Function, Symbol.Struct])
+            check_type(fns, [Symbol.Function, Symbol.Struct])
 
             if fns.TYPE == Symbol.Function:
                 res |= {Match(fn) for fn in fns.functions}
@@ -165,8 +158,8 @@ class Module(SymbolTable):
             # FIXME: use correct module hierarchy for this to work
             # return self.parent.path('.') + self.fullname()
             return self.fullname()
-        else:
-            return self.fullname()
+
+        return self.fullname()
 
     def path(self, sep=':'):
         path = self.fullpath()
@@ -279,24 +272,24 @@ class Function(SymbolTable):
 
     def __str__(self):
         return '{}{}({}){}'.format(
-                self.name,
-                '{' + ', '.join(str(g) for g in self.generics) + '}'
-                    if self.generics else '',
-                ', '.join(str(p) for p in self.params),
-                ' ' + str(self.ret) if self.ret != VOID else '')
+            self.name,
+            '{' + ', '.join(str(g) for g in self.generics) + '}'
+            if self.generics else '',
+            ', '.join(str(p) for p in self.params),
+            ' ' + str(self.ret) if self.ret != VOID else '')
 
     def fullname(self):
         # TODO: generic parameters
         return '{}({}){}'.format(
-                self.name,
-                ','.join(p.type.fullpath() for p in self.params),
-                self.ret.fullpath() if self.ret != VOID else '')
+            self.name,
+            ','.join(p.type.fullpath() for p in self.params),
+            self.ret.fullpath() if self.ret != VOID else '')
 
     def fullpath(self):
         return self.module().path() + self.fullname()
 
     def add_variable(self, name, tp):
-        assert type(name) is str
+        assert isinstance(name, str)
 
         var = Variable(name, tp, Location.Param, 0)
 
@@ -309,7 +302,7 @@ class Function(SymbolTable):
         return var
 
     def add_generic(self, name):
-        assert type(name) is str
+        assert isinstance(name, str)
 
         gen = Generic(name)
 
@@ -373,6 +366,10 @@ class Block(SymbolTable):
 class Match:
     def __init__(self, src):
         self.source = src
+        self.levels = None
+        self.gens = None
+        self.params = None
+        self.ret = None
 
     def __lt__(self, other):
         assert len(self.levels) == len(other.levels)
@@ -393,9 +390,9 @@ class Match:
 
     def __str__(self):
         return '{} {}{}'.format(self.source,
-                self.levels,
-                ''.join(', {} = {}'.format(k, g)
-                    for k, g in self.gens.items()))
+                                self.levels,
+                                ''.join(', {} = {}'.format(k, g)
+                                        for k, g in self.gens.items()))
 
     def update(self, args, ret):
         self.levels, self.gens = self.source.match(args, ret)
@@ -426,7 +423,7 @@ class FunctionGroup:
 
 class Reference:
     def __init__(self, tp, lvl):
-        assert type(tp) is not Reference
+        assert not isinstance(tp, Reference)
 
         self.type = tp
         self.level = lvl
@@ -451,15 +448,15 @@ class Reference:
 
 
 class Array:
-    def __init__(self, tp, size=None):
+    def __init__(self, tp, length=None):
         self.type = tp
-        self._size = size
+        self.length = length
 
     def __format(self, tp):
-        if self._size is None:
+        if self.length is None:
             return '[{}]'.format(tp)
-        else:
-            return '[{}; {}]'.format(tp, self._size)
+
+        return '[{}; {}]'.format(tp, self.length)
 
     def __str__(self):
         return self.__format(self.type)
@@ -471,10 +468,10 @@ class Array:
         return self.__format(self.type.fullpath())
 
     def size(self):
-        if self._size is None:
+        if self.length is None:
             raise TypeError('array is unsized')
 
-        return self.type.size() * self._size
+        return self.type.size() * self.length
 
     def resolve(self, gens):
         return Array(self.type.resolve(gens))
@@ -493,6 +490,7 @@ class Construct:
             self.generics = struct.generics
 
         self._finalized = False
+        self.symbols = None
 
     def __str__(self):
         res = str(self.struct)
@@ -538,14 +536,12 @@ class Construct:
 
         gen_args = []
         for g in self.generics:
-            if type(g) is Generic:
+            if isinstance(g, Generic):
                 g = g.resolve(gens)
 
             gen_args.append(g)
 
-        return Construct(self.struct,
-                fields,
-                gen_args)
+        return Construct(self.struct, fields, gen_args)
 
     def finalize(self):
         if self._finalized:
@@ -579,15 +575,15 @@ def load_builtins():
     mod = Module('')
 
     # classes
-    for struct in { BOOL, INT, FLOAT }:
+    for struct in {BOOL, INT, FLOAT}:
         mod.add_struct(struct)
 
     # constants
-    for const in { TRUE, FALSE }:
+    for const in {TRUE, FALSE}:
         mod.add_constant(const)
 
     # builtin operations
-    for tp in { INT, FLOAT }:
+    for tp in {INT, FLOAT}:
         tp = Construct(tp)
 
         # binary
@@ -605,7 +601,7 @@ def load_builtins():
 
         # comparison
         for op in ['equal', 'notEqual', 'less', 'lessEqual', 'greater',
-                'greaterEqual']:
+                   'greaterEqual']:
             fn = Function(op, BOOL)
             fn.add_variable('left', tp)
             fn.add_variable('right', tp)
@@ -660,14 +656,14 @@ def to_type(val, syms):
         # maybe we should use the lexer for this
         tp = to_type(sub, syms)
         return Array(tp)
-    else:
-        return Construct(syms.get(val, Symbol.Struct))
+
+    return Construct(syms.get(val, Symbol.Struct))
 
 def to_level(tp, lvl):
     if tp == UNKNOWN:
         return UNKNOWN
 
-    if type(tp) is Reference:
+    if isinstance(tp, Reference):
         tp = tp.type
 
     if lvl > 0:
@@ -676,7 +672,7 @@ def to_level(tp, lvl):
     return tp
 
 def to_ref(tp):
-    if type(tp) is not Reference:
+    if not isinstance(tp, Reference):
         tp = Reference(tp, 0)
 
     return tp
@@ -698,8 +694,8 @@ def interpolate_types(tps, gens):
         elif other == DIVERGE:
             continue
 
-        if type(res) is Reference:
-            if type(other) is not Reference:
+        if isinstance(res, Reference):
+            if not isinstance(other, Reference):
                 other = Reference(other, 0)
 
             if not match_type(res.type, other.type, gens):
@@ -709,7 +705,7 @@ def interpolate_types(tps, gens):
             res = to_level(res.type, lvl)
             continue
 
-        if type(other) is Reference:
+        if isinstance(other, Reference):
             other = other.type
 
         if not match_type(res, other, gens):
@@ -759,46 +755,55 @@ def resolve_overload(overloads, args, ret):
 
         res = {r for r in res if not r < match}
 
-        for r in res:
-            if match < r:
+        for other in res:
+            if match < other:
                 break
         else:
             res.add(match)
 
     return res
 
+def check_type(sym, tps):
+    if sym.TYPE not in tps:
+        raise LookupError("expecting {}, but got {} '{}'".format(
+            ' or '.join(t.name for t in tps),
+            sym.TYPE.name,
+            sym))
+
 def match_type(self, other, gens):
-    if type(other) is Generic:
+    if isinstance(other, Generic):
         if other.name not in gens:
             gens[other.name] = self
             return True
 
         other = gens[other.name]
 
-    if type(self) is Generic:
+    if isinstance(self, Generic):
         if self.name not in gens:
             gens[self.name] = other
             return True
 
         self = gens[self.name]
 
-    if type(self) is not type(other):
-        return False
-
-    if type(self) is Reference:
-        return self.level == other.level \
+    if isinstance(self, Reference):
+        return isinstance(other, Reference) \
+                and self.level == other.level \
                 and match_unsized(self.type, other.type, gens)
 
-    if type(self) is Array:
-        return self._size == other._size \
+    if isinstance(self, Array) is Array:
+        return isinstance(other, Array) \
+                and self.length == other.length \
                 and match_type(self.type, other.type, gens)
 
-    if type(self) is Construct:
+    if isinstance(self, Construct):
+        if not isinstance(other, Construct):
+            return False
+
         if self.struct != other.struct:
             return False
 
-        for f, o in zip(self.fields, other.fields):
-            if not match_type(f.type, o.type, gens):
+        for field, other_field in zip(self.fields, other.fields):
+            if not match_type(field.type, other_field.type, gens):
                 return False
 
         return True
@@ -806,11 +811,11 @@ def match_type(self, other, gens):
     assert False, 'unknown type'
 
 def match_unsized(self, other, gens):
-    if type(self) is Array and type(other) is Array:
+    if isinstance(self, Array) and isinstance(other, Array):
         if not match_type(self.type, other.type, gens):
             return False
 
-        return self._size is None or self._size == other._size
+        return self.length is None or self.length == other.length
 
     return match_type(self, other, gens)
 
@@ -824,43 +829,38 @@ def accept_type(self, other, gens):
     if self == VOID:
         if other == VOID:
             return MATCH_PERFECT
-        else:
-            return MATCH_TO_VOID
 
-    if type(other) is Generic:
+        return MATCH_TO_VOID
+
+    if isinstance(other, Generic):
         if other.name not in gens:
             gens[other.name] = self
             return MATCH_PERFECT
 
         other = gens[other.name]
 
-    if type(self) is Generic:
+    if isinstance(self, Generic):
         if self.name not in gens:
             gens[self.name] = other
             return MATCH_PERFECT
 
         self = gens[self.name]
 
-    if type(self) is Reference:
-        if type(other) is not Reference or self.level > other.level:
-            return None
-
-        if not match_unsized(self.type, other.type, gens):
+    if isinstance(self, Reference):
+        if not isinstance(other, Reference) or self.level > other.level \
+                or not match_unsized(self.type, other.type, gens):
             return None
 
         return MATCH_PERFECT - 1.0 + self.level / other.level
 
-    if type(other) is Reference:
+    if isinstance(other, Reference):
         # auto reduction to level 0
         other = other.type
         reduction = 1.0
     else:
         reduction = 0.0
 
-    if type(self) is not type(other):
-        return None
-
-    if type(self) is Array or type(self) is Construct:
+    if isinstance(self, (Array, Construct)):
         if not match_type(self, other, gens):
             return None
 

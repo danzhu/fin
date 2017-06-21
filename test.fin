@@ -2,7 +2,7 @@ struct Pair{Key, Val}
     key Key
     val Val
 
-def test()
+def test(p Pair{Int, Float})
     let i = 2
     let l = Pair(Pair(1, i), 2.4)
     i = 3
@@ -11,4 +11,4 @@ def test()
     let arr [Pair{Int, Float}; 10]
     arr[0] = Pair(2, 4.5)
 
-test()
+test(Pair(2, input()))
