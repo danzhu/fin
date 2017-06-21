@@ -92,7 +92,7 @@ class Lexer:
                     raise LexerError('wrong indent',
                                      Token('INDENT', line, ln, new_indent))
 
-                for i in range((new_indent - indent) // self.ind_amount):
+                for _ in range((new_indent - indent) // self.ind_amount):
                     yield Token('INDENT', line, ln)
 
             elif new_indent < indent:
@@ -101,7 +101,7 @@ class Lexer:
                                      Token('DEDENT', line, ln, new_indent))
 
                 # end all blocks except the last one
-                for i in range((indent - new_indent) // self.ind_amount - 1):
+                for _ in range((indent - new_indent) // self.ind_amount - 1):
                     yield Token('DEDENT', line, ln)
                     yield Token('EOL', line, ln)
 
@@ -160,7 +160,7 @@ class Lexer:
             yield Token('EOL', line, ln, len(line), '\n')
 
         if self.ind_amount > 0:
-            for i in range(indent // self.ind_amount):
+            for _ in range(indent // self.ind_amount):
                 yield Token('DEDENT', line, ln)
                 yield Token('EOL', line, ln)
 
