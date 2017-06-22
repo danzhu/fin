@@ -5,7 +5,7 @@
 - [x] functions
   - [x] function overloading
   - [x] operator overloading
-  - [ ] cast operator
+  - [x] cast operator
 - [x] type inference
   - [x] functions
   - [x] control flow

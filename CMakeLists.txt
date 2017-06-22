@@ -86,6 +86,32 @@ add_custom_target(run
     COMMAND fin ${CMAKE_CURRENT_BINARY_DIR}/test.fm
     DEPENDS test.fm)
 
+# tests
+enable_testing()
+
+# macro for testing compilation process
+macro(test_compile name expect)
+    add_test(NAME "compiler_${name}"
+        COMMAND tools/compiler.py "${PROJECT_SOURCE_DIR}/test/${name}.fin"
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+    if(${ARGC} GREATER 1)
+        set_tests_properties("compiler_${name}" PROPERTIES
+            PASS_REGULAR_EXPRESSION ${expect})
+    endif()
+endmacro()
+
+test_compile("invalid_implicit_cast" "Float cannot be converted to Int")
+test_compile("generic_generic" "generic type cannot have generic arguments")
+test_compile("no_overload" "no viable function overload")
+test_compile("infer_failed" "unable to infer type")
+test_compile("resolve_failed" "cannot resolve function overload")
+test_compile("diverge_var" "cannot create variable of type Diverge")
+test_compile("init_mismatch" "initialization level mismatch")
+
+# add_test(NAME source_type_check COMMAND mypy ${TOOLS})
+# add_test(NAME source_format_check COMMAND pylint ${TOOLS})
+
 # options
 option(DEBUG "Enable debug messages" OFF)
 

@@ -8,7 +8,7 @@ In short, it's "just another programming language" :)
 
 ## Compilation
 
-Requires CMake, a C++14 compiler, and Python 3. To build the runtime:
+Requires CMake, a C++14 compiler, and Python 3.6. To build the runtime:
 
 ```sh
 mkdir build && cd build

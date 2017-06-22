@@ -1,0 +1,2 @@
+struct Test{T}
+    value T{Int}

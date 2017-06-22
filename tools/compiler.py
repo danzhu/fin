@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from typing import Set, Iterable, cast
+import sys
 import argparse
 import io
 from lexer import Lexer
@@ -86,7 +87,7 @@ def main() -> None:
     try:
         compiler.compile(args.src, args.out, args.name, args.stage)
     except CompilerError as e:
-        print(f'{type(e).__name__}: {e}')
+        print(f'{type(e).__name__}: {e}', file=sys.stderr)
         exit(1)
 
 if __name__ == '__main__':
