@@ -18,12 +18,11 @@ class Parser:
 
     def _expect(self, *types: str) -> None:
         if len(types) == 0:
-            self._error('unexpected token {}'.format(self._lookahead.type))
+            self._error(f'unexpected token {self._lookahead.type}')
 
         if self._lookahead.type not in types:
-            self._error('expecting {}, but got {}'.format(
-                ' or '.join(types),
-                self._lookahead.type))
+            tps = ' or '.join(types)
+            self._error(f'expecting {tps}, but got {self._lookahead.type}')
 
         self._next()
 

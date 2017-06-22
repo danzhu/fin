@@ -86,7 +86,7 @@ def main() -> None:
     try:
         compiler.compile(args.src, args.out, args.name, args.stage)
     except CompilerError as e:
-        print('{}: {}'.format(type(e).__name__, e))
+        print(f'{type(e).__name__}: {e}')
         exit(1)
 
 if __name__ == '__main__':

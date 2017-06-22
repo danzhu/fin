@@ -43,7 +43,7 @@ class Param:
         self.type = segs[1]
 
     def format(self) -> str:
-        return '{}:{}'.format(self.name, self.type)
+        return f'{self.name}:{self.type}'
 
 
 class Allocator:

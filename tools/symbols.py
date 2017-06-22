@@ -39,7 +39,7 @@ class Variable(Symbol):
         self.offset = off
 
     def __str__(self) -> str:
-        return '{} {}'.format(self.name, self.type)
+        return f'{self.name} {self.type}'
 
     def var_type(self) -> Type:
         if not isinstance(self.type, Reference):
@@ -71,8 +71,7 @@ class SymbolTable:
 
     def _check_exists(self, name: str):
         if name in self.symbols:
-            raise LookupError("symbol '{}' exists as {}".format(
-                name, self.symbols[name]))
+            raise LookupError(f"symbol '{name}' exists as {self.symbols[name]}")
 
     def _add_symbol(self, sym: Symbol) -> None:
         self._check_exists(sym.name)
@@ -91,7 +90,7 @@ class SymbolTable:
         sym = self.find(name)
 
         if sym is None:
-            raise LookupError("cannot find symbol '{}'".format(name))
+            raise LookupError(f"cannot find symbol '{name}'")
 
         check_type(sym, tps)
 
@@ -99,8 +98,7 @@ class SymbolTable:
 
     def ancestor(self, tp: type) -> 'SymbolTable':
         if self.parent is None:
-            raise LookupError('cannot find ancestor of type {}'.format(
-                tp.__name__))
+            raise LookupError(f'cannot find ancestor of type {tp.__name__}')
 
         if isinstance(self.parent, tp):
             return self.parent
@@ -185,7 +183,7 @@ class Module(SymbolTable, Symbol):
             sym = self.symbols[fn.name]
 
             if not isinstance(sym, FunctionGroup):
-                raise LookupError("redefining '{}' as function".format(group))
+                raise LookupError(f"redefining '{group}' as function")
 
             group = sym
 
@@ -269,19 +267,27 @@ class Function(SymbolTable, Symbol):
         self.generics: List[Generic] = []
 
     def __str__(self) -> str:
-        return '{}{}({}){}'.format(
-            self.name,
-            '{' + ', '.join(str(g) for g in self.generics) + '}'
-            if self.generics else '',
-            ', '.join(str(p) for p in self.params),
-            ' ' + str(self.ret) if self.ret != VOID else '')
+        gens = ''
+        if len(self.generics) > 0:
+            gens = '{' + ', '.join(str(g) for g in self.generics) + '}'
+
+        params = ', '.join(str(p) for p in self.params)
+
+        ret = ''
+        if self.ret != VOID:
+            ret = ' ' + str(self.ret)
+
+        return f'{self.name}{gens}({params}){ret}'
 
     def fullname(self) -> str:
         # TODO: generic parameters
-        return '{}({}){}'.format(
-            self.name,
-            ','.join(p.type.fullpath() for p in self.params),
-            self.ret.fullpath() if self.ret != VOID else '')
+        params = ','.join(p.type.fullpath() for p in self.params)
+
+        ret = ''
+        if self.ret != VOID:
+            ret = self.ret.fullpath()
+
+        return f'{self.name}({params}){ret}'
 
     def fullpath(self) -> str:
         return self.module().path() + self.fullname()
@@ -387,10 +393,8 @@ class Match:
         return less
 
     def __str__(self) -> str:
-        return '{} {}{}'.format(self.source,
-                                self.levels,
-                                ''.join(', {} = {}'.format(k, g)
-                                        for k, g in self.gens.items()))
+        gens = ''.join(f', {k} = {g}' for k, g in self.gens.items())
+        return f'{self.source} {self.levels}{gens}'
 
     def update(self, args: List[Type], ret: Type) -> bool:
         self.levels, self.gens = self.source.match(args, ret)
@@ -425,7 +429,7 @@ class Reference(Type):
         self.level = lvl
 
     def __format(self, tp: Any) -> str:
-        return '{}{}'.format('&' * self.level, tp)
+        return '&' * self.level + str(tp)
 
     def __str__(self) -> str:
         return self.__format(self.type)
@@ -448,29 +452,21 @@ class Array(Type):
         self.type = tp
         self.length = length
 
-    def __format(self, tp: Any) -> str:
+    def __format(self, tp: Any, sep: str) -> str:
+        length = ''
         if self.length is None:
-            return '[{}]'.format(tp)
+            length = f'{sep}{self.length}'
 
-        return '[{}; {}]'.format(tp, self.length)
+        return f'[{tp}{length}]'
 
     def __str__(self) -> str:
-        if self.length is None:
-            return '[{}]'.format(self.type)
-
-        return '[{}; {}]'.format(self.type, self.length)
+        return self.__format(self.type, '; ')
 
     def fullname(self) -> str:
-        if self.length is None:
-            return '[{}]'.format(self.type.fullname())
-
-        return '[{};{}]'.format(self.type.fullname(), self.length)
+        return self.__format(self.type.fullname(), ';')
 
     def fullpath(self) -> str:
-        if self.length is None:
-            return '[{}]'.format(self.type.fullpath())
-
-        return '[{};{}]'.format(self.type.fullpath(), self.length)
+        return self.__format(self.type.fullpath(), ';')
 
     def size(self) -> int:
         if self.length is None:
@@ -545,8 +541,8 @@ class Construct(Type):
         self.finalize()
 
         if name not in self.symbols:
-            raise LookupError("field '{}' does not exist in struct '{}'".format(
-                name, self.struct))
+            raise LookupError(
+                f"field '{name}' does not exist in struct '{self.struct}'")
 
         return self.symbols[name]
 
@@ -764,7 +760,7 @@ def interpolate_types(tps: Iterable[Type], gens: Dict[str, Type]) -> Type:
 
 def load_module(mod_name: str, glob: Module) -> Module:
     # TODO: a better way to locate
-    filename = 'ref/{}.fd'.format(mod_name)
+    filename = f'ref/{mod_name}.fd'
     mod = Module(mod_name)
     glob.add_module(mod)
     with open(filename) as f:
@@ -816,9 +812,8 @@ def check_type(sym: Symbol, tps: Tuple[type, ...]):
         if isinstance(sym, tp):
             return
 
-    raise LookupError("expecting {}, but got '{}'".format(
-        ' or '.join(t.__name__ for t in tps),
-        sym))
+    exp = ' or '.join(t.__name__ for t in tps)
+    raise LookupError(f"expecting {exp}, but got '{sym}'")
 
 def match_type(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
     if isinstance(other, Generic):
@@ -858,7 +853,7 @@ def match_type(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
 
         return True
 
-    assert False, 'unknown type {}'.format(self)
+    assert False, f'unknown type {self}'
 
 def match_unsized(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
     if isinstance(self, Array) and isinstance(other, Array):
@@ -919,7 +914,7 @@ def accept_type(self: Type, other: Type, gens: Dict[str, Type]) -> float:
 
         return MATCH_PERFECT - reduction
 
-    assert False, 'unknown type {}'.format(self)
+    assert False, f'unknown type {self}'
 
 BOOL = Struct('Bool', 1)
 INT = Struct('Int', 4)

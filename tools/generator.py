@@ -31,11 +31,11 @@ class Generator:
                        + '\n')
 
     def _gen(self, node: Node) -> None:
-        self._write('# {}'.format(node))
+        self._write(f'# {node}')
 
         self.indent += 1
 
-        getattr(self, '_' + node.type)(node)
+        getattr(self, f'_{node.type}')(node)
         self._cast(node.expr_type, node.target_type)
 
         self.indent -= 1
@@ -101,7 +101,7 @@ class Generator:
     def _label(self, name: str) -> str:
         count = self._labels[name] if name in self._labels else 0
         self._labels[name] = count + 1
-        return '{}_{}'.format(name, count)
+        return f'{name}_{count}'
 
     def _call(self, match: Match) -> None:
         assert isinstance(match.source, Function)
@@ -143,7 +143,7 @@ class Generator:
         if fn.name == 'cast':
             frm = match.params[0].fullname()[0].lower()
             tar = match.ret.fullname()[0].lower()
-            self._write('cast_{}_{}'.format(frm, tar))
+            self._write(f'cast_{frm}_{tar}')
             return
 
         if fn.name == 'pos':
@@ -173,10 +173,10 @@ class Generator:
         elif fn.name == 'modulus':
             op = 'mod'
         else:
-            assert False, 'unknown operator {}'.format(fn.name)
+            assert False, f'unknown operator {fn.name}'
 
         name = match.params[0].fullname()[0].lower()
-        self._write('{}_{}'.format(op, name))
+        self._write(f'{op}_{name}')
 
     def _FILE(self, node: Node) -> None:
         ref_list = []

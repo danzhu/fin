@@ -8,13 +8,11 @@ class CompilerError(Exception):
     def __str__(self) -> str:
         val = super().__str__()
         if self.token is not None:
-            val += '\n  at line {}, column {}:'.format(
-                self.token.line,
-                self.token.column)
+            val += f'\n  at line {self.token.line}, column {self.token.column}:'
 
             line = self.token.src.lstrip()
             indent = len(self.token.src) - len(line)
-            val += '\n\n    ' + line
+            val += f'\n\n    {line}'
             val += '    ' + ' ' * (self.token.column - 1 - indent)
             val += '^' * len(self.token.value or ' ')
 

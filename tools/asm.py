@@ -137,13 +137,13 @@ class Assembler:
             self.ref_module = args[0]
 
         elif opname == 'ref_function':
-            self.references.append('{}:{}'.format(self.ref_module, args[0]))
+            self.references.append(f'{self.ref_module}:{args[0]}')
 
         elif opname == 'module':
             self.module = args[0]
 
         elif opname == 'function':
-            self.references.append('{}:{}'.format(self.module, args[0]))
+            self.references.append(f'{self.module}:{args[0]}')
 
         for param, arg in zip(ins.params, args):
             token: Token

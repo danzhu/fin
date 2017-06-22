@@ -1,4 +1,4 @@
-from typing import Sequence, Set, Any, List, Dict, Union
+from typing import Sequence, Set, List, Dict, Union
 from tokens import Token
 import symbols
 from symbols import Module, Function, Struct, Block, Type, Reference, Array, \
@@ -22,7 +22,7 @@ class StackNode:
         self.next = nxt
 
     def __str__(self) -> str:
-        return '{} {}'.format(self.next, self.type)
+        return f'{self.next} {self.type}'
 
 
 class Node:
@@ -67,23 +67,20 @@ class Node:
         content = self.type
 
         if self.match:
-            content += ' {}'.format(self.match)
+            content += f' {self.match}'
         elif self.function:
-            content += ' {}'.format(self.function)
+            content += f' {self.function}'
         elif self.value:
-            content += ' {}'.format(self.value)
+            content += f' {self.value}'
 
         if self.expr_type and self.expr_type != symbols.VOID:
-            content += ' <{}'.format(self.expr_type)
+            content += f' <{self.expr_type}'
             if self.target_type:
-                content += ' -> {}'.format(self.target_type)
+                content += f' -> {self.target_type}'
             content += '>'
 
         if self.level:
-            content += ' {}'.format(self.level)
-
-        # if self.stack_end:
-        #     content += ' [[{} ]]'.format(format_list(self.stack_end))
+            content += f' {self.level}'
 
         return content
 
@@ -108,7 +105,7 @@ class Node:
 
         while True:
             if node is None:
-                self._error('cannot find ancestor {}', tp)
+                self._error(f'cannot find ancestor {tp}')
 
             if node.type == tp:
                 return node
@@ -125,17 +122,14 @@ class Node:
 
         return res
 
-    def _error(self, msg: str, *args: Any):
-        msg = msg.format(*args)
-
-        msg += '\n  in {}'.format(self)
+    def _error(self, msg: str):
+        msg += f'\n  in {self}'
         if self.type == 'CALL':
             if self.args is None:
                 self.args = [c.expr_type for c in self.children]
-            msg += '\n    {}({}) {}'.format(
-                self.value,
-                ', '.join(str(a) for a in self.args),
-                self.target_type)
+
+            args = ', '.join(str(a) for a in self.args)
+            msg += f'\n    {self.value}({args}) {self.target_type}'
 
         raise AnalyzerError(msg, self.token)
 
@@ -145,7 +139,7 @@ class Node:
         assert tp is not None
 
         if symbols.accept_type(tp, self.expr_type, {}) is None:
-            self._error('{} cannot be converted to {}', self.expr_type, tp)
+            self._error(f'{self.expr_type} cannot be converted to {tp}')
 
         self.target_type = tp
 
@@ -241,8 +235,8 @@ class Node:
             if not required:
                 return
 
-            self._error('cannot resolve function overload between\n{}',
-                        '\n'.join('    ' + str(fn) for fn in self.matches))
+            self._error('cannot resolve function overload between\n'
+                        + '\n'.join('    ' + str(fn) for fn in self.matches))
 
         match = next(iter(self.matches))
 
@@ -250,7 +244,7 @@ class Node:
             if not required:
                 return
 
-            self._error('cannot resolve generic parameters\n  {}', match)
+            self._error('cannot resolve generic parameters\n  ' + str(match))
 
         self.match = match
 
@@ -307,7 +301,7 @@ class Node:
             self.matches = syms.overloads(self.value)
 
             if len(self.matches) == 0:
-                self._error("no function '{}' defined", self.value)
+                self._error(f"no function '{self.value}' defined")
 
             self.args = [c.expr_type for c in self.children]
             self._resolve_overload(refs, self.args, self.target_type)
@@ -364,7 +358,7 @@ class Node:
                     if tp == symbols.UNKNOWN:
                         self._error('unable to infer type, ' +
                                     'type annotation required')
-                    self._error('cannot create variable of type {}', tp)
+                    self._error(f'cannot create variable of type {tp}')
 
                 tp = symbols.to_level(tp, self.level)
 

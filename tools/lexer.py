@@ -116,14 +116,14 @@ class Lexer:
                     continue
 
                 if state == self.start:
-                    raise LexerError("invalid character '{}'".format(c),
+                    raise LexerError(f"invalid character '{c}'",
                                      Token(state.name, line, ln, start + 1, c))
 
                 val = line[start:end]
 
                 if not state.accept:
                     raise LexerError(
-                        "invalid token '{}'".format(val),
+                        f"invalid token '{val}'",
                         Token(state.name, line, ln, start + 1, val))
 
                 if val in self.keywords:
