@@ -1,0 +1,2 @@
+def test()
+    let a = print(1)

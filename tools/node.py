@@ -6,11 +6,11 @@ from symbols import Module, Function, Struct, Block, Type, Reference, Array, \
 from error import AnalyzerError
 
 def error(fn):
-    def dec(self, *args, **kargs):
+    def dec(self: 'Node', *args, **kargs):
         try:
             ret = fn(self, *args, **kargs)
         except (LookupError, TypeError) as e:
-            self._error('{}', e)
+            self._error(str(e))
 
         return ret
 

@@ -1,0 +1,5 @@
+struct Test{T}
+    value T
+
+def test()
+    let t Test{Int, Float}

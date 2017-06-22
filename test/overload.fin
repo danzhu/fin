@@ -1,0 +1,10 @@
+struct Test
+    value Int
+
+def print(t Test)
+    t.value.print()
+
+def test()
+    (1).print()
+    (1.2).print()
+    Test(2).print()

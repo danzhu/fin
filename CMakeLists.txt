@@ -90,30 +90,39 @@ add_custom_target(run
 enable_testing()
 
 # macro for testing compilation process
-macro(test_compile name expect)
-    add_test(NAME "compiler_${name}"
-        COMMAND tools/compiler.py "${PROJECT_SOURCE_DIR}/test/${name}.fin"
+macro(test_compile name)
+    add_test(NAME ${name}
+        COMMAND python tools/compiler.py "${PROJECT_SOURCE_DIR}/test/${name}.fin"
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
     if(${ARGC} GREATER 1)
-        set_tests_properties("compiler_${name}" PROPERTIES
-            PASS_REGULAR_EXPRESSION ${expect})
+        set_tests_properties(${name} PROPERTIES
+            PASS_REGULAR_EXPRESSION ${ARGV1})
     endif()
 endmacro()
 
-test_compile("invalid_implicit_cast" "Float cannot be converted to Int")
+test_compile("overload")
+
+test_compile("no_implicit_cast" "Float cannot be converted to Int")
 test_compile("generic_generic" "generic type cannot have generic arguments")
 test_compile("no_overload" "no viable function overload")
 test_compile("infer_failed" "unable to infer type")
 test_compile("resolve_failed" "cannot resolve function overload")
 test_compile("diverge_var" "cannot create variable of type Diverge")
 test_compile("init_mismatch" "initialization level mismatch")
+test_compile("no_type" "type is required when not assigning a value")
+test_compile("generic_unmatched" "unmatched generic arguments")
+test_compile("member_nonstruct" "member access requires struct type")
+test_compile("void_var" "cannot create variable of type Void")
+test_compile("args_unmatched" "no viable function overload")
+test_compile("no_symbol" "cannot find symbol 'i'")
+test_compile("unsized_array" "array is unsized")
 
-# add_test(NAME source_type_check COMMAND mypy ${TOOLS})
-# add_test(NAME source_format_check COMMAND pylint ${TOOLS})
+add_test(NAME source_type_check COMMAND mypy ${TOOLS})
+add_test(NAME source_format_check COMMAND pylint ${TOOLS})
 
 # options
-option(DEBUG "Enable debug messages" OFF)
+option(DEBUG "Enable debug messages" 0)
 
 if(DEBUG)
     target_compile_definitions(fin PRIVATE DEBUG=${DEBUG})

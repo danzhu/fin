@@ -1,5 +1,16 @@
 # Fin Project Todo List
 
+## Roadmap
+
+- [x] Runtime
+- [ ] Python Compiler
+- [ ] Libraries
+  - [ ] Language Builtins
+  - [ ] Runtime Library
+  - [ ] Standard Library
+- [ ] Compiler Rewrite
+- [ ] Debugger
+
 ## Language
 
 - [x] functions
