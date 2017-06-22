@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from typing import Set, Iterable, cast
 import argparse
 import io
 from lexer import Lexer
@@ -10,14 +11,18 @@ import symbols
 from error import CompilerError
 
 class Compiler:
-    def __init__(self, lex):
+    def __init__(self, lex: str) -> None:
         with open(lex) as f:
             self.lexer = Lexer(f)
         self.parser = Parser()
         self.generator = Generator()
         self.assembler = Assembler()
 
-    def compile(self, src, out, name, stage):
+    def compile(self,
+                src: Iterable[str],
+                out: io.BytesIO,
+                name: str,
+                stage: str) -> None:
         tokens = self.lexer.read(src)
 
         if stage == 'lex':
@@ -29,7 +34,7 @@ class Compiler:
 
         glob = symbols.load_builtins()
         syms = symbols.load_module('fin', glob)
-        refs = set()
+        refs: Set[symbols.Function] = set()
 
         if stage == 'parse':
             root.print()
@@ -41,15 +46,20 @@ class Compiler:
             root.print()
             return
 
-        with io.StringIO() as assembly:
-            self.generator.generate(root, name, refs, assembly)
+        with io.StringIO() as asm:
+            assembly = cast(io.StringIO, asm)
+
+            self.generator.generate(root,
+                                    name,
+                                    refs,
+                                    cast(io.TextIOBase, assembly))
 
             if stage == 'asm':
                 print(assembly.getvalue())
                 return
 
             assembly.seek(0)
-            self.assembler.assemble(assembly, out.buffer)
+            self.assembler.assemble(assembly, out)
 
             if stage == 'exec':
                 return
@@ -57,12 +67,12 @@ class Compiler:
         raise CompilerError('invalid stage', None)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description='Fin compiler.')
     parser.add_argument('src', type=argparse.FileType(), metavar='input',
                         help='source file')
     parser.add_argument('-o', dest='out', metavar='<output>',
-                        type=argparse.FileType('w'), default='a.fm',
+                        type=argparse.FileType('wb'), default='a.fm',
                         help='write output to <output>')
     parser.add_argument('-n', dest='name', metavar='<name>', default='main',
                         help='name of the module')

@@ -1,5 +1,8 @@
+from typing import Sequence, Set, Any, List, Dict, Union
+from tokens import Token
 import symbols
-from symbols import Symbol, Module, Function, Struct, Block, Reference, Array, Construct, Special
+from symbols import Module, Function, Struct, Block, Type, Reference, Array, \
+    Construct, Special, Match, SymbolTable, Variable, Constant, Generic
 from error import AnalyzerError
 
 def error(fn):
@@ -13,8 +16,22 @@ def error(fn):
 
     return dec
 
+class StackNode:
+    def __init__(self, tp: Type, nxt: 'StackNode') -> None:
+        self.type = tp
+        self.next = nxt
+
+    def __str__(self) -> str:
+        return '{} {}'.format(self.next, self.type)
+
+
 class Node:
-    def __init__(self, tp, token, children, val=None, lvl=None):
+    def __init__(self,
+                 tp: str,
+                 token: Token,
+                 children: Sequence['Node'],
+                 val: str = None,
+                 lvl: int = None) -> None:
         # basic data
         self.type = tp
         self.token = token
@@ -28,25 +45,25 @@ class Node:
             c.parent = self
 
         # semantic analysis
-        self.module = None
-        self.function = None
-        self.struct = None
-        self.args = None
-        self.match = None
-        self.matches = None
-        self.expr_type = None
-        self.target_type = None
-        self.stack_start = None
-        self.stack_end = None
-        self.stack_next = None
-        self.sym = None
-        self.block = None
-        self.field = None
+        self.module: Module = None
+        self.function: Function = None
+        self.struct: Struct = None
+        self.args: List[Type] = None
+        self.match: Match = None
+        self.matches: Set[Match] = None
+        self.expr_type: Type = None
+        self.target_type: Type = None
+        self.stack_start: StackNode = None
+        self.stack_end: StackNode = None
+        self.stack_next: StackNode = None
+        self.variable: Union[Variable, Constant] = None
+        self.block: Block = None
+        self.field: Variable = None
 
         # code generation
-        self.context = None
+        self.context: Dict[str, str] = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         content = self.type
 
         if self.match:
@@ -70,34 +87,35 @@ class Node:
 
         return content
 
-    def print(self, indent=0):
+    def print(self, indent: int = 0) -> None:
         print('  ' * indent + str(self))
         for c in self.children:
             c.print(indent + 1)
 
-    def analyze(self, mod_name, syms, refs):
+    def analyze(self, mod_name: str, mod: Module, refs) -> None:
         assert self.type == 'FILE'
 
         self.module = Module(mod_name)
-        syms.add_module(self.module)
-        syms = self.module
+        mod.add_module(self.module)
+        mod = self.module
 
         self._analyze_declare()
-        self._analyze_acquire(syms, refs)
-        self._analyze_expect(refs, None)
+        self._analyze_acquire(mod, refs)
+        self._analyze_expect(refs, '')
 
-    def ancestor(self, tp):
+    def ancestor(self, tp: str) -> 'Node':
         node = self.parent
 
-        while node is not None:
+        while True:
+            if node is None:
+                self._error('cannot find ancestor {}', tp)
+
             if node.type == tp:
                 return node
 
             node = node.parent
 
-        self._error('cannot find ancestor {}', tp)
-
-    def decedents(self, tp):
+    def decedents(self, tp: str) -> Set['Node']:
         res = set()
         for c in self.children:
             if c.type == tp:
@@ -107,7 +125,7 @@ class Node:
 
         return res
 
-    def _error(self, msg, *args):
+    def _error(self, msg: str, *args: Any):
         msg = msg.format(*args)
 
         msg += '\n  in {}'.format(self)
@@ -122,7 +140,7 @@ class Node:
         raise AnalyzerError(msg, self.token)
 
     @error
-    def _expect_type(self, tp):
+    def _expect_type(self, tp: Type) -> None:
         assert self.expr_type is not None
         assert tp is not None
 
@@ -132,12 +150,12 @@ class Node:
         self.target_type = tp
 
     @error
-    def _declare(self, mod):
+    def _declare(self, mod: Module) -> None:
         self.struct = Struct(self.value)
         mod.add_struct(self.struct)
 
     @error
-    def _define(self, mod):
+    def _define(self, mod: Module) -> None:
         if self.type == 'DEF':
             name = self.value
             ret = self.children[1]._type(mod)
@@ -166,35 +184,35 @@ class Node:
             assert False, 'unknown declaration'
 
     @error
-    def _type(self, syms):
+    def _type(self, syms: SymbolTable) -> Type:
         if self.type == 'EMPTY':
             return None
 
         if self.type == 'TYPE':
-            tp = syms.get(self.value, Symbol.Struct, Symbol.Generic)
+            sym = syms.get(self.value, Struct, Generic)
 
-            if tp.TYPE == Symbol.Generic:
+            assert isinstance(sym, (Struct, Generic))
+
+            if isinstance(sym, Generic):
                 if len(self.children) != 0:
                     self._error('generic type cannot have generic arguments')
 
-                return tp
+                return sym
 
-            if len(self.children) != len(tp.generics):
+            if len(self.children) != len(sym.generics):
                 self._error('unmatched generic arguments')
 
-            gens = {g.name: c._type(syms) for g, c in zip(tp.generics, self.children)}
-            tp = Construct(tp).resolve(gens)
-            return tp
+            gens = {g.name: c._type(syms)
+                    for g, c in zip(sym.generics, self.children)}
+            return Construct(sym).resolve(gens)
 
-        elif self.type == 'REF':
+        if self.type == 'REF':
+            assert self.level > 0
+
             tp = self.children[0]._type(syms)
+            return Reference(tp, self.level)
 
-            if self.level > 0:
-                tp = Reference(tp, self.level)
-
-            return tp
-
-        elif self.type == 'ARRAY':
+        if self.type == 'ARRAY':
             tp = self.children[0]._type(syms)
 
             if self.children[1].type != 'EMPTY':
@@ -203,8 +221,14 @@ class Node:
 
             return Array(tp)
 
+        assert False, 'unknown AST node type'
+
     @error
-    def _resolve_overload(self, refs, args, ret, required=False):
+    def _resolve_overload(self,
+                          refs: Set[Function],
+                          args: List[Type],
+                          ret: Type,
+                          required: bool = False) -> None:
         if self.match is not None:
             return
 
@@ -231,7 +255,7 @@ class Node:
         self.match = match
 
     @error
-    def _analyze_declare(self):
+    def _analyze_declare(self) -> None:
         # structs must be declared first for recursive definition
         for c in self.children:
             if c.type == 'STRUCT':
@@ -244,7 +268,7 @@ class Node:
                 c._define(self.module)
 
     @error
-    def _analyze_acquire(self, syms, refs):
+    def _analyze_acquire(self, syms: SymbolTable, refs: Set[Function]) -> None:
         # symbol table
         if self.type == 'DEF':
             syms = self.function
@@ -262,8 +286,11 @@ class Node:
 
         # expr type
         if self.type == 'VAR':
-            self.sym = syms.get(self.value, Symbol.Variable, Symbol.Constant)
-            self.expr_type = self.sym.var_type()
+            sym = syms.get(self.value, Variable, Constant)
+            assert isinstance(sym, (Variable, Constant))
+
+            self.variable = sym
+            self.expr_type = self.variable.var_type()
 
         elif self.type == 'NUM':
             self.expr_type = Construct(symbols.INT)
@@ -300,11 +327,19 @@ class Node:
             ret = symbols.to_level(self.args[0], 0)
             self._resolve_overload(refs, self.args, ret)
 
+        elif self.type == 'CAST':
+            self.expr_type = self.children[1]._type(syms)
+            self.matches = syms.overloads('cast')
+
+            self.args = [self.children[0].expr_type]
+            self._resolve_overload(refs, self.args, self.expr_type, True)
+
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 0)
 
             if not isinstance(tp, Construct):
                 self._error('member access requires struct type')
+                assert False
 
             self.field = tp.member(self.value)
             self.expr_type = self.field.var_type()
@@ -313,7 +348,7 @@ class Node:
             self.expr_type = self.children[-1].expr_type
 
         elif self.type == 'IF':
-            tps = [c.expr_type for c in self.children[1:]]
+            tps = {c.expr_type for c in self.children[1:]}
             self.expr_type = symbols.interpolate_types(tps, {})
 
         elif self.type == 'LET':
@@ -333,7 +368,7 @@ class Node:
 
                 tp = symbols.to_level(tp, self.level)
 
-            self.sym = syms.add_variable(name, tp)
+            self.variable = syms.add_variable(name, tp)
             self.expr_type = symbols.VOID
 
         elif self.type == 'WHILE':
@@ -350,13 +385,13 @@ class Node:
             self.expr_type = symbols.DIVERGE
 
     @error
-    def _analyze_expect(self, refs, stack):
+    def _analyze_expect(self, refs: Set[Function], stack: StackNode) -> None:
         self.stack_start = stack
         self.stack_next = stack
 
         if self.type == 'TEST':
             for c in self.children:
-                c._expect_type(symbols.BOOL)
+                c._expect_type(Construct(symbols.BOOL))
 
         elif self.type == 'ASSN':
             tp = symbols.to_level(self.children[0].expr_type, self.level + 1)
@@ -366,13 +401,12 @@ class Node:
             self.children[1]._expect_type(tp)
 
         elif self.type == 'CALL':
-            self.args = [c.expr_type for c in self.children]
             self._resolve_overload(refs, self.args, self.target_type, True)
 
-            if self.match.source.TYPE == Symbol.Function:
+            if isinstance(self.match.source, Function):
                 # record usage for ref generation
                 refs.add(self.match.source)
-            elif self.match.source.TYPE == Symbol.Struct:
+            elif isinstance(self.match.source, Struct):
                 pass
             else:
                 assert False
@@ -382,15 +416,26 @@ class Node:
                 c._expect_type(p)
 
         elif self.type == 'INC_ASSN':
-            self.args = [c.expr_type for c in self.children]
             ret = symbols.to_level(self.args[0], 0)
             self._resolve_overload(refs, self.args, ret, True)
 
-            refs.add(self.match.function)
+            if not isinstance(self.match.source, Function):
+                self._error('why is it not a function...')
+                assert False
+
+            refs.add(self.match.source)
 
             tp = symbols.to_level(self.match.params[0], 1)
             self.children[0]._expect_type(tp)
             self.children[1]._expect_type(self.match.params[1])
+
+        elif self.type == 'CAST':
+            if not isinstance(self.match.source, Function):
+                self._error('how is casting not a function?')
+                assert False
+
+            refs.add(self.match.source)
+            self.children[0]._expect_type(self.match.params[0])
 
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 1)
@@ -411,7 +456,7 @@ class Node:
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
-            self.children[0]._expect_type(symbols.BOOL)
+            self.children[0]._expect_type(Construct(symbols.BOOL))
 
             self.expr_type = self.target_type
 
@@ -421,7 +466,7 @@ class Node:
         elif self.type == 'WHILE':
             self.expr_type = self.target_type
 
-            self.children[0]._expect_type(symbols.BOOL)
+            self.children[0]._expect_type(Construct(symbols.BOOL))
             self.children[1]._expect_type(symbols.VOID)
             self.children[2]._expect_type(self.expr_type)
 
@@ -435,21 +480,21 @@ class Node:
 
         elif self.type == 'LET':
             if self.children[1].type != 'EMPTY':
-                if isinstance(self.sym.type, Reference):
-                    lvl = self.sym.type.level
+                if isinstance(self.variable.type, Reference):
+                    lvl = self.variable.type.level
                 else:
                     lvl = 0
 
                 if lvl != self.level:
                     self._error('initialization level mismatch')
 
-                self.children[1]._expect_type(self.sym.type)
+                self.children[1]._expect_type(self.variable.type)
 
-            self.stack_next = (self.sym.type, stack)
+            self.stack_next = StackNode(self.variable.type, stack)
 
         if self.target_type is not None \
                 and self.target_type != symbols.VOID:
-            self.stack_next = (self.target_type, stack)
+            self.stack_next = StackNode(self.target_type, stack)
 
         # recurse
         if self.type in ['IF', 'WHILE', 'TEST']:
@@ -463,7 +508,7 @@ class Node:
             self.children[0]._analyze_expect(refs, stack)
 
             # the ref is duplicated on the stack and loaded
-            stack = (self.match.params[0], self.children[0].stack_next)
+            stack = StackNode(self.match.params[0], self.children[0].stack_next)
 
             self.children[1]._analyze_expect(refs, stack)
 
@@ -474,10 +519,3 @@ class Node:
                 stack = c.stack_next
 
             self.stack_end = stack
-
-
-def format_list(l):
-    if l is None:
-        return ''
-
-    return '{} {}'.format(format_list(l[1]), l[0])

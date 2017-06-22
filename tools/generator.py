@@ -1,20 +1,23 @@
-from symbols import Location, Symbol, Reference
+from typing import Any, Dict, Set
+from io import TextIOBase
+from symbols import Location, Reference, Constant, Function, Struct, Type, \
+    Match, Construct
 import symbols
+from node import Node, StackNode
 
 class Generator:
-    def __init__(self):
-        self._gens = {}
-        for attr in dir(self):
-            if attr[0] == '_' and attr[1].isupper():
-                self._gens[attr[1:]] = getattr(self, attr)
+    def __init__(self) -> None:
+        self._labels: Dict[str, int] = {}
+        self.module_name: str = None
+        self.refs: Set[Function] = None
+        self.out: TextIOBase = None
+        self.indent: int = None
 
-        self._labels = {}
-        self.module_name = None
-        self.refs = None
-        self.out = None
-        self.indent = None
-
-    def generate(self, tree, name, refs, out):
+    def generate(self,
+                 tree: Node,
+                 name: str,
+                 refs: Set[Function],
+                 out: TextIOBase) -> None:
         self.module_name = name
         self.refs = refs
         self.out = out
@@ -22,22 +25,22 @@ class Generator:
         self.indent = 0
         self._gen(tree)
 
-    def _write(self, *args):
+    def _write(self, *args: Any) -> None:
         self.out.write('  ' * self.indent
                        + ' '.join(str(a) for a in args)
                        + '\n')
 
-    def _gen(self, node):
+    def _gen(self, node: Node) -> None:
         self._write('# {}'.format(node))
 
         self.indent += 1
 
-        self._gens[node.type](node)
+        getattr(self, '_' + node.type)(node)
         self._cast(node.expr_type, node.target_type)
 
         self.indent -= 1
 
-    def _cast(self, tp, tar):
+    def _cast(self, tp: Type, tar: Type) -> None:
         # diverge will never return so we can ignore casting
         if tp is None or tp == symbols.DIVERGE:
             return
@@ -60,112 +63,122 @@ class Generator:
             return
 
         lvl = tp.level
-        tar = symbols.to_ref(tar).level
+        tar_lvl = symbols.to_ref(tar).level
 
-        while lvl > tar:
+        while lvl > tar_lvl:
             lvl -= 1
             tp = symbols.to_level(tp, lvl)
             self._write('load', tp.size())
 
-    def _pop_size(self, stack, target):
+    def _pop_size(self, stack: StackNode, target: StackNode) -> int:
         size = 0
         while stack is not target:
             assert stack is not None, 'cannot match stack'
 
-            tp_size = stack[0].size()
+            tp_size = stack.type.size()
 
             assert tp_size > 0
             size += tp_size
-            stack = stack[1]
+            stack = stack.next
 
         return size
 
-    def _exit(self, stack, target):
+    def _exit(self, stack: StackNode, target: StackNode) -> None:
         amount = self._pop_size(stack, target)
         if amount > 0:
             self._write('pop', amount)
 
-    def _reduce(self, stack, target):
-        assert symbols.match_type(target[0], stack[0], {})
+    def _reduce(self, stack: StackNode, target: StackNode) -> None:
+        assert symbols.match_type(target.type, stack.type, {})
 
-        size = stack[0].size()
-        amount = self._pop_size(stack[1], target[1])
+        size = stack.type.size()
+        amount = self._pop_size(stack.next, target.next)
 
         assert size > 0
         if amount > 0:
             self._write('reduce', size, amount)
 
-    def _label(self, name):
+    def _label(self, name: str) -> str:
         count = self._labels[name] if name in self._labels else 0
         self._labels[name] = count + 1
         return '{}_{}'.format(name, count)
 
-    def _call(self, node):
+    def _call(self, match: Match) -> None:
+        assert isinstance(match.source, Function)
+
+        fn: Function = match.source
+
         # user-defined function
-        if node.match.source.module().name != '':
-            arg_size = sum(p.size() for p in node.match.params)
-            self._write('call', node.match.source.fullpath(), arg_size)
+        if fn.module().name != '':
+            arg_size = sum(p.size() for p in match.params)
+            self._write('call', fn.fullpath(), arg_size)
             return
 
-        if node.value == 'alloc':
-            size = node.match.gens['T'].size()
+        if fn.name == 'alloc':
+            size = match.gens['T'].size()
             self._write('const_i', size)
 
-            if len(node.children) > 0:
+            if len(fn.params) > 0:
                 self._write('mult_i')
 
             self._write('alloc')
             return
 
-        if node.value == 'dealloc':
+        if fn.name == 'dealloc':
             self._write('dealloc')
             return
 
-        if node.value == 'realloc':
-            size = node.match.gens['T'].size()
-            self._write('const_i', size)
+        if fn.name == 'realloc':
+            tp = match.gens['T']
+            self._write('const_i', tp.size())
             self._write('mult_i')
             self._write('realloc')
             return
 
-        if node.value == 'subscript':
-            tp = symbols.to_level(node.expr_type, node.expr_type.level - 1)
+        if fn.name == 'subscript':
+            tp = match.gens['T']
             self._write('addr_offset', tp.size())
             return
 
-        if node.value == 'pos':
+        if fn.name == 'cast':
+            frm = match.params[0].fullname()[0].lower()
+            tar = match.ret.fullname()[0].lower()
+            self._write('cast_{}_{}'.format(frm, tar))
+            return
+
+        if fn.name == 'pos':
             raise NotImplementedError('unary + not implemented')
-        elif node.value == 'neg':
+        elif fn.name == 'neg':
             op = 'neg'
-        elif node.value == 'less':
+        elif fn.name == 'less':
             op = 'lt'
-        elif node.value == 'greater':
+        elif fn.name == 'greater':
             op = 'gt'
-        elif node.value == 'lessEqual':
+        elif fn.name == 'lessEqual':
             op = 'le'
-        elif node.value == 'greaterEqual':
+        elif fn.name == 'greaterEqual':
             op = 'ge'
-        elif node.value == 'equal':
+        elif fn.name == 'equal':
             op = 'eq'
-        elif node.value == 'notEqual':
+        elif fn.name == 'notEqual':
             op = 'ne'
-        elif node.value == 'plus':
+        elif fn.name == 'plus':
             op = 'add'
-        elif node.value == 'minus':
+        elif fn.name == 'minus':
             op = 'sub'
-        elif node.value == 'multiplies':
+        elif fn.name == 'multiplies':
             op = 'mult'
-        elif node.value == 'divides':
+        elif fn.name == 'divides':
             op = 'div'
-        elif node.value == 'modulus':
+        elif fn.name == 'modulus':
             op = 'mod'
         else:
-            assert False, 'unknown operator {}'.format(node.value)
+            assert False, 'unknown operator {}'.format(fn.name)
 
-        tp = node.children[0].target_type.fullname()[0].lower()
-        self._write('{}_{}'.format(op, tp))
+        name = match.params[0].fullname()[0].lower()
+        self._write('{}_{}'.format(op, name))
 
-    def _FILE(self, node):
+    def _FILE(self, node: Node) -> None:
         ref_list = []
         for ref in self.refs:
             mod = ref.module()
@@ -198,11 +211,11 @@ class Generator:
                 self._gen(c)
                 self._write('')
 
-    def _IMPORT(self, node):
+    def _IMPORT(self, node: Node) -> None:
         # TODO
         assert False
 
-    def _DEF(self, node):
+    def _DEF(self, node: Node) -> None:
         end = 'END_FN_' + node.function.fullname()
 
         self._write('function', node.function.fullname(), end)
@@ -216,7 +229,7 @@ class Generator:
         self._write(end + ':')
         self._write('')
 
-    def _BLOCK(self, node):
+    def _BLOCK(self, node: Node) -> None:
         for c in node.children:
             self._gen(c)
             self._write('')
@@ -226,16 +239,16 @@ class Generator:
         else:
             self._reduce(node.stack_end, node.parent.stack_end)
 
-    def _EMPTY(self, node):
+    def _EMPTY(self, node: Node) -> None:
         pass
 
-    def _LET(self, node):
+    def _LET(self, node: Node) -> None:
         if node.children[1].type == 'EMPTY':
-            self._write('push', node.sym.type.size())
+            self._write('push', node.variable.type.size())
         else:
             self._gen(node.children[1])
 
-    def _IF(self, node):
+    def _IF(self, node: Node) -> None:
         els = self._label('ELSE')
         end = self._label('END_IF')
         has_else = node.children[2].type != 'EMPTY'
@@ -249,7 +262,7 @@ class Generator:
             self._gen(node.children[2])
         self._write(end + ':')
 
-    def _WHILE(self, node):
+    def _WHILE(self, node: Node) -> None:
         start = self._label('WHILE')
         cond = self._label('COND')
         end = self._label('END_WHILE')
@@ -269,7 +282,7 @@ class Generator:
         self._gen(node.children[2]) # else
         self._write(end + ':')
 
-    def _BREAK(self, node):
+    def _BREAK(self, node: Node) -> None:
         tar = node.ancestor('WHILE')
 
         self._gen(node.children[0])
@@ -281,17 +294,17 @@ class Generator:
 
         self._write('br', tar.context['break'])
 
-    def _CONTINUE(self, node):
+    def _CONTINUE(self, node: Node) -> None:
         tar = node.ancestor('WHILE')
         self._exit(node.stack_end, tar.stack_start)
         self._write('br', tar.context['continue'])
 
-    def _REDO(self, node):
+    def _REDO(self, node: Node) -> None:
         tar = node.ancestor('WHILE')
         self._exit(node.stack_end, tar.stack_start)
         self._write('br', tar.context['redo'])
 
-    def _RETURN(self, node):
+    def _RETURN(self, node: Node) -> None:
         tar = node.ancestor('DEF')
 
         self._gen(node.children[0])
@@ -303,7 +316,7 @@ class Generator:
             self._reduce(node.stack_end, tar.stack_end)
             self._write('return_val', node.children[0].target_type.size())
 
-    def _TEST(self, node):
+    def _TEST(self, node: Node) -> None:
         if node.value == 'NOT':
             self._gen(node.children[0])
             self._write('not')
@@ -330,25 +343,25 @@ class Generator:
 
         self._write(end + ':')
 
-    def _ASSN(self, node):
+    def _ASSN(self, node: Node) -> None:
         self._gen(node.children[0])
         self._gen(node.children[1])
 
         size = node.children[1].target_type.size()
         self._write('store', size)
 
-    def _CALL(self, node):
+    def _CALL(self, node: Node) -> None:
         for c in node.children:
             self._gen(c)
 
-        if node.match.source.TYPE == Symbol.Function:
-            self._call(node)
-        elif node.match.source.TYPE == Symbol.Struct:
+        if isinstance(node.match.source, Function):
+            self._call(node.match)
+        elif isinstance(node.match.source, Struct):
             pass # struct construction
         else:
             assert False
 
-    def _INC_ASSN(self, node):
+    def _INC_ASSN(self, node) -> None:
         # left
         self._gen(node.children[0])
         self._write('dup', node.children[0].target_type.size())
@@ -358,44 +371,52 @@ class Generator:
         self._gen(node.children[1])
 
         # call
-        self._call(node)
+        self._call(node.match)
 
         # assn
         ret = symbols.to_level(node.children[0].target_type, 0)
         self._cast(node.match.ret, ret)
         self._write('store', ret.size())
 
-    def _MEMBER(self, node):
+    def _CAST(self, node: Node) -> None:
+        self._gen(node.children[0])
+        self._call(node.match)
+
+    def _MEMBER(self, node: Node) -> None:
         self._gen(node.children[0])
 
         self._write('offset', node.field.offset)
 
-    def _NUM(self, node):
+    def _NUM(self, node: Node) -> None:
         self._write('const_i', node.value)
 
-    def _FLOAT(self, node):
+    def _FLOAT(self, node: Node) -> None:
         self._write('const_f', node.value)
 
-    def _VAR(self, node):
-        if node.sym.TYPE == Symbol.Constant:
-            if node.sym.type == symbols.BOOL:
-                if node.sym.value:
+    def _VAR(self, node: Node) -> None:
+        if isinstance(node.variable, Constant):
+            cons = node.variable.type
+            if not isinstance(cons, Construct):
+                raise NotADirectoryError()
+
+            if cons.struct == symbols.BOOL:
+                if node.variable.value:
                     self._write('const_true')
                 else:
                     self._write('const_false')
             else:
                 raise NotImplementedError()
 
-        elif node.sym.location == Location.Global:
-            # self._write('addr_glob', node.sym.offset)
+        elif node.variable.location == Location.Global:
+            # self._write('addr_glob', node.variable.offset)
             raise NotImplementedError()
 
-        elif node.sym.location == Location.Param:
+        elif node.variable.location == Location.Param:
             self._write('addr_frame',
-                        node.sym.offset)
+                        node.variable.offset)
 
-        elif node.sym.location == Location.Local:
-            self._write('addr_frame', node.sym.offset)
+        elif node.variable.location == Location.Local:
+            self._write('addr_frame', node.variable.offset)
 
         else:
             assert False

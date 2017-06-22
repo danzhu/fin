@@ -24,7 +24,7 @@ namespace Fin
 
         T &at(uint32_t idx)
         {
-            if (idx < 0 || idx >= _size)
+            if (idx >= _size)
                 throw std::range_error{"out of range"};
             return _content[idx];
         }

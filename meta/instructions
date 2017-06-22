@@ -174,3 +174,9 @@ gt_f
 ge_f
     Pop two values from stack and push the boolean representing if greater than
     or equal to.
+
+cast_i_f
+    Convert int to float.
+
+cast_f_i
+    Convert float to int.

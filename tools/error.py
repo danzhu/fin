@@ -1,9 +1,11 @@
+from tokens import Token
+
 class CompilerError(Exception):
-    def __init__(self, msg, token):
+    def __init__(self, msg: str, token: Token) -> None:
         super().__init__(msg)
         self.token = token
 
-    def __str__(self):
+    def __str__(self) -> str:
         val = super().__str__()
         if self.token is not None:
             val += '\n  at line {}, column {}:'.format(

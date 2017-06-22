@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from typing import List
 import heapq
 
 HEADER = """# Fin Instruction Set"""
@@ -14,7 +15,7 @@ FORMAT = """
 {ins.comment}"""
 
 class Instr:
-    def __init__(self, line, alloc):
+    def __init__(self, line: str, alloc: 'Allocator') -> None:
         segs = line.split(' ')
         name = segs[0].split('=')
 
@@ -27,7 +28,7 @@ class Instr:
         self.params = [Param(param) for param in segs[1:]]
         self.comment = ''
 
-    def format(self):
+    def format(self) -> str:
         val = self.opname
         for p in self.params:
             val += ' ' + p.format()
@@ -35,41 +36,46 @@ class Instr:
 
 
 class Param:
-    def __init__(self, val):
+    def __init__(self, val: str) -> None:
         segs = val.split(':')
 
         self.name = segs[0]
         self.type = segs[1]
 
-    def format(self):
+    def format(self) -> str:
         return '{}:{}'.format(self.name, self.type)
 
 
 class Allocator:
-    def __init__(self, size):
+    def __init__(self, size: int) -> None:
         self.at = 0
-        self.removed = []
+        self.size = size
+        self.removed: List[int] = []
 
-    def next(self):
+    def next(self) -> int:
         while len(self.removed) > 0 and self.at == self.removed[0]:
             self.at += 1
             heapq.heappop(self.removed)
+
+        if self.at >= self.size:
+            raise ValueError('exceeding maximum instruction count')
+
         val = self.at
         self.at += 1
         return val
 
-    def remove(self, val):
+    def remove(self, val: int) -> None:
         if val < self.at or val in self.removed:
             raise ValueError('already used value')
         heapq.heappush(self.removed, val)
 
 
-def load(source='meta/instructions'):
+def load(source: str = 'meta/instructions') -> List[Instr]:
     # available enum values
     alloc = Allocator(256)
     instrs = []
 
-    instr = None
+    instr: Instr = None
     with open(source) as f:
         for line in f:
             # empty line
@@ -77,7 +83,7 @@ def load(source='meta/instructions'):
                 continue
 
             # comment
-            if line[0] == ' ':
+            if line[0] == ' ' and instr is not None:
                 instr.comment += line.lstrip()
                 continue
 
@@ -86,7 +92,7 @@ def load(source='meta/instructions'):
 
     return instrs
 
-def main():
+def main() -> None:
     instrs = load()
 
     print(HEADER)

@@ -459,6 +459,14 @@ void Fin::Runtime::execute()
             case Opcode::GeF:
                 binaryOp<std::greater_equal<float>>();
                 continue;
+
+            case Opcode::CastIF:
+                opStack.push(static_cast<float>(opStack.pop<int32_t>()));
+                continue;
+
+            case Opcode::CastFI:
+                opStack.push(static_cast<int32_t>(opStack.pop<float>()));
+                continue;
         }
 
         throw std::runtime_error{"invalid opcode "

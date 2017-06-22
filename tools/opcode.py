@@ -21,7 +21,7 @@ namespace Fin
 
 #endif"""
 
-def main():
+def main() -> None:
     opcodes = sorted((ins.opcode, ins.opname) for ins in instr.load())
 
     print(FORMAT.format(opcodes=',\n'.join(

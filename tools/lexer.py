@@ -1,37 +1,21 @@
+from typing import Dict, Iterable
 import string
 from error import LexerError
+from tokens import Token
 
 class State:
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
-        self.transitions = {}
+        self.transitions: Dict[str, State] = {}
 
         self.accept = self.name[0].isupper()
 
 
-class Token:
-    def __init__(self, tp, src, line, col=0, val=None, var=None):
-        self.type = tp
-        self.src = src
-        self.line = line
-        self.column = col
-        self.value = val
-        self.variant = var
-
-    def __str__(self):
-        s = self.type
-        if self.variant:
-            s += ' [' + self.variant + ']'
-        if self.value:
-            s += ' ' + self.value
-        return s
-
-
 class Lexer:
-    def __init__(self, syn):
-        self.states = {}
-        self.types = {}
-        self.keywords = {}
+    def __init__(self, syn: Iterable[str]) -> None:
+        self.states: Dict[str, State] = {}
+        self.types: Dict[str, str] = {}
+        self.keywords: Dict[str, str] = {}
 
         for line in syn:
             segs = line[:-1].split(' ')
@@ -48,21 +32,21 @@ class Lexer:
 
         self.start = self.states['start']
 
-        self.ind_amount = None
+        self.ind_amount: int = None
 
-    def _expand(self, trans):
+    def _expand(self, trans: str) -> str:
         return trans.replace('[ALPHA]', string.ascii_letters) \
                 .replace('[NUM]', string.digits) \
                 .replace('[SPACE]', string.whitespace) \
                 .replace('[LF]', '\n') \
                 .replace('[ANY]', ''.join(map(chr, range(128))))
 
-    def _state(self, name):
+    def _state(self, name: str) -> State:
         if name not in self.states:
             self.states[name] = State(name)
         return self.states[name]
 
-    def read(self, src):
+    def read(self, src: Iterable[str]) -> Iterable[Token]:
         self.ind_amount = None
         indent = 0
         ln = 0
@@ -138,8 +122,9 @@ class Lexer:
                 val = line[start:end]
 
                 if not state.accept:
-                    raise LexerError("invalid token '{}'".format(val),
-                                     Token(state.name, line, ln, start + 1, val))
+                    raise LexerError(
+                        "invalid token '{}'".format(val),
+                        Token(state.name, line, ln, start + 1, val))
 
                 if val in self.keywords:
                     tp = self.keywords[val]
