@@ -42,40 +42,33 @@ SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
 # files
+set(PY "${PROJECT_SOURCE_DIR}/py")
 file(GLOB SOURCES "src/*.cc")
 file(GLOB HEADERS "src/*.h")
-file(GLOB TOOLS "tools/*.py")
+file(GLOB FINC "${PY}/finc/*.py")
 
 # custom commands
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_custom_command(
     OUTPUT opcode.h
-    DEPENDS meta/instructions tools/opcode.py
-    COMMAND tools/opcode.py > "${CMAKE_CURRENT_BINARY_DIR}/opcode.h"
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    )
+    DEPENDS "${PY}/instructions" "${PY}/instr.py" "${PY}/opcode.py"
+    COMMAND "${PY}/opcode.py" > opcode.h)
 
 add_custom_command(
     OUTPUT opcode.cc
-    DEPENDS meta/instructions tools/opcode.py tools/opname.py
-    COMMAND tools/opname.py > "${CMAKE_CURRENT_BINARY_DIR}/opcode.cc"
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    )
+    DEPENDS "${PY}/instructions" "${PY}/instr.py" "${PY}/opname.py"
+    COMMAND "${PY}/opname.py" > opcode.cc)
 
 add_custom_command(
     OUTPUT instructions.md
-    DEPENDS meta/instructions tools/instr.py
-    COMMAND tools/instr.py > "${CMAKE_CURRENT_BINARY_DIR}/instructions.md"
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    )
+    DEPENDS "${PY}/instructions" "${PY}/instr.py"
+    COMMAND "${PY}/instr.py" > instructions.md)
 
 add_custom_command(
     OUTPUT test.fm
-    DEPENDS test.fin ${TOOLS}
-    COMMAND tools/compiler.py test.fin -o "${CMAKE_CURRENT_BINARY_DIR}/test.fm"
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    )
+    DEPENDS test.fin "${PY}/compiler.py" "${PY}/asm.py" ${FINC}
+    COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test.fin" -o test.fm)
 
 # targets
 add_executable(fin ${SOURCES} ${HEADERS} opcode.h opcode.cc)
@@ -83,7 +76,7 @@ add_executable(fin ${SOURCES} ${HEADERS} opcode.h opcode.cc)
 add_custom_target(doc DEPENDS instructions.md)
 
 add_custom_target(run
-    COMMAND fin ${CMAKE_CURRENT_BINARY_DIR}/test.fm
+    COMMAND fin test.fm
     DEPENDS test.fm)
 
 # tests
@@ -92,8 +85,8 @@ enable_testing()
 # macro for testing compilation process
 macro(test_compile name)
     add_test(NAME ${name}
-        COMMAND python tools/compiler.py "${PROJECT_SOURCE_DIR}/test/${name}.fin"
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+        COMMAND python "${PY}/compiler.py"
+            "${PROJECT_SOURCE_DIR}/test/${name}.fin")
 
     if(${ARGC} GREATER 1)
         set_tests_properties(${name} PROPERTIES
@@ -117,9 +110,6 @@ test_compile("void_var" "cannot create variable of type Void")
 test_compile("args_unmatched" "no viable function overload")
 test_compile("no_symbol" "cannot find symbol 'i'")
 test_compile("unsized_array" "array is unsized")
-
-add_test(NAME source_type_check COMMAND mypy ${TOOLS})
-add_test(NAME source_format_check COMMAND pylint ${TOOLS})
 
 # options
 option(DEBUG "Enable debug messages" 0)

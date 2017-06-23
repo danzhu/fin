@@ -1,9 +1,10 @@
 from typing import Any, Dict, Set
 from io import TextIOBase
-from symbols import Location, Reference, Constant, Function, Struct, Type, \
+from .symbols import Location, Reference, Constant, Function, Struct, Type, \
     Match, Construct
-import symbols
-from node import Node, StackNode
+from . import symbols
+from .node import Node, StackNode
+
 
 class Generator:
     def __init__(self) -> None:
@@ -26,9 +27,9 @@ class Generator:
         self._gen(tree)
 
     def _write(self, *args: Any) -> None:
-        self.out.write('  ' * self.indent
-                       + ' '.join(str(a) for a in args)
-                       + '\n')
+        self.out.write('  ' * self.indent +
+                       ' '.join(str(a) for a in args) +
+                       '\n')
 
     def _gen(self, node: Node) -> None:
         self._write(f'# {node}')
@@ -253,7 +254,7 @@ class Generator:
         end = self._label('END_IF')
         has_else = node.children[2].type != 'EMPTY'
 
-        self._gen(node.children[0]) # comp
+        self._gen(node.children[0])  # comp
         self._write('br_false', els if has_else else end)
         self._gen(node.children[1])
         if has_else:
@@ -271,15 +272,15 @@ class Generator:
             'break': end,
             'continue': cond,
             'redo': start
-            }
+        }
 
         self._write('br', cond)
         self._write(start + ':')
         self._gen(node.children[1])
         self._write(cond + ':')
-        self._gen(node.children[0]) # comp
+        self._gen(node.children[0])  # comp
         self._write('br_true', start)
-        self._gen(node.children[2]) # else
+        self._gen(node.children[2])  # else
         self._write(end + ':')
 
     def _BREAK(self, node: Node) -> None:
@@ -357,7 +358,7 @@ class Generator:
         if isinstance(node.match.source, Function):
             self._call(node.match)
         elif isinstance(node.match.source, Struct):
-            pass # struct construction
+            pass  # struct construction
         else:
             assert False
 

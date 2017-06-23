@@ -1,7 +1,8 @@
 from typing import Iterable, Iterator, List
-from tokens import Token
-from node import Node
-from error import ParserError
+from .tokens import Token
+from .node import Node
+from .error import ParserError
+
 
 class Parser:
     def __init__(self) -> None:
@@ -113,7 +114,7 @@ class Parser:
         while self._lookahead.type != 'DEDENT':
             children.append(self._field())
 
-        self._next() # DEDENT
+        self._next()  # DEDENT
 
         return Node('FIELDS', None, children)
 
@@ -268,7 +269,7 @@ class Parser:
             return Node('REF', token, (node,), None, lvl)
 
         if self._lookahead.type == 'LBRACKET':
-            self._next() # LBRACKET
+            self._next()  # LBRACKET
             node = self._type()
 
             if self._lookahead.type == 'SEMICOLON':
@@ -321,7 +322,7 @@ class Parser:
         if self._lookahead.type == 'INC_ASSN':
             token = self._lookahead
             op = self._lookahead.variant.split('_', 1)[0].lower()
-            self._next() # INC_ASSN
+            self._next()  # INC_ASSN
             val = self._test()
             return Node('INC_ASSN', token, (node, val), op)
 
@@ -426,7 +427,7 @@ class Parser:
 
         while True:
             if self._lookahead.type == 'DOT':
-                self._next() # DOT
+                self._next()  # DOT
                 token = self._lookahead
                 name = self._name()
 
@@ -440,7 +441,7 @@ class Parser:
 
             elif self._lookahead.type == 'LBRACKET':
                 token = self._lookahead
-                self._next() # LBRACKET
+                self._next()  # LBRACKET
                 idx = self._test()
                 self._expect('RBRACKET')
                 node = Node('CALL', token, (node, idx), 'subscript')
@@ -455,7 +456,6 @@ class Parser:
                 break
 
         return node
-
 
     def _atom(self) -> Node:
         if self._lookahead.type == 'ID':

@@ -21,6 +21,7 @@ namespace Fin
 
 #endif"""
 
+
 def main() -> None:
     opcodes = sorted((ins.opcode, ins.opname) for ins in instr.load())
 
@@ -29,6 +30,7 @@ def main() -> None:
             ''.join(s.title() for s in e[1].split('_')),
             hex(e[0]))
         for e in opcodes)))
+
 
 if __name__ == '__main__':
     main()

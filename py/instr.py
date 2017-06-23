@@ -2,6 +2,7 @@
 
 from typing import List
 import heapq
+import os
 
 HEADER = """# Fin Instruction Set"""
 
@@ -13,6 +14,7 @@ FORMAT = """
 **Format**: `{format}`
 
 {ins.comment}"""
+
 
 class Instr:
     def __init__(self, line: str, alloc: 'Allocator') -> None:
@@ -70,7 +72,10 @@ class Allocator:
         heapq.heappush(self.removed, val)
 
 
-def load(source: str = 'meta/instructions') -> List[Instr]:
+def load() -> List[Instr]:
+    loc = os.path.dirname(os.path.realpath(__file__))
+    source = os.path.join(loc, 'instructions')
+
     # available enum values
     alloc = Allocator(256)
     instrs = []
@@ -92,16 +97,15 @@ def load(source: str = 'meta/instructions') -> List[Instr]:
 
     return instrs
 
+
 def main() -> None:
     instrs = load()
 
     print(HEADER)
 
     for ins in instrs:
-        print(FORMAT.format(
-            ins=ins,
-            format=ins.format()
-            ), end='')
+        print(FORMAT.format(ins=ins, format=ins.format()), end='')
+
 
 if __name__ == '__main__':
     main()

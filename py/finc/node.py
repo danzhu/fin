@@ -1,9 +1,10 @@
 from typing import Sequence, Set, List, Dict, Union
-from tokens import Token
-import symbols
-from symbols import Module, Function, Struct, Block, Type, Reference, Array, \
+from .tokens import Token
+from . import symbols
+from .symbols import Module, Function, Struct, Block, Type, Reference, Array, \
     Construct, Special, Match, SymbolTable, Variable, Constant, Generic
-from error import AnalyzerError
+from .error import AnalyzerError
+
 
 def error(fn):
     def dec(self: 'Node', *args, **kargs):
@@ -15,6 +16,7 @@ def error(fn):
         return ret
 
     return dec
+
 
 class StackNode:
     def __init__(self, tp: Type, nxt: 'StackNode') -> None:
@@ -235,8 +237,8 @@ class Node:
             if not required:
                 return
 
-            self._error('cannot resolve function overload between\n'
-                        + '\n'.join('    ' + str(fn) for fn in self.matches))
+            self._error('cannot resolve function overload between\n' +
+                        '\n'.join('    ' + str(fn) for fn in self.matches))
 
         match = next(iter(self.matches))
 
@@ -255,8 +257,8 @@ class Node:
             if c.type == 'STRUCT':
                 c._declare(self.module)
 
-        # define structs and declare functions next so they can be used anywhere
-        # in functions
+        # define structs and declare functions next so they can be used
+        # anywhere in functions
         for c in self.children:
             if c.type in ['DEF', 'STRUCT']:
                 c._define(self.module)
@@ -368,7 +370,7 @@ class Node:
         elif self.type == 'WHILE':
             bks = self.children[1].decedents('BREAK')
             tps = {node.children[0].expr_type for node in bks}
-            tps.add(self.children[2].expr_type) # else
+            tps.add(self.children[2].expr_type)  # else
 
             self.expr_type = symbols.interpolate_types(tps, {})
 
@@ -502,7 +504,8 @@ class Node:
             self.children[0]._analyze_expect(refs, stack)
 
             # the ref is duplicated on the stack and loaded
-            stack = StackNode(self.match.params[0], self.children[0].stack_next)
+            stack = StackNode(self.match.params[0],
+                              self.children[0].stack_next)
 
             self.children[1]._analyze_expect(refs, stack)
 

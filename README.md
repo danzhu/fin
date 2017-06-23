@@ -6,7 +6,7 @@ operations for efficiency in both development and runtime.
 
 In short, it's "just another programming language" :)
 
-## Compilation
+## Runtime
 
 Requires CMake, a C++14 compiler, and Python 3.6. To build the runtime:
 
@@ -24,6 +24,24 @@ cmake --build . --target run
 
 To enable debug logging in runtime, pass `-DDEBUG=[level]` to CMake when
 configuring, where `[level]` is the level of details for the log messages.
+
+## Compiler
+
+Basic usage:
+
+```sh
+py/compiler.py [-o <output>] [-s <stage>] input
+```
+
+Where `<stage>` can be one of `lex`, `parse`, `ast`, `asm`, `exec`, which will
+print the intermediate info to stdout (except `exec` which only writes to output
+file).
+
+Example:
+
+```sh
+py/compiler.py test.fin -o test.fm
+```
 
 ## Inspiration
 

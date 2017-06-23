@@ -6,6 +6,7 @@ import argparse
 import struct
 import instr
 
+
 class Token:
     size: int
 
@@ -17,6 +18,7 @@ class Token:
               syms: Dict[str, int],
               refs: Dict[str, int]) -> None:
         raise NotImplementedError()
+
 
 class Bytes(Token):
     def __init__(self, val: bytes) -> None:
@@ -168,6 +170,7 @@ class Assembler:
 def encode(fmt: str, val: Any) -> bytes:
     return struct.pack('<' + fmt, val)
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description='Fin assembler.')
     parser.add_argument('src', type=argparse.FileType(), metavar='input',
@@ -179,6 +182,7 @@ def main() -> None:
 
     asm = Assembler()
     asm.assemble(args.src, args.out)
+
 
 if __name__ == '__main__':
     main()

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 
 from typing import Set, Iterable, cast
-import sys
 import argparse
 import io
-from lexer import Lexer
-from parse import Parser
-from generator import Generator
+import sys
 from asm import Assembler
-import symbols
-from error import CompilerError
+from finc import symbols
+from finc.error import CompilerError
+from finc.generator import Generator
+from finc.lexer import Lexer
+from finc.parse import Parser
+
 
 class Compiler:
-    def __init__(self, lex: str) -> None:
-        with open(lex) as f:
-            self.lexer = Lexer(f)
+    def __init__(self) -> None:
+        self.lexer = Lexer()
         self.parser = Parser()
         self.generator = Generator()
         self.assembler = Assembler()
@@ -82,13 +82,14 @@ def main() -> None:
                         help='compilation stage')
     args = parser.parse_args()
 
-    compiler = Compiler('meta/lex')
+    compiler = Compiler()
 
     try:
         compiler.compile(args.src, args.out, args.name, args.stage)
     except CompilerError as e:
         print(f'{type(e).__name__}: {e}', file=sys.stderr)
         exit(1)
+
 
 if __name__ == '__main__':
     main()

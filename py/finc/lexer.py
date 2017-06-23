@@ -1,7 +1,9 @@
 from typing import Dict, Iterable
 import string
-from error import LexerError
-from tokens import Token
+import os
+from .error import LexerError
+from .tokens import Token
+
 
 class State:
     def __init__(self, name: str) -> None:
@@ -12,23 +14,26 @@ class State:
 
 
 class Lexer:
-    def __init__(self, syn: Iterable[str]) -> None:
+    def __init__(self) -> None:
         self.states: Dict[str, State] = {}
         self.types: Dict[str, str] = {}
         self.keywords: Dict[str, str] = {}
 
-        for line in syn:
-            segs = line[:-1].split(' ')
-            if segs[0] == '>':
-                start = self._state(segs[1])
-                trans = self._expand(segs[2])
-                end = self._state(segs[3])
-                for c in trans:
-                    start.transitions[c] = end
-            elif segs[0] == 'type':
-                self.types[segs[1]] = segs[2]
-            elif segs[0] == 'keyword':
-                self.keywords[segs[1]] = segs[2]
+        loc = os.path.dirname(os.path.realpath(__file__))
+        source = os.path.join(loc, 'lex')
+        with open(source) as syn:
+            for line in syn:
+                segs = line[:-1].split(' ')
+                if segs[0] == '>':
+                    start = self._state(segs[1])
+                    trans = self._expand(segs[2])
+                    end = self._state(segs[3])
+                    for c in trans:
+                        start.transitions[c] = end
+                elif segs[0] == 'type':
+                    self.types[segs[1]] = segs[2]
+                elif segs[0] == 'keyword':
+                    self.keywords[segs[1]] = segs[2]
 
         self.start = self.states['start']
 
@@ -36,10 +41,10 @@ class Lexer:
 
     def _expand(self, trans: str) -> str:
         return trans.replace('[ALPHA]', string.ascii_letters) \
-                .replace('[NUM]', string.digits) \
-                .replace('[SPACE]', string.whitespace) \
-                .replace('[LF]', '\n') \
-                .replace('[ANY]', ''.join(map(chr, range(128))))
+            .replace('[NUM]', string.digits) \
+            .replace('[SPACE]', string.whitespace) \
+            .replace('[LF]', '\n') \
+            .replace('[ANY]', ''.join(map(chr, range(128))))
 
     def _state(self, name: str) -> State:
         if name not in self.states:
@@ -141,7 +146,7 @@ class Lexer:
                 start = end
                 state = self.start
 
-            # since '\n' is part of line, len(line) is exactly the column of EOL
+            # since \n is part of line, len(line) is exactly the column of EOL
             yield Token('EOL', line, ln, len(line), '\n')
 
         if self.ind_amount > 0:

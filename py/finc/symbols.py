@@ -1,6 +1,8 @@
 from typing import Tuple, Dict, Any, Set, List, Union, cast, Iterable
 from enum import Enum
 import math
+import os
+
 
 class Location(Enum):
     Global = 0
@@ -71,7 +73,8 @@ class SymbolTable:
 
     def _check_exists(self, name: str):
         if name in self.symbols:
-            raise LookupError(f"symbol '{name}' exists as {self.symbols[name]}")
+            raise LookupError(
+                f"symbol '{name}' exists as {self.symbols[name]}")
 
     def _add_symbol(self, sym: Symbol) -> None:
         self._check_exists(sym.name)
@@ -235,7 +238,8 @@ class Struct(SymbolTable, Symbol):
             return None, None
 
         gens: Dict[str, Type] = {}
-        lvls = [accept_type(p.type, a, gens) for p, a in zip(self.fields, args)]
+        lvls = [accept_type(p.type, a, gens)
+                for p, a in zip(self.fields, args)]
 
         if ret is not None:
             cons = Construct(self)
@@ -327,7 +331,8 @@ class Function(SymbolTable, Symbol):
         # nan: unknown
 
         gens: Dict[str, Type] = {}
-        lvls = [accept_type(p.type, a, gens) for p, a in zip(self.params, args)]
+        lvls = [accept_type(p.type, a, gens)
+                for p, a in zip(self.params, args)]
 
         if ret is not None:
             lvls.append(accept_type(ret, self.ret, gens))
@@ -441,7 +446,7 @@ class Reference(Type):
         return self.__format(self.type.fullpath())
 
     def size(self) -> int:
-        return 8 # size of pointer
+        return 8  # size of pointer
 
     def resolve(self, gens: Dict[str, Type]) -> 'Reference':
         return Reference(self.type.resolve(gens), self.level)
@@ -681,6 +686,7 @@ def load_builtins() -> Module:
 
     return mod
 
+
 def to_type(val: str, syms: SymbolTable) -> Type:
     if val[0] == '&':
         sub = val.lstrip('&')
@@ -700,6 +706,7 @@ def to_type(val: str, syms: SymbolTable) -> Type:
     assert isinstance(struct, Struct)
     return Construct(struct)
 
+
 def to_level(tp, lvl: int) -> Type:
     if tp == UNKNOWN:
         return UNKNOWN
@@ -712,11 +719,13 @@ def to_level(tp, lvl: int) -> Type:
 
     return tp
 
+
 def to_ref(tp: Type) -> Reference:
     if not isinstance(tp, Reference):
         tp = Reference(tp, 0)
 
     return tp
+
 
 def interpolate_types(tps: Iterable[Type], gens: Dict[str, Type]) -> Type:
     res: Type = DIVERGE
@@ -758,9 +767,11 @@ def interpolate_types(tps: Iterable[Type], gens: Dict[str, Type]) -> Type:
 
     return res
 
+
 def load_module(mod_name: str, glob: Module) -> Module:
     # TODO: a better way to locate
-    filename = f'ref/{mod_name}.fd'
+    loc = os.path.dirname(os.path.realpath(__file__))
+    filename = os.path.join(loc, 'ref', f'{mod_name}.fd')
     mod = Module(mod_name)
     glob.add_module(mod)
     with open(filename) as f:
@@ -770,7 +781,7 @@ def load_module(mod_name: str, glob: Module) -> Module:
 
             if tp == 'def':
                 ret: Type
-                if len(segs) % 2 == 0: # void
+                if len(segs) % 2 == 0:  # void
                     [tp, name, *params] = segs
                     ret = VOID
                 else:
@@ -788,6 +799,7 @@ def load_module(mod_name: str, glob: Module) -> Module:
                 raise ValueError('invalid declaration type')
 
     return mod
+
 
 def resolve_overload(overloads: Set[Match], args: List[Type], ret: Type) \
         -> Set[Match]:
@@ -807,6 +819,7 @@ def resolve_overload(overloads: Set[Match], args: List[Type], ret: Type) \
 
     return res
 
+
 def check_type(sym: Symbol, tps: Tuple[type, ...]):
     for tp in tps:
         if isinstance(sym, tp):
@@ -814,6 +827,7 @@ def check_type(sym: Symbol, tps: Tuple[type, ...]):
 
     exp = ' or '.join(t.__name__ for t in tps)
     raise LookupError(f"expecting {exp}, but got '{sym}'")
+
 
 def match_type(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
     if isinstance(other, Generic):
@@ -832,13 +846,13 @@ def match_type(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
 
     if isinstance(self, Reference):
         return isinstance(other, Reference) \
-                and self.level == other.level \
-                and match_unsized(self.type, other.type, gens)
+            and self.level == other.level \
+            and match_unsized(self.type, other.type, gens)
 
     if isinstance(self, Array):
         return isinstance(other, Array) \
-                and self.length == other.length \
-                and match_type(self.type, other.type, gens)
+            and self.length == other.length \
+            and match_type(self.type, other.type, gens)
 
     if isinstance(self, Construct):
         if not isinstance(other, Construct):
@@ -855,6 +869,7 @@ def match_type(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
 
     assert False, f'unknown type {self}'
 
+
 def match_unsized(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
     if isinstance(self, Array) and isinstance(other, Array):
         if not match_type(self.type, other.type, gens):
@@ -863,6 +878,7 @@ def match_unsized(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
         return self.length is None or self.length == other.length
 
     return match_type(self, other, gens)
+
 
 def accept_type(self: Type, other: Type, gens: Dict[str, Type]) -> float:
     if other == DIVERGE:
@@ -915,6 +931,7 @@ def accept_type(self: Type, other: Type, gens: Dict[str, Type]) -> float:
         return MATCH_PERFECT - reduction
 
     assert False, f'unknown type {self}'
+
 
 BOOL = Struct('Bool', 1)
 INT = Struct('Int', 4)
