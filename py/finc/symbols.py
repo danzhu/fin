@@ -232,30 +232,8 @@ class Struct(SymbolTable, Symbol):
         self._add_symbol(var)
         return var
 
-    def match(self, args: List[Type], ret: Type) \
-            -> Tuple[List[float], Dict[str, Type]]:
-        if len(self.fields) != len(args):
-            return None, None
-
-        gens: Dict[str, Type] = {}
-        lvls = [accept_type(p.type, a, gens)
-                for p, a in zip(self.fields, args)]
-
-        if ret is not None:
-            cons = Construct(self)
-            lvls.append(accept_type(ret, cons, gens))
-        else:
-            lvls.append(math.nan)
-
-        if None in lvls:
-            return None, None
-
-        return lvls, gens
-
-    def resolve(self, gens: Dict[str, Type]) -> Tuple[List[Type], Type]:
-        params = [p.type.resolve(gens) for p in self.fields]
-        ret = Construct(self).resolve(gens)
-        return params, ret
+    def overload_info(self) -> Tuple[List[Type], Type]:
+        return [f.type for f in self.fields], Construct(self)
 
 
 class Function(SymbolTable, Symbol):
@@ -319,35 +297,8 @@ class Function(SymbolTable, Symbol):
 
         return gen
 
-    def match(self, args: List[Type], ret: Type) \
-            -> Tuple[List[float], Dict[str, Type]]:
-        if len(self.params) != len(args):
-            return None, None
-
-        # None: type mismatch
-        # 1: casting to none
-        # 2: level reduction
-        # 3: exact match
-        # nan: unknown
-
-        gens: Dict[str, Type] = {}
-        lvls = [accept_type(p.type, a, gens)
-                for p, a in zip(self.params, args)]
-
-        if ret is not None:
-            lvls.append(accept_type(ret, self.ret, gens))
-        else:
-            lvls.append(math.nan)
-
-        if None in lvls:
-            return None, None
-
-        return lvls, gens
-
-    def resolve(self, gens: Dict[str, Type]) -> Tuple[List[Type], Type]:
-        params = [p.type.resolve(gens) for p in self.params]
-        ret = self.ret.resolve(gens)
-        return params, ret
+    def overload_info(self) -> Tuple[List[Type], Type]:
+        return [p.type for p in self.params], self.ret
 
 
 class Block(SymbolTable):
@@ -377,8 +328,8 @@ class Match:
         self.source = src
         self.levels: List[float] = None
         self.gens: Dict[str, Type] = None
-        self.params: List[Type] = None
-        self.ret: Type = None
+
+        self.params, self.result = src.overload_info()
 
     def __lt__(self, other: 'Match') -> bool:
         assert len(self.levels) == len(other.levels)
@@ -402,15 +353,33 @@ class Match:
         return f'{self.source} {self.levels}{gens}'
 
     def update(self, args: List[Type], ret: Type) -> bool:
-        self.levels, self.gens = self.source.match(args, ret)
-        return self.levels is not None
+        if len(args) != len(self.params):
+            return False
+
+        # None: type mismatch
+        # 1: casting to none
+        # 2: level reduction
+        # 3: exact match
+        # nan: unknown
+
+        self.gens = {}
+        self.levels = [accept_type(p, a, self.gens)
+                       for p, a in zip(self.params, args)]
+
+        if ret is not None:
+            self.levels.append(accept_type(ret, self.result, self.gens))
+        else:
+            self.levels.append(math.nan)
+
+        return None not in self.levels
 
     def resolve(self) -> bool:
         # check that all generic params are resolved
         if len(self.gens) != len(self.source.generics):
             return False
 
-        self.params, self.ret = self.source.resolve(self.gens)
+        self.params = [p.resolve(self.gens) for p in self.params]
+        self.result = self.result.resolve(self.gens)
         return True
 
 

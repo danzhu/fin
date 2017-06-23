@@ -143,7 +143,7 @@ class Generator:
 
         if fn.name == 'cast':
             frm = match.params[0].fullname()[0].lower()
-            tar = match.ret.fullname()[0].lower()
+            tar = match.result.fullname()[0].lower()
             self._write(f'cast_{frm}_{tar}')
             return
 

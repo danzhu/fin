@@ -309,7 +309,7 @@ class Node:
             self._resolve_overload(refs, self.args, self.target_type)
 
             if self.match is not None:
-                self.expr_type = self.match.ret
+                self.expr_type = self.match.result
 
         elif self.type == 'INC_ASSN':
             assert len(self.children) == 2
@@ -407,7 +407,7 @@ class Node:
             else:
                 assert False
 
-            self.expr_type = self.match.ret
+            self.expr_type = self.match.result
             for c, p in zip(self.children, self.match.params):
                 c._expect_type(p)
 

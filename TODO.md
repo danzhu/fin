@@ -98,6 +98,7 @@
 - [ ] show token of unsized type error
   - [ ] first bring back recursive definition check
 - [ ] optimize `and` / `or` short-circuit
+- [ ] restrict struct construction to call syntax
 
 ## Runtime
 
