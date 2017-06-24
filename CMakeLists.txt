@@ -85,8 +85,7 @@ enable_testing()
 # macro for testing compilation process
 macro(test_compile name)
     add_test(NAME ${name}
-        COMMAND python "${PY}/compiler.py"
-            "${PROJECT_SOURCE_DIR}/test/${name}.fin")
+        COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test/${name}.fin")
 
     if(${ARGC} GREATER 1)
         set_tests_properties(${name} PROPERTIES
