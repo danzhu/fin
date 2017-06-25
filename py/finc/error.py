@@ -10,7 +10,7 @@ class CompilerError(Exception):
         val = super().__str__()
         if self.token is not None:
             val += f'\n  at line {self.token.line},' \
-                + ' column {self.token.column}:'
+                + f' column {self.token.column}:'
 
             line = self.token.src.lstrip()
             indent = len(self.token.src) - len(line)

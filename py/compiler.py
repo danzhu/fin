@@ -10,6 +10,7 @@ from finc.error import CompilerError
 from finc.generator import Generator
 from finc.lexer import Lexer
 from finc.parse import Parser
+from finc.reflect import Module
 
 
 class Compiler:
@@ -31,26 +32,29 @@ class Compiler:
                 print(t)
             return
 
-        root = self.parser.parse(tokens)
-
-        glob = symbols.load_builtins()
-        syms = symbols.load_module('fin', glob)
-        refs: Set[symbols.Function] = set()
+        ast = self.parser.parse(tokens)
 
         if stage == 'parse':
-            root.print()
+            ast.print()
             return
 
-        root.analyze(name, syms, refs)
+        builtins = symbols.load_builtins()
+        root = Module('', None, builtins)
+        symbols.load_module('rt', root)
+
+        refs: Set[symbols.Function] = set()
+
+        mod = Module(name, root)
+        ast.analyze(mod, root, refs)
 
         if stage == 'ast':
-            root.print()
+            ast.print()
             return
 
         with io.StringIO() as asm:
             assembly = cast(io.StringIO, asm)
 
-            self.generator.generate(root,
+            self.generator.generate(ast,
                                     name,
                                     refs,
                                     cast(io.TextIOBase, assembly))
@@ -72,17 +76,26 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Fin compiler.')
     parser.add_argument('src', type=argparse.FileType(), metavar='input',
                         help='source file')
-    parser.add_argument('-o', dest='out', metavar='<output>',
+    parser.add_argument('-o', '--out', dest='out', metavar='<output>',
                         type=argparse.FileType('wb'), default='a.fm',
                         help='write output to <output>')
-    parser.add_argument('-n', dest='name', metavar='<name>', default='main',
+    parser.add_argument('-n', '--name', dest='name', metavar='<name>',
+                        default='main',
                         help='name of the module')
-    parser.add_argument('-s', dest='stage', metavar='<stage>', default='exec',
+    parser.add_argument('-s', '--stage', dest='stage', metavar='<stage>',
+                        default='exec',
                         choices=['lex', 'parse', 'ast', 'asm', 'exec'],
                         help='compilation stage')
+    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
+                        help='enable debug information')
     args = parser.parse_args()
 
     compiler = Compiler()
+
+    if args.debug:
+        # don't catch any exceptions
+        compiler.compile(args.src, args.out, args.name, args.stage)
+        return
 
     try:
         compiler.compile(args.src, args.out, args.name, args.stage)

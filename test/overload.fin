@@ -1,10 +1,12 @@
+import rt
+
 struct Test
     value Int
 
 def print(t Test)
-    t.value.print()
+    t.value.rt::print()
 
 def test()
-    (1).print()
-    (1.2).print()
+    (1).rt::print()
+    (1.2).rt::print()
     Test(2).print()

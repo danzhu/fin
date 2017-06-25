@@ -24,6 +24,7 @@
 - [x] arrays
   - [x] sized arrays
   - [x] unsized arrays
+- [x] enums
 - [ ] tuples
 - [x] assignment
   - [x] level-based assignment
@@ -35,14 +36,19 @@
   - [ ] RAII
 - [ ] library
   - [ ] library version
-- [ ] modules
-  - [ ] encapsulation (import / export)
+- [x] modules
+  - [x] import
+  - [ ] encapsulation
+  - [ ] export
 - [ ] generics
-  - [x] struct
+  - [x] struct / enum
   - [ ] function
+- [ ] pattern matching
+  - [ ] constant
+  - [ ] deconstruction
+- [ ] traits
 - [ ] iterators
   - [ ] continuation-based iteration
-- [ ] traits
 
 ## Compiler
 
@@ -85,7 +91,7 @@
   - [x] member call syntax
   - [ ] member call scope limit
 - [x] symbol full path
-  - [ ] fix standard library hierarchy (import)
+  - [x] fix standard library hierarchy (import)
 - [x] `let` type inference
 - [x] function group no override
 - [x] partial order overload
@@ -99,6 +105,7 @@
   - [ ] first bring back recursive definition check
 - [ ] optimize `and` / `or` short-circuit
 - [ ] restrict struct construction to call syntax
+- [ ] make parentheses after enum optional
 
 ## Runtime
 

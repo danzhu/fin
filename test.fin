@@ -1,7 +1,24 @@
+import rt
+
+struct Vec
+    x Float
+    y Float
+
+enum Opt{T}
+    Some(value T)
+    None
+
+def plus(left Vec, right Vec) Vec
+    Vec(left.x + right.x, left.y + right.y)
+
 def test()
-    let f = 1.2
-    while f < 1000.
-        f->Int.print()
-        f *= 2.
+    let opt Opt{Int} = Opt::Some(1)
+    opt = Opt::None()
+
+    rt::print(1 + 2)
+
+    let v = Vec(3., 4.) + Vec(1., 1.)
+    v.x.rt::print()
+    v.y.rt::print()
 
 test()

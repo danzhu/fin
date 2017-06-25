@@ -1,7 +1,7 @@
-from typing import Any, Dict, Set
+from typing import Any, Dict, Set, cast
 from io import TextIOBase
-from .symbols import Location, Reference, Constant, Function, Struct, Type, \
-    Match, Construct
+from .reflect import Location, Reference, Constant, Function, Struct, Type, \
+    Match, Construct, Variant, Enumeration
 from . import symbols
 from .node import Node, StackNode
 
@@ -208,13 +208,9 @@ class Generator:
                 self._write('')
 
         for c in node.children:
-            if c.type not in ['STRUCT', 'DEF']:
+            if c.type not in ['IMPORT', 'STRUCT', 'ENUM', 'DEF']:
                 self._gen(c)
                 self._write('')
-
-    def _IMPORT(self, node: Node) -> None:
-        # TODO
-        assert False
 
     def _DEF(self, node: Node) -> None:
         end = 'END_FN_' + node.function.fullname()
@@ -352,15 +348,30 @@ class Generator:
         self._write('store', size)
 
     def _CALL(self, node: Node) -> None:
-        for c in node.children:
+        if isinstance(node.match.source, Variant):
+            self._write('const_i', node.match.source.value)
+
+        for c in node.children[1].children:
             self._gen(c)
 
         if isinstance(node.match.source, Function):
             self._call(node.match)
         elif isinstance(node.match.source, Struct):
             pass  # struct construction
+        elif isinstance(node.match.source, Variant):
+            enum = cast(Enumeration, node.match.source.parent).size
+            args = sum(c.target_type.size() for c in node.children[1].children)
+            size = node.target_type.size() - enum - args
+            if size > 0:
+                self._write('push', size)
         else:
             assert False
+
+    def _OP(self, node: Node) -> None:
+        for c in node.children:
+            self._gen(c)
+
+        self._call(node.match)
 
     def _INC_ASSN(self, node) -> None:
         # left
@@ -386,7 +397,8 @@ class Generator:
     def _MEMBER(self, node: Node) -> None:
         self._gen(node.children[0])
 
-        self._write('offset', node.field.offset)
+        if node.field.offset > 0:
+            self._write('offset', node.field.offset)
 
     def _NUM(self, node: Node) -> None:
         self._write('const_i', node.value)

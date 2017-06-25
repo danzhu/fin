@@ -33,6 +33,7 @@
 > NUM . FLOAT
 > NUM [NUM] NUM
 > FLOAT [NUM] FLOAT
+> COLON : SCOPE
 > PLUS = PLUS_ASSN
 > MINUS = MINUS_ASSN
 > MULTIPLIES = MULTIPLIES_ASSN
@@ -58,6 +59,7 @@ type LT COMP
 type LE COMP
 keyword import IMPORT
 keyword struct STRUCT
+keyword enum ENUM
 keyword def DEF
 keyword let LET
 keyword if IF

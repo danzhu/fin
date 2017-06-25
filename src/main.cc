@@ -39,7 +39,7 @@ int main(int argc, const char *argv[])
 
     Fin::Runtime runtime;
 
-    auto &fin = runtime.createModule("fin");
+    auto &fin = runtime.createModule("rt");
     fin.addFunction("print(Int)", Fin::Function{print<int32_t>});
     fin.addFunction("print(Float)", Fin::Function{print<float>});
     fin.addFunction("print(Bool)", Fin::Function{print<bool>});

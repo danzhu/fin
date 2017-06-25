@@ -1,4 +1,4 @@
-from typing import Iterable, Iterator, List
+from typing import Iterable, Iterator, List, Callable
 from .tokens import Token
 from .node import Node
 from .error import ParserError
@@ -30,6 +30,11 @@ class Parser:
     def _error(self, msg: str):
         raise ParserError(msg, self._lookahead)
 
+    def _id(self) -> str:
+        name = self._lookahead.value
+        self._expect('ID')
+        return name
+
     def _args(self) -> List[Node]:
         self._expect('LPAREN')
         if self._lookahead.type == 'RPAREN':
@@ -47,6 +52,32 @@ class Parser:
 
         return children
 
+    def _params(self) -> List[Node]:
+        self._expect('LPAREN')
+        children = []
+        if self._lookahead.type == 'RPAREN':
+            self._next()
+        else:
+            while True:
+                children.append(self._param())
+
+                tp = self._lookahead.type
+                self._expect('COMMA', 'RPAREN')
+                if tp == 'RPAREN':
+                    break
+        return children
+
+    def _children(self, tp: str, fn: Callable[[], Node]) -> Node:
+        self._expect('INDENT')
+
+        children = []
+        while self._lookahead.type != 'DEDENT':
+            children.append(fn())
+
+        self._next()  # DEDENT
+
+        return Node(tp, None, children)
+
     def _empty(self) -> Node:
         return Node('EMPTY', self._lookahead, ())
 
@@ -59,6 +90,8 @@ class Parser:
                 children.append(self._def())
             elif self._lookahead.type == 'STRUCT':
                 children.append(self._struct())
+            elif self._lookahead.type == 'ENUM':
+                children.append(self._enum())
             else:
                 children.append(self._stmt())
         return Node('FILE', None, children)
@@ -68,24 +101,7 @@ class Parser:
         self._expect('IMPORT')
         name = self._name()
         self._expect('EOL')
-        return Node('IMPORT', token, (), name)
-
-    def _struct(self) -> Node:
-        token = self._lookahead
-        self._expect('STRUCT')
-        name = self._name()
-
-        if self._lookahead.type == 'LBRACE':
-            gens = self._gens()
-        else:
-            gens = self._empty()
-
-        self._expect('EOL')
-
-        fields = self._fields()
-        self._expect('EOL')
-
-        return Node('STRUCT', token, (gens, fields), name)
+        return Node('IMPORT', token, (name,))
 
     def _gens(self) -> Node:
         children = []
@@ -100,37 +116,73 @@ class Parser:
             if tp == 'RBRACE':
                 break
 
-        return Node('GENS', None, children)
+        return Node('GEN_PARAMS', None, children)
 
     def _gen(self) -> Node:
         token = self._lookahead
         self._expect('ID')
         return Node('GEN', token, (), token.value)
 
-    def _fields(self) -> Node:
-        self._expect('INDENT')
+    def _struct(self) -> Node:
+        self._expect('STRUCT')
+        token = self._lookahead
+        name = self._id()
 
-        children = []
-        while self._lookahead.type != 'DEDENT':
-            children.append(self._field())
+        if self._lookahead.type == 'LBRACE':
+            gens = self._gens()
+        else:
+            gens = self._empty()
 
-        self._next()  # DEDENT
+        self._expect('EOL')
 
-        return Node('FIELDS', None, children)
+        fields = self._children('FIELDS', self._field)
+        self._expect('EOL')
+
+        return Node('STRUCT', token, (gens, fields), name)
 
     def _field(self) -> Node:
         token = self._lookahead
-        name = self._name()
+        name = self._id()
         tp = self._type()
         self._expect('EOL')
         return Node('FIELD', token, (tp,), name)
 
-    def _def(self) -> Node:
+    def _enum(self) -> Node:
+        self._expect('ENUM')
         token = self._lookahead
-        self._expect('DEF')
+        name = self._id()
 
-        name = self._name()
-        params = self._params()
+        if self._lookahead.type == 'LBRACE':
+            gens = self._gens()
+        else:
+            gens = self._empty()
+
+        self._expect('EOL')
+
+        variants = self._children('VARIANTS', self._variant)
+        self._expect('EOL')
+
+        return Node('ENUM', token, (gens, variants), name)
+
+    def _variant(self) -> Node:
+        token = self._lookahead
+        name = self._id()
+
+        if self._lookahead.type == 'LPAREN':
+            params = self._params()
+        else:
+            params = []
+
+        self._expect('EOL')
+
+        return Node('VARIANT', token, params, name)
+
+    def _def(self) -> Node:
+        self._expect('DEF')
+        token = self._lookahead
+
+        name = self._id()
+        params = Node('PARAMS', None, self._params())
 
         if self._lookahead.type == 'EOL':
             ret = self._empty()
@@ -143,22 +195,6 @@ class Parser:
         self._expect('EOL')
         return Node('DEF', token, (params, ret, cont), name)
 
-    def _params(self) -> Node:
-        token = self._lookahead
-        self._expect('LPAREN')
-        children = []
-        if self._lookahead.type == 'RPAREN':
-            self._next()
-        else:
-            while True:
-                children.append(self._param())
-
-                tp = self._lookahead.type
-                self._expect('COMMA', 'RPAREN')
-                if tp == 'RPAREN':
-                    break
-        return Node('PARAMS', token, children)
-
     def _stmt(self) -> Node:
         if self._lookahead.type == 'LET':
             node = self._let()
@@ -170,7 +206,7 @@ class Parser:
     def _let(self) -> Node:
         token = self._lookahead
         self._expect('LET')
-        name = self._name()
+        name = self._id()
 
         if self._lookahead.type in ['ASSN', 'COLON', 'EOL']:
             tp = self._empty()
@@ -252,9 +288,23 @@ class Parser:
 
     def _param(self) -> Node:
         token = self._lookahead
-        name = self._name()
+        name = self._id()
         tp = self._type()
         return Node('PARAM', token, (tp,), name)
+
+    def _name(self) -> Node:
+        token = self._lookahead
+        name = self._id()
+
+        node = Node('ID', token, (), name)
+
+        while self._lookahead.type == 'SCOPE':
+            token = self._lookahead
+            self._next()
+            member = Node('ID', self._lookahead, (), self._id())
+            node = Node('SCOPE', token, (node, member))
+
+        return node
 
     def _type(self) -> Node:
         token = self._lookahead
@@ -299,7 +349,8 @@ class Parser:
                     if tp == 'RBRACE':
                         break
 
-            return Node('TYPE', token, children, name)
+            gens = Node('GEN_ARGS', None, children)
+            return Node('TYPE', token, (name, gens))
 
         self._expect()
         assert False
@@ -384,7 +435,7 @@ class Parser:
                 assert False
             self._next()
             r = self._expr()
-            node = Node('CALL', token, (node, r), op)
+            node = Node('OP', token, (node, r), op)
         return node
 
     def _expr(self) -> Node:
@@ -394,7 +445,7 @@ class Parser:
             op = self._lookahead.type.lower()
             self._next()
             r = self._term()
-            node = Node('CALL', token, (node, r), op)
+            node = Node('OP', token, (node, r), op)
         return node
 
     def _term(self) -> Node:
@@ -404,7 +455,7 @@ class Parser:
             op = self._lookahead.type.lower()
             self._next()
             r = self._factor()
-            node = Node('CALL', token, (node, r), op)
+            node = Node('OP', token, (node, r), op)
         return node
 
     def _factor(self) -> Node:
@@ -418,7 +469,7 @@ class Parser:
                 assert False
             self._next()
             val = self._factor()
-            return Node('CALL', token, (val,), op)
+            return Node('OP', token, (val,), op)
         else:
             return self._atom_expr()
 
@@ -433,18 +484,18 @@ class Parser:
 
                 if self._lookahead.type == 'LPAREN':
                     # method call
-                    args = self._args()
-                    node = Node('CALL', token, [node] + args, name)
+                    args = Node('ARGS', None, [node] + self._args())
+                    node = Node('CALL', token, (name, args))
                 else:
                     # member access
-                    node = Node('MEMBER', token, (node,), name)
+                    node = Node('MEMBER', token, (node, name))
 
             elif self._lookahead.type == 'LBRACKET':
                 token = self._lookahead
                 self._next()  # LBRACKET
                 idx = self._test()
                 self._expect('RBRACKET')
-                node = Node('CALL', token, (node, idx), 'subscript')
+                node = Node('OP', token, (node, idx), 'subscript')
 
             elif self._lookahead.type == 'ARROW':
                 token = self._lookahead
@@ -463,10 +514,10 @@ class Parser:
             name = self._name()
 
             if self._lookahead.type == 'LPAREN':
-                args = self._args()
-                return Node('CALL', token, args, name)
+                args = Node('ARGS', None, self._args())
+                return Node('CALL', token, (name, args))
 
-            return Node('VAR', token, (), name)
+            return Node('VAR', token, (name,))
 
         if self._lookahead.type in ['NUM', 'FLOAT']:
             token = self._lookahead
@@ -509,8 +560,3 @@ class Parser:
 
         self._expect()
         assert False
-
-    def _name(self) -> str:
-        name = self._lookahead.value
-        self._expect('ID')
-        return name

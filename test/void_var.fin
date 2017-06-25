@@ -1,2 +1,4 @@
+import rt
+
 def test()
-    let a = print(1)
+    let a = rt::print(1)

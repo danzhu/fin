@@ -1,6 +1,8 @@
+import rt
+
 struct Test
     value Int
 
 def test()
     let val Test
-    val.print()
+    val.rt::print()
