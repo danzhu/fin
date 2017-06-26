@@ -48,13 +48,6 @@ class Callable:
         raise NotImplementedError()
 
 
-class Overload:
-    generics: List['Generic']
-
-    def overload_info(self) -> Tuple[List[Type], Type]:
-        raise NotImplementedError()
-
-
 class Variable(Symbol):
     def __init__(self,
                  name: str,
@@ -95,22 +88,14 @@ class SymbolTable:
         self.symbols: Dict[str, Symbol] = {}
         self.references: Dict[str, Module] = {}
 
-    def _check_exists(self, name: str):
-        if name in self.symbols:
-            raise LookupError(
-                f"symbol '{name}' exists as {self.symbols[name]}")
-
     def _add_symbol(self, sym: Symbol) -> None:
-        self._check_exists(sym.name)
+        if sym.name in self.symbols:
+            raise LookupError(
+                f"symbol '{sym.name}' exists as {self.symbols[sym.name]}")
+
         self.symbols[sym.name] = sym
 
-    def add_reference(self, mod: 'Module') -> None:
-        if mod.name in self.references:
-            raise LookupError(f"reference '{mod.name}' already in scope")
-
-        self.references[mod.name] = mod
-
-    def find(self, name: str) -> Symbol:
+    def _find(self, name: str) -> Symbol:
         if name in self.symbols:
             return self.symbols[name]
 
@@ -118,12 +103,24 @@ class SymbolTable:
             return self.references[name]
 
         if self.parent:
-            return self.parent.find(name)
+            return self.parent._find(name)
 
         return None
 
+    def _member(self, name: str) -> Symbol:
+        if name in self.symbols:
+            return self.symbols[name]
+
+        return None
+
+    def add_reference(self, mod: 'Module') -> None:
+        if mod.name in self.references:
+            raise LookupError(f"reference '{mod.name}' already in scope")
+
+        self.references[mod.name] = mod
+
     def get(self, name: str, *tps: type) -> Symbol:
-        sym = self.find(name)
+        sym = self._find(name)
 
         if sym is None:
             raise LookupError(f"cannot find symbol '{name}'")
@@ -132,10 +129,10 @@ class SymbolTable:
         return sym
 
     def member(self, name: str, *tps: type) -> Symbol:
-        if name not in self.symbols:
-            raise LookupError(f"cannot find member '{name}'")
+        sym = self._member(name)
 
-        sym = self.symbols[name]
+        if sym is None:
+            raise LookupError(f"cannot find member '{name}'")
 
         check_type(sym, tps)
         return sym
@@ -189,7 +186,7 @@ class Module(Scope):
     def __lt__(self, other: 'Module') -> bool:
         return self.name < other.name
 
-    def find(self, name: str) -> Symbol:
+    def _find(self, name: str) -> Symbol:
         if name in self.symbols:
             return self.symbols[name]
 
@@ -243,27 +240,27 @@ class Module(Scope):
         self._add_symbol(const)
 
     def operators(self, name: str) -> Set['Match']:
-        ops: Set[Function]
+        ops: Set[Match]
 
         fns = self.symbols.get(name, None)
         if isinstance(fns, FunctionGroup):
-            ops = fns.functions
+            ops = fns.overloads()
         else:
             ops = set()
 
         fns = self.builtins.symbols.get(name, None)
         if isinstance(fns, FunctionGroup):
-            ops |= fns.functions
+            ops |= fns.overloads()
 
         for ref in self.references.values():
             fns = ref.symbols.get(name, None)
             if isinstance(fns, FunctionGroup):
-                ops |= fns.functions
+                ops |= fns.overloads()
 
-        return {Match(fn) for fn in ops}
+        return ops
 
 
-class Struct(Scope, Callable, Overload):
+class Struct(Scope, Callable):
     LOCATION = Location.Struct
 
     def __init__(self, name: str, size: int = 0) -> None:
@@ -290,10 +287,7 @@ class Struct(Scope, Callable, Overload):
         return var
 
     def overloads(self) -> Set['Match']:
-        return {Match(self)}
-
-    def overload_info(self) -> Tuple[List[Type], Type]:
-        return [f.type for f in self.fields], Construct(self)
+        return {Match(self, self.generics, self.fields, StructType(self))}
 
 
 class Enumeration(Scope):
@@ -323,7 +317,6 @@ class Enumeration(Scope):
 
     def add_variant(self, name: str) -> 'Variant':
         var = Variant(name, self)
-        var.generics = self.generics
         self.counter += 1
 
         self._add_symbol(var)
@@ -331,7 +324,7 @@ class Enumeration(Scope):
         return var
 
 
-class Variant(Scope, Callable, Overload):
+class Variant(Scope, Callable):
     LOCATION = Location.Enum
 
     def __init__(self, name: str, parent: Enumeration) -> None:
@@ -341,7 +334,7 @@ class Variant(Scope, Callable, Overload):
         self.parent = parent
 
         self.value = parent.counter
-        self.struct = Struct(name, parent.size)
+        self.struct = Struct('<variant>', parent.size)
 
     def __str__(self) -> str:
         return f'{self.parent}:{self.name}'
@@ -350,15 +343,13 @@ class Variant(Scope, Callable, Overload):
         return self.struct.add_variable(name, tp)
 
     def overloads(self) -> Set['Match']:
-        return {Match(self)}
-
-    def overload_info(self) -> Tuple[List[Type], Type]:
         assert isinstance(self.parent, Enumeration)
-        return [f.type for f in self.struct.fields], \
-            EnumerationType(self.parent)
+
+        ret = EnumerationType(self.parent)
+        return {Match(self, self.parent.generics, self.struct.fields, ret)}
 
 
-class Function(Scope, Overload):
+class Function(Scope):
     LOCATION = Location.Param
 
     def __init__(self, name: str, ret: Type) -> None:
@@ -416,8 +407,20 @@ class Function(Scope, Overload):
 
         return gen
 
-    def overload_info(self) -> Tuple[List[Type], Type]:
-        return [p.type for p in self.params], self.ret
+
+class FunctionGroup(Symbol):
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.functions: Set[Function] = set()
+
+    def __str__(self) -> str:
+        return self.name
+
+    def add(self, fn: Function) -> None:
+        self.functions.add(fn)
+
+    def overloads(self) -> Set['Match']:
+        return {Match(f, f.generics, f.params, f.ret) for f in self.functions}
 
 
 class Block(SymbolTable):
@@ -443,19 +446,26 @@ class Block(SymbolTable):
 
 
 class Match:
-    def __init__(self, src: Overload) -> None:
-        self.source = src
-        self.levels: List[float] = None
-        self.gens: Dict[str, Type] = None
+    def __init__(self,
+                 source: SymbolTable,
+                 generics: Sequence['Generic'],
+                 params: Sequence[Variable],
+                 ret: Type) -> None:
+        self.source = source
 
-        self.params, self.result = src.overload_info()
+        self.generics = generics
+        self.params = [p.type for p in params]
+        self.ret = ret
+
+        self.resolved_gens: Dict[str, Type] = None
+        self.levels: List[float] = None
 
     def __lt__(self, other: 'Match') -> bool:
         assert len(self.levels) == len(other.levels)
 
         # generic has lower precedence
-        if len(self.source.generics) == 0 \
-                and len(other.source.generics) > 0:
+        if len(self.generics) == 0 \
+                and len(other.generics) > 0:
             return False
 
         less = False
@@ -468,8 +478,9 @@ class Match:
         return less
 
     def __str__(self) -> str:
-        gens = ''.join(f', {k} = {g}' for k, g in self.gens.items())
-        return f'{self.source} {self.levels}{gens}'
+        gens = ''.join(f', {k} = {g}' for k, g in self.resolved_gens.items())
+        # FIXME: print actual signature
+        return f'{self.levels}{gens}'
 
     def update(self, args: List[Type], ret: Type) -> bool:
         if len(args) != len(self.params):
@@ -481,12 +492,12 @@ class Match:
         # 3: exact match
         # nan: unknown
 
-        self.gens = {}
-        self.levels = [symbols.accept_type(p, a, self.gens)
+        self.resolved_gens = {}
+        self.levels = [symbols.accept_type(p, a, self.resolved_gens)
                        for p, a in zip(self.params, args)]
 
         if ret is not None:
-            lvl = symbols.accept_type(ret, self.result, self.gens)
+            lvl = symbols.accept_type(ret, self.ret, self.resolved_gens)
         else:
             lvl = math.nan
 
@@ -496,27 +507,12 @@ class Match:
 
     def resolve(self) -> bool:
         # check that all generic params are resolved
-        if len(self.gens) != len(self.source.generics):
+        if len(self.resolved_gens) != len(self.generics):
             return False
 
-        self.params = [p.resolve(self.gens) for p in self.params]
-        self.result = self.result.resolve(self.gens)
+        self.params = [p.resolve(self.resolved_gens) for p in self.params]
+        self.ret = self.ret.resolve(self.resolved_gens)
         return True
-
-
-class FunctionGroup(Symbol):
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.functions: Set[Function] = set()
-
-    def __str__(self) -> str:
-        return self.name
-
-    def add(self, fn: Function) -> None:
-        self.functions.add(fn)
-
-    def overloads(self) -> Set['Match']:
-        return {Match(f) for f in self.functions}
 
 
 class Reference(Type):
@@ -596,7 +592,7 @@ class Generic(Type, Symbol):
         return gens[self.name]
 
 
-class Construct(Type):
+class StructType(Type):
     def __init__(self,
                  struct: Struct,
                  fields: List[Variable] = None,
@@ -650,7 +646,7 @@ class Construct(Type):
         # note: struct size is only for builtins
         return self.struct.size + sum(f.type.size() for f in self.fields)
 
-    def resolve(self, gens: Dict[str, Type]) -> 'Construct':
+    def resolve(self, gens: Dict[str, Type]) -> 'StructType':
         fields = []
         for f in self.fields:
             var = Variable(f.name, f.type.resolve(gens), Location.Struct)
@@ -663,7 +659,7 @@ class Construct(Type):
 
             gen_args.append(g)
 
-        return Construct(self.struct, fields, gen_args)
+        return StructType(self.struct, fields, gen_args)
 
     def finalize(self) -> None:
         if self._finalized:
@@ -682,7 +678,7 @@ class Construct(Type):
 class EnumerationType(Type):
     def __init__(self,
                  enum: Enumeration,
-                 variants: Sequence[Construct] = None,
+                 variants: Sequence[StructType] = None,
                  gens: Sequence[Type] = None) -> None:
         super().__init__()
 
@@ -691,7 +687,7 @@ class EnumerationType(Type):
         self.generics = gens
 
         if self.variants is None:
-            self.variants = [Construct(v.struct) for v in enum.variants]
+            self.variants = [StructType(v.struct) for v in enum.variants]
 
         if self.generics is None:
             self.generics = enum.generics

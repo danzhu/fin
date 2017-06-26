@@ -4,7 +4,7 @@ from functools import wraps
 from .tokens import Token
 from . import symbols
 from .reflect import Module, Function, Struct, Block, Type, Reference, Array, \
-    Construct, Special, Match, SymbolTable, Variable, Constant, Generic, \
+    StructType, Special, Match, SymbolTable, Variable, Constant, Generic, \
     FunctionGroup, Symbol, Enumeration, Variant, EnumerationType
 from .error import AnalyzerError
 
@@ -240,7 +240,7 @@ class Node:
                     for g, a in zip(sym.generics, gen_args)}
 
             if isinstance(sym, Struct):
-                return Construct(sym).resolve(gens)
+                return StructType(sym).resolve(gens)
 
             if isinstance(sym, Enumeration):
                 return EnumerationType(sym).resolve(gens)
@@ -342,13 +342,13 @@ class Node:
             self.expr_type = self.variable.var_type()
 
         elif self.type == 'NUM':
-            self.expr_type = Construct(symbols.INT)
+            self.expr_type = StructType(symbols.INT)
 
         elif self.type == 'FLOAT':
-            self.expr_type = Construct(symbols.FLOAT)
+            self.expr_type = StructType(symbols.FLOAT)
 
         elif self.type == 'TEST':
-            self.expr_type = Construct(symbols.BOOL)
+            self.expr_type = StructType(symbols.BOOL)
 
         elif self.type == 'CALL':
             sym = self.children[0]._symbol(
@@ -367,7 +367,7 @@ class Node:
             self._resolve_overload(refs, self.args, self.target_type)
 
             if self.match is not None:
-                self.expr_type = self.match.result
+                self.expr_type = self.match.ret
 
         elif self.type == 'OP':
             self.expr_type = symbols.UNKNOWN
@@ -380,7 +380,7 @@ class Node:
             self._resolve_overload(refs, self.args, self.target_type)
 
             if self.match is not None:
-                self.expr_type = self.match.result
+                self.expr_type = self.match.ret
 
         elif self.type == 'INC_ASSN':
             assert len(self.children) == 2
@@ -410,7 +410,7 @@ class Node:
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 0)
 
-            if not isinstance(tp, Construct):
+            if not isinstance(tp, StructType):
                 self._error('member access requires struct type')
                 assert False
 
@@ -466,7 +466,7 @@ class Node:
 
         if self.type == 'TEST':
             for c in self.children:
-                c._expect_type(Construct(symbols.BOOL))
+                c._expect_type(StructType(symbols.BOOL))
 
         elif self.type == 'ASSN':
             tp = symbols.to_level(self.children[0].expr_type, self.level + 1)
@@ -481,20 +481,18 @@ class Node:
             if isinstance(self.match.source, Function):
                 # record usage for ref generation
                 refs.add(self.match.source)
-            elif isinstance(self.match.source, Struct):
-                pass
-            elif isinstance(self.match.source, Variant):
+            elif isinstance(self.match.source, (Struct, Variant)):
                 pass
             else:
                 assert False, f'unknown type {type(self.match.source)}'
 
-            self.expr_type = self.match.result
+            self.expr_type = self.match.ret
             for c, p in zip(self.children[1].children, self.match.params):
                 c._expect_type(p)
 
         elif self.type == 'OP':
             self._resolve_overload(refs, self.args, self.target_type, True)
-            self.expr_type = self.match.result
+            self.expr_type = self.match.ret
             for c, p in zip(self.children, self.match.params):
                 c._expect_type(p)
 
@@ -539,7 +537,7 @@ class Node:
             self.children[-1]._expect_type(self.expr_type)
 
         elif self.type == 'IF':
-            self.children[0]._expect_type(Construct(symbols.BOOL))
+            self.children[0]._expect_type(StructType(symbols.BOOL))
 
             self.expr_type = self.target_type
 
@@ -549,7 +547,7 @@ class Node:
         elif self.type == 'WHILE':
             self.expr_type = self.target_type
 
-            self.children[0]._expect_type(Construct(symbols.BOOL))
+            self.children[0]._expect_type(StructType(symbols.BOOL))
             self.children[1]._expect_type(symbols.VOID)
             self.children[2]._expect_type(self.expr_type)
 

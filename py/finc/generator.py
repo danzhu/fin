@@ -1,7 +1,7 @@
 from typing import Any, Dict, Set, cast
 from io import TextIOBase
 from .reflect import Location, Reference, Constant, Function, Struct, Type, \
-    Match, Construct, Variant, Enumeration
+    Match, StructType, Variant, Enumeration
 from . import symbols
 from .node import Node, StackNode
 
@@ -116,7 +116,7 @@ class Generator:
             return
 
         if fn.name == 'alloc':
-            size = match.gens['T'].size()
+            size = match.resolved_gens['T'].size()
             self._write('const_i', size)
 
             if len(fn.params) > 0:
@@ -130,20 +130,20 @@ class Generator:
             return
 
         if fn.name == 'realloc':
-            tp = match.gens['T']
+            tp = match.resolved_gens['T']
             self._write('const_i', tp.size())
             self._write('mult_i')
             self._write('realloc')
             return
 
         if fn.name == 'subscript':
-            tp = match.gens['T']
+            tp = match.resolved_gens['T']
             self._write('addr_offset', tp.size())
             return
 
         if fn.name == 'cast':
             frm = match.params[0].fullname()[0].lower()
-            tar = match.result.fullname()[0].lower()
+            tar = match.ret.fullname()[0].lower()
             self._write(f'cast_{frm}_{tar}')
             return
 
@@ -409,7 +409,7 @@ class Generator:
     def _VAR(self, node: Node) -> None:
         if isinstance(node.variable, Constant):
             cons = node.variable.type
-            if not isinstance(cons, Construct):
+            if not isinstance(cons, StructType):
                 raise NotADirectoryError()
 
             if cons.struct == symbols.BOOL:

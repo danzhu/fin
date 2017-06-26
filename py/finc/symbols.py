@@ -1,7 +1,7 @@
 from typing import Dict, Set, List, Iterable
 import math
 import os
-from .reflect import Module, Construct, Function, Reference, Array, \
+from .reflect import Module, StructType, Function, Reference, Array, \
     SymbolTable, Type, Struct, Match, Generic, EnumerationType, Special, \
     Constant
 
@@ -9,7 +9,7 @@ from .reflect import Module, Construct, Function, Reference, Array, \
 def load_builtins() -> Module:
     mod = Module('', None, None)
 
-    NUM_TYPES = {Construct(tp) for tp in {INT, FLOAT}}
+    NUM_TYPES = {StructType(tp) for tp in {INT, FLOAT}}
 
     # classes
     for struct in {BOOL, INT, FLOAT}:
@@ -37,7 +37,7 @@ def load_builtins() -> Module:
         # comparison
         for op in ['equal', 'notEqual', 'less', 'lessEqual', 'greater',
                    'greaterEqual']:
-            fn = Function(op, Construct(BOOL))
+            fn = Function(op, StructType(BOOL))
             fn.add_variable('left', tp)
             fn.add_variable('right', tp)
             mod.add_function(fn)
@@ -55,7 +55,7 @@ def load_builtins() -> Module:
     fn = Function('subscript', None)
     t = fn.add_generic('T')
     fn.add_variable('arr', Reference(Array(t), 1))
-    fn.add_variable('index', Construct(INT))
+    fn.add_variable('index', StructType(INT))
     fn.ret = Reference(t, 1)
     mod.add_function(fn)
 
@@ -67,7 +67,7 @@ def load_builtins() -> Module:
 
     fn = Function('alloc', None)
     t = fn.add_generic('T')
-    fn.add_variable('length', Construct(INT))
+    fn.add_variable('length', StructType(INT))
     fn.ret = Reference(Array(t), 1)
     mod.add_function(fn)
 
@@ -81,7 +81,7 @@ def load_builtins() -> Module:
     fn = Function('realloc', VOID)
     t = fn.add_generic('T')
     fn.add_variable('array', Reference(Array(t), 1))
-    fn.add_variable('length', Construct(INT))
+    fn.add_variable('length', StructType(INT))
     mod.add_function(fn)
 
     return mod
@@ -104,7 +104,7 @@ def to_type(val: str, syms: SymbolTable) -> Type:
 
     struct = syms.get(val, Struct)
     assert isinstance(struct, Struct)
-    return Construct(struct)
+    return StructType(struct)
 
 
 def to_level(tp: Type, lvl: int) -> Type:
@@ -250,8 +250,8 @@ def match_type(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
             and self.length == other.length \
             and match_type(self.type, other.type, gens)
 
-    if isinstance(self, Construct):
-        if not isinstance(other, Construct):
+    if isinstance(self, StructType):
+        if not isinstance(other, StructType):
             return False
 
         if self.struct != other.struct:
@@ -333,7 +333,7 @@ def accept_type(self: Type, other: Type, gens: Dict[str, Type]) -> float:
     else:
         reduction = 0.0
 
-    if isinstance(self, (Array, Construct, EnumerationType)):
+    if isinstance(self, (Array, StructType, EnumerationType)):
         if not match_type(self, other, gens):
             return None
 
@@ -349,8 +349,8 @@ UNKNOWN = Special('?')
 DIVERGE = Special('Diverge')
 VOID = Special('Void')
 
-TRUE = Constant('TRUE', Construct(BOOL), True)
-FALSE = Constant('FALSE', Construct(BOOL), False)
+TRUE = Constant('TRUE', StructType(BOOL), True)
+FALSE = Constant('FALSE', StructType(BOOL), False)
 
 MATCH_PERFECT = 3.0
 MATCH_TO_VOID = 1.0
