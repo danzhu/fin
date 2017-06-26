@@ -24,22 +24,22 @@ def load_builtins() -> Module:
         # binary
         for op in ['plus', 'minus', 'multiplies', 'divides', 'modulus']:
             fn = Function(op, tp)
-            fn.add_variable('left', tp)
-            fn.add_variable('right', tp)
+            fn.add_param('left', tp)
+            fn.add_param('right', tp)
             mod.add_function(fn)
 
         # unary
         for op in ['pos', 'neg']:
             fn = Function(op, tp)
-            fn.add_variable('value', tp)
+            fn.add_param('value', tp)
             mod.add_function(fn)
 
         # comparison
         for op in ['equal', 'notEqual', 'less', 'lessEqual', 'greater',
                    'greaterEqual']:
             fn = Function(op, StructType(BOOL))
-            fn.add_variable('left', tp)
-            fn.add_variable('right', tp)
+            fn.add_param('left', tp)
+            fn.add_param('right', tp)
             mod.add_function(fn)
 
     for val in NUM_TYPES:
@@ -48,14 +48,14 @@ def load_builtins() -> Module:
                 continue
 
             fn = Function('cast', res)
-            fn.add_variable('value', val)
+            fn.add_param('value', val)
             mod.add_function(fn)
 
     # array subscript
     fn = Function('subscript', None)
     t = fn.add_generic('T')
-    fn.add_variable('arr', Reference(Array(t), 1))
-    fn.add_variable('index', StructType(INT))
+    fn.add_param('arr', Reference(Array(t), 1))
+    fn.add_param('index', StructType(INT))
     fn.ret = Reference(t, 1)
     mod.add_function(fn)
 
@@ -67,21 +67,21 @@ def load_builtins() -> Module:
 
     fn = Function('alloc', None)
     t = fn.add_generic('T')
-    fn.add_variable('length', StructType(INT))
+    fn.add_param('length', StructType(INT))
     fn.ret = Reference(Array(t), 1)
     mod.add_function(fn)
 
     # dealloc
     fn = Function('dealloc', VOID)
     t = fn.add_generic('T')
-    fn.add_variable('reference', Reference(t, 1))
+    fn.add_param('reference', Reference(t, 1))
     mod.add_function(fn)
 
     # realloc
     fn = Function('realloc', VOID)
     t = fn.add_generic('T')
-    fn.add_variable('array', Reference(Array(t), 1))
-    fn.add_variable('length', StructType(INT))
+    fn.add_param('array', Reference(Array(t), 1))
+    fn.add_param('length', StructType(INT))
     mod.add_function(fn)
 
     return mod
@@ -194,7 +194,7 @@ def load_module(mod_name: str, parent: Module) -> Module:
                 for i in range(len(params) // 2):
                     name = params[i * 2]
                     param: Type = to_type(params[i * 2 + 1], mod)
-                    fn.add_variable(name, param)
+                    fn.add_param(name, param)
                 mod.add_function(fn)
 
             else:

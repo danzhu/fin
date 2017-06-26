@@ -93,7 +93,8 @@ class Parser:
             elif self._lookahead.type == 'ENUM':
                 children.append(self._enum())
             else:
-                children.append(self._stmt())
+                children.append(self._test())
+                self._expect('EOL')
         return Node('FILE', None, children)
 
     def _import(self) -> Node:
@@ -195,14 +196,6 @@ class Parser:
         self._expect('EOL')
         return Node('DEF', token, (params, ret, cont), name)
 
-    def _stmt(self) -> Node:
-        if self._lookahead.type == 'LET':
-            node = self._let()
-        else:
-            node = self._test()
-        self._expect('EOL')
-        return node
-
     def _let(self) -> Node:
         token = self._lookahead
         self._expect('LET')
@@ -299,8 +292,8 @@ class Parser:
         node = Node('ID', token, (), name)
 
         while self._lookahead.type == 'SCOPE':
-            token = self._lookahead
             self._next()
+            token = self._lookahead
             member = Node('ID', self._lookahead, (), self._id())
             node = Node('SCOPE', token, (node, member))
 
@@ -360,7 +353,13 @@ class Parser:
         stmts = []
         self._expect('INDENT')
         while self._lookahead.type != 'DEDENT':
-            stmts.append(self._stmt())
+            if self._lookahead.type == 'LET':
+                node = self._let()
+            else:
+                node = self._test()
+            self._expect('EOL')
+            stmts.append(node)
+
         self._next()
         return Node('BLOCK', token, stmts)
 

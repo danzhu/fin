@@ -1,6 +1,6 @@
 from typing import Any, Dict, Set, cast
 from io import TextIOBase
-from .reflect import Location, Reference, Constant, Function, Struct, Type, \
+from .reflect import Reference, Variable, Constant, Function, Struct, Type, \
     Match, StructType, Variant, Enumeration
 from . import symbols
 from .node import Node, StackNode
@@ -111,7 +111,7 @@ class Generator:
 
         # user-defined function
         if fn.module().name != '':
-            arg_size = sum(p.size() for p in match.params)
+            arg_size = sum(p.size() for p in match.args)
             self._write('call', fn.fullpath(), arg_size)
             return
 
@@ -142,8 +142,8 @@ class Generator:
             return
 
         if fn.name == 'cast':
-            frm = match.params[0].fullname()[0].lower()
-            tar = match.ret.fullname()[0].lower()
+            frm = match.args[0].fullname()[0].lower()
+            tar = match.result.fullname()[0].lower()
             self._write(f'cast_{frm}_{tar}')
             return
 
@@ -176,7 +176,7 @@ class Generator:
         else:
             assert False, f'unknown operator {fn.name}'
 
-        name = match.params[0].fullname()[0].lower()
+        name = match.args[0].fullname()[0].lower()
         self._write(f'{op}_{name}')
 
     def _FILE(self, node: Node) -> None:
@@ -395,10 +395,12 @@ class Generator:
         self._call(node.match)
 
     def _MEMBER(self, node: Node) -> None:
+        assert isinstance(node.variable, Variable)
+
         self._gen(node.children[0])
 
-        if node.field.offset > 0:
-            self._write('offset', node.field.offset)
+        if node.variable.offset > 0:
+            self._write('offset', node.variable.offset)
 
     def _NUM(self, node: Node) -> None:
         self._write('const_i', node.value)
@@ -420,15 +422,7 @@ class Generator:
             else:
                 raise NotImplementedError()
 
-        elif node.variable.location == Location.Global:
-            # self._write('addr_glob', node.variable.offset)
-            raise NotImplementedError()
-
-        elif node.variable.location == Location.Param:
-            self._write('addr_frame',
-                        node.variable.offset)
-
-        elif node.variable.location == Location.Local:
+        elif isinstance(node.variable, Variable):
             self._write('addr_frame', node.variable.offset)
 
         else:

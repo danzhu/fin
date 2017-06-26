@@ -1,6 +1,5 @@
 from typing import Tuple, Dict, Any, Set, List, cast, Sequence, TypeVar
 import typing
-from enum import Enum
 import math
 from . import symbols
 
@@ -14,15 +13,7 @@ def check_type(sym: 'Symbol', tps: Tuple[type, ...]):
             return
 
     exp = ' or '.join(t.__name__ for t in tps)
-    raise LookupError(f"expecting {exp}, but got '{sym}'")
-
-
-class Location(Enum):
-    Global = 0
-    Struct = 1
-    Enum = 2
-    Param = 3
-    Local = 4
+    raise LookupError(f"expecting {exp}, but got {type(sym).__name__} '{sym}'")
 
 
 class Type:
@@ -43,45 +34,12 @@ class Symbol:
     name: str
 
 
-class Callable:
+class Invokable:
     def overloads(self) -> Set['Match']:
         raise NotImplementedError()
 
 
-class Variable(Symbol):
-    def __init__(self,
-                 name: str,
-                 tp: Type,
-                 loc: Location,
-                 off: int = None) -> None:
-        self.name = name
-        self.type = tp
-        self.location = loc
-        self.offset = off
-
-    def __str__(self) -> str:
-        return f'{self.name} {self.type}'
-
-    def var_type(self) -> Type:
-        if not isinstance(self.type, Reference):
-            return Reference(self.type, 1)
-
-        return Reference(self.type.type, self.type.level + 1)
-
-
-class Constant(Symbol):
-    def __init__(self, name: str, tp: Type, val: Any) -> None:
-        self.name = name
-        self.type = tp
-        self.value = val
-
-    def var_type(self) -> Type:
-        return self.type
-
-
 class SymbolTable:
-    LOCATION: Location
-
     def __init__(self, parent: 'SymbolTable' = None) -> None:
         self.parent = parent
 
@@ -152,6 +110,44 @@ class SymbolTable:
         return mod
 
 
+class Constant(Symbol):
+    def __init__(self, name: str, tp: Type, val: Any) -> None:
+        self.name = name
+        self.type = tp
+        self.value = val
+
+    def var_type(self) -> Type:
+        return self.type
+
+
+class Variable(Symbol):
+    def __init__(self,
+                 name: str,
+                 tp: Type,
+                 off: int) -> None:
+        self.name = name
+        self.type = tp
+        self.offset = off
+
+    def __str__(self) -> str:
+        return f'{self.name} {self.type}'
+
+    def var_type(self) -> Type:
+        lvl = self.type.level if isinstance(self.type, Reference) else 0
+        return symbols.to_level(self.type, lvl + 1)
+
+
+class Field(Symbol):
+    def __init__(self,
+                 name: str,
+                 tp: Type) -> None:
+        self.name = name
+        self.type = tp
+
+    def __str__(self) -> str:
+        return f'{self.name} {self.type}'
+
+
 class Scope(Symbol, SymbolTable):
     def __str__(self):
         return self.name
@@ -167,8 +163,6 @@ class Scope(Symbol, SymbolTable):
 
 
 class Module(Scope):
-    LOCATION = Location.Global
-
     def __init__(self, name: str,
                  parent: 'Module',
                  builtins: 'Module' = None) -> None:
@@ -260,19 +254,14 @@ class Module(Scope):
         return ops
 
 
-class Struct(Scope, Callable):
-    LOCATION = Location.Struct
-
+class Struct(Scope, Invokable):
     def __init__(self, name: str, size: int = 0) -> None:
         super().__init__()
 
         self.name = name
         self.size = size
         self.generics: List[Generic] = []
-        self.fields: List[Variable] = []
-
-    def fullpath(self) -> str:
-        return self.module().path() + self.fullname()
+        self.fields: List[Field] = []
 
     def add_generic(self, name: str) -> 'Generic':
         gen = Generic(name)
@@ -280,19 +269,17 @@ class Struct(Scope, Callable):
         self._add_symbol(gen)
         return gen
 
-    def add_variable(self, name: str, tp: Type) -> Variable:
-        var = Variable(name, tp, Location.Struct)
-        self.fields.append(var)
-        self._add_symbol(var)
-        return var
+    def add_field(self, name: str, tp: Type) -> Field:
+        field = Field(name, tp)
+        self.fields.append(field)
+        self._add_symbol(field)
+        return field
 
     def overloads(self) -> Set['Match']:
         return {Match(self, self.generics, self.fields, StructType(self))}
 
 
 class Enumeration(Scope):
-    LOCATION = Location.Enum
-
     def __init__(self, name: str) -> None:
         super().__init__()
 
@@ -302,12 +289,6 @@ class Enumeration(Scope):
         self.counter = 0
         self.generics: List['Generic'] = []
         self.variants: List['Variant'] = []
-
-    def __str__(self) -> str:
-        return self.name
-
-    def fullname(self) -> str:
-        return self.name
 
     def add_generic(self, name: str) -> 'Generic':
         gen = Generic(name)
@@ -324,9 +305,7 @@ class Enumeration(Scope):
         return var
 
 
-class Variant(Scope, Callable):
-    LOCATION = Location.Enum
-
+class Variant(Scope, Invokable):
     def __init__(self, name: str, parent: Enumeration) -> None:
         super().__init__()
 
@@ -339,8 +318,10 @@ class Variant(Scope, Callable):
     def __str__(self) -> str:
         return f'{self.parent}:{self.name}'
 
-    def add_variable(self, name: str, tp: Type) -> Variable:
-        return self.struct.add_variable(name, tp)
+    def add_field(self, name: str, tp: Type) -> Field:
+        field = self.struct.add_field(name, tp)
+        self._add_symbol(field)
+        return field
 
     def overloads(self) -> Set['Match']:
         assert isinstance(self.parent, Enumeration)
@@ -350,29 +331,14 @@ class Variant(Scope, Callable):
 
 
 class Function(Scope):
-    LOCATION = Location.Param
-
     def __init__(self, name: str, ret: Type) -> None:
         super().__init__()
 
         self.name = name
         self.ret = ret
 
-        self.params: List[Variable] = []
+        self.params: List[Field] = []
         self.generics: List[Generic] = []
-
-    def __str__(self) -> str:
-        gens = ''
-        if len(self.generics) > 0:
-            gens = '{' + ', '.join(str(g) for g in self.generics) + '}'
-
-        params = ', '.join(str(p) for p in self.params)
-
-        ret = ''
-        if self.ret != symbols.VOID:
-            ret = ' ' + str(self.ret)
-
-        return f'{self.name}{gens}({params}){ret}'
 
     def fullname(self) -> str:
         # TODO: generic parameters
@@ -384,18 +350,14 @@ class Function(Scope):
 
         return f'{self.name}({params}){ret}'
 
-    def add_variable(self, name: str, tp: Type) -> Variable:
+    def add_param(self, name: str, tp: Type) -> Field:
         assert isinstance(name, str)
 
-        var = Variable(name, tp, Location.Param, 0)
+        param = Field(name, tp)
 
-        self._add_symbol(var)
-        self.params.append(var)
-
-        for param in self.params:
-            param.offset -= tp.size()
-
-        return var
+        self._add_symbol(param)
+        self.params.append(param)
+        return param
 
     def add_generic(self, name: str) -> 'Generic':
         assert isinstance(name, str)
@@ -424,21 +386,15 @@ class FunctionGroup(Symbol):
 
 
 class Block(SymbolTable):
-    LOCATION = Location.Local
-
-    def __init__(self, parent: SymbolTable) -> None:
+    def __init__(self, parent: SymbolTable, offset: int) -> None:
         super().__init__(parent)
 
         self.offset = 0
+        self.parent_offset = offset
 
-        if isinstance(parent, Block):
-            self.parent_offset = parent.offset
-        else:
-            self.parent_offset = 0
-
-    def add_variable(self, name: str, tp: Type) -> Variable:
+    def add_local(self, name: str, tp: Type) -> Variable:
         offset = self.parent_offset + self.offset
-        var = Variable(name, tp, Location.Local, offset)
+        var = Variable(name, tp, offset)
         self.offset += tp.size()
 
         self._add_symbol(var)
@@ -449,27 +405,31 @@ class Match:
     def __init__(self,
                  source: SymbolTable,
                  generics: Sequence['Generic'],
-                 params: Sequence[Variable],
+                 params: Sequence[Field],
                  ret: Type) -> None:
         self.source = source
 
-        self.generics = generics
-        self.params = [p.type for p in params]
-        self.ret = ret
+        self._generics = generics
+        self._params = params
+        self._ret = ret
 
         self.resolved_gens: Dict[str, Type] = None
-        self.levels: List[float] = None
+        self.args: List[Type] = None
+        self.result: Type = None
+
+        self._levels: List[float] = None
+        self._resolved = False
 
     def __lt__(self, other: 'Match') -> bool:
-        assert len(self.levels) == len(other.levels)
+        assert len(self._levels) == len(other._levels)
 
         # generic has lower precedence
-        if len(self.generics) == 0 \
-                and len(other.generics) > 0:
+        if len(self._generics) == 0 \
+                and len(other._generics) > 0:
             return False
 
         less = False
-        for s, o in zip(self.levels, other.levels):
+        for s, o in zip(self._levels, other._levels):
             if s > o:
                 return False
             if s < o:
@@ -478,12 +438,26 @@ class Match:
         return less
 
     def __str__(self) -> str:
-        gens = ''.join(f', {k} = {g}' for k, g in self.resolved_gens.items())
-        # FIXME: print actual signature
-        return f'{self.levels}{gens}'
+        if len(self._generics) > 0:
+            gens = '{'
+            for g in self._generics:
+                gens += g.name
+                resolved = self.resolved_gens.get(g.name, None)
+                if resolved is not None:
+                    gens += f'={resolved}'
+
+            gens += '}'
+        else:
+            gens = ''
+
+        params = ', '.join(str(p) for p in self._params)
+
+        ret = f' {self._ret}' if self._ret != symbols.VOID else ''
+
+        return f'{self.source}{gens}({params}){ret} {self._levels}'
 
     def update(self, args: List[Type], ret: Type) -> bool:
-        if len(args) != len(self.params):
+        if len(args) != len(self._params):
             return False
 
         # None: type mismatch
@@ -493,25 +467,28 @@ class Match:
         # nan: unknown
 
         self.resolved_gens = {}
-        self.levels = [symbols.accept_type(p, a, self.resolved_gens)
-                       for p, a in zip(self.params, args)]
+        self._levels = [symbols.accept_type(p.type, a, self.resolved_gens)
+                        for p, a in zip(self._params, args)]
 
         if ret is not None:
-            lvl = symbols.accept_type(ret, self.ret, self.resolved_gens)
+            lvl = symbols.accept_type(ret, self._ret, self.resolved_gens)
         else:
             lvl = math.nan
 
-        self.levels.append(lvl)
+        self._levels.append(lvl)
 
-        return None not in self.levels
+        return None not in self._levels
 
     def resolve(self) -> bool:
+        assert not self._resolved
         # check that all generic params are resolved
-        if len(self.resolved_gens) != len(self.generics):
+        if len(self.resolved_gens) != len(self._generics):
             return False
 
-        self.params = [p.resolve(self.resolved_gens) for p in self.params]
-        self.ret = self.ret.resolve(self.resolved_gens)
+        self.args = [p.type.resolve(self.resolved_gens) for p in self._params]
+        self.result = self._ret.resolve(self.resolved_gens)
+
+        self._resolved = True
         return True
 
 
@@ -595,7 +572,7 @@ class Generic(Type, Symbol):
 class StructType(Type):
     def __init__(self,
                  struct: Struct,
-                 fields: List[Variable] = None,
+                 fields: List[Field] = None,
                  gens: List[Type] = None) -> None:
         self.struct = struct
         self.fields = fields
@@ -631,7 +608,7 @@ class StructType(Type):
 
         return res
 
-    def member(self, name: str) -> Variable:
+    def field(self, name: str) -> Variable:
         self.finalize()
 
         if name not in self.symbols:
@@ -649,8 +626,8 @@ class StructType(Type):
     def resolve(self, gens: Dict[str, Type]) -> 'StructType':
         fields = []
         for f in self.fields:
-            var = Variable(f.name, f.type.resolve(gens), Location.Struct)
-            fields.append(var)
+            field = Field(f.name, f.type.resolve(gens))
+            fields.append(field)
 
         gen_args = []
         for g in self.generics:
@@ -668,9 +645,8 @@ class StructType(Type):
         size = 0
         self.symbols = {}
         for f in self.fields:
-            f.offset = size
+            self.symbols[f.name] = Variable(f.name, f.type, size)
             size += f.type.size()
-            self.symbols[f.name] = f
 
         self._finalized = True
 

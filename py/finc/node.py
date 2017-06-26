@@ -68,7 +68,6 @@ class Node:
         self.stack_next: StackNode = None
         self.variable: Union[Variable, Constant] = None
         self.block: Block = None
-        self.field: Variable = None
 
         # code generation
         self.context: Dict[str, str] = None
@@ -177,7 +176,7 @@ class Node:
             for p in self.children[0].children:
                 name = p.value
                 tp = p.children[0]._type(mod)
-                self.function.add_variable(name, tp)
+                self.function.add_param(name, tp)
 
             mod.add_function(self.function)
 
@@ -188,7 +187,7 @@ class Node:
             for f in self.children[1].children:
                 name = f.value
                 tp = f.children[0]._type(self.struct)
-                self.struct.add_variable(name, tp)
+                self.struct.add_field(name, tp)
 
         elif self.type == 'ENUM':
             for g in self.children[0].children:
@@ -198,7 +197,7 @@ class Node:
                 var = self.enum.add_variant(v.value)
                 for p in v.children:
                     tp = p.children[0]._type(self.enum)
-                    var.add_variable(p.value, tp)
+                    var.add_field(p.value, tp)
 
         else:
             assert False, 'unknown declaration'
@@ -317,7 +316,12 @@ class Node:
     def _analyze_acquire(self, syms: SymbolTable, refs: Set[Function]) -> None:
         # symbol table
         if self.type == 'DEF':
-            syms = self.function
+            offset = -sum(f.type.size() for f in self.function.params)
+            syms = Block(self.function, offset)
+            for f in self.function.params:
+                syms.add_local(f.name, f.type)
+
+            assert offset + syms.offset == 0
 
         elif self.type == 'STRUCT':
             syms = self.struct
@@ -326,7 +330,9 @@ class Node:
             syms = self.enum
 
         elif self.type == 'BLOCK':
-            syms = Block(syms)
+            assert isinstance(syms, Block)
+
+            syms = Block(syms, syms.offset)
             self.block = syms
 
         # process children
@@ -367,7 +373,7 @@ class Node:
             self._resolve_overload(refs, self.args, self.target_type)
 
             if self.match is not None:
-                self.expr_type = self.match.ret
+                self.expr_type = self.match.result
 
         elif self.type == 'OP':
             self.expr_type = symbols.UNKNOWN
@@ -380,7 +386,7 @@ class Node:
             self._resolve_overload(refs, self.args, self.target_type)
 
             if self.match is not None:
-                self.expr_type = self.match.ret
+                self.expr_type = self.match.result
 
         elif self.type == 'INC_ASSN':
             assert len(self.children) == 2
@@ -414,8 +420,8 @@ class Node:
                 self._error('member access requires struct type')
                 assert False
 
-            self.field = tp.member(self.children[1].value)
-            self.expr_type = self.field.var_type()
+            self.variable = tp.field(self.children[1].value)
+            self.expr_type = self.variable.var_type()
 
         elif self.type == 'BLOCK':
             self.expr_type = self.children[-1].expr_type
@@ -441,9 +447,9 @@ class Node:
 
                 tp = symbols.to_level(tp, self.level)
 
-            assert isinstance(syms, (Module, Block))
+            assert isinstance(syms, Block)
 
-            self.variable = syms.add_variable(name, tp)
+            self.variable = syms.add_local(name, tp)
             self.expr_type = symbols.VOID
 
         elif self.type == 'WHILE':
@@ -486,14 +492,14 @@ class Node:
             else:
                 assert False, f'unknown type {type(self.match.source)}'
 
-            self.expr_type = self.match.ret
-            for c, p in zip(self.children[1].children, self.match.params):
+            self.expr_type = self.match.result
+            for c, p in zip(self.children[1].children, self.match.args):
                 c._expect_type(p)
 
         elif self.type == 'OP':
             self._resolve_overload(refs, self.args, self.target_type, True)
-            self.expr_type = self.match.ret
-            for c, p in zip(self.children, self.match.params):
+            self.expr_type = self.match.result
+            for c, p in zip(self.children, self.match.args):
                 c._expect_type(p)
 
         elif self.type == 'INC_ASSN':
@@ -506,9 +512,9 @@ class Node:
 
             refs.add(self.match.source)
 
-            tp = symbols.to_level(self.match.params[0], 1)
+            tp = symbols.to_level(self.match.args[0], 1)
             self.children[0]._expect_type(tp)
-            self.children[1]._expect_type(self.match.params[1])
+            self.children[1]._expect_type(self.match.args[1])
 
         elif self.type == 'CAST':
             if not isinstance(self.match.source, Function):
@@ -516,7 +522,7 @@ class Node:
                 assert False
 
             refs.add(self.match.source)
-            self.children[0]._expect_type(self.match.params[0])
+            self.children[0]._expect_type(self.match.args[0])
 
         elif self.type == 'MEMBER':
             tp = symbols.to_level(self.children[0].expr_type, 1)
@@ -589,7 +595,7 @@ class Node:
             self.children[0]._analyze_expect(refs, stack)
 
             # the ref is duplicated on the stack and loaded
-            stack = StackNode(self.match.params[0],
+            stack = StackNode(self.match.args[0],
                               self.children[0].stack_next)
 
             self.children[1]._analyze_expect(refs, stack)
