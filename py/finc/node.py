@@ -285,20 +285,7 @@ class Node:
     def _pattern(self, syms: Block, tp: Type) -> Pattern:
         pat: pattern.Pattern
 
-        if self.type == 'PAT_ANY':
-            pat = pattern.Any()
-
-        elif self.type == 'PAT_NUM':
-            pat = pattern.Int(int(self.value))
-
-        elif self.type == 'PAT_FLOAT':
-            pat = pattern.Float(float(self.value))
-
-        elif self.type == 'PAT_VAR':
-            name = self.children[0].value
-            pat = pattern.Variable(name, tp)
-
-        elif self.type == 'PAT_STRUCT':
+        if self.type == 'PAT_STRUCT':
             sym = self.children[0]._symbol(syms, Struct, Variant)
             if isinstance(sym, Struct):
                 assert False, 'TODO'
@@ -324,8 +311,26 @@ class Node:
             else:
                 assert False
 
+            return pat
+
+        if self.type == 'PAT_ANY':
+            return pattern.Any()
+
+        if self.type == 'PAT_VAR':
+            name = self.children[0].value
+            return pattern.Variable(name, tp)
+
+        if self.type == 'PAT_NUM':
+            pat = pattern.Int(int(self.value))
+
+        elif self.type == 'PAT_FLOAT':
+            pat = pattern.Float(float(self.value))
+
         else:
             assert False, 'unknown pattern type'
+
+        if symbols.accept_type(pat.type, tp, {}) is None:
+            self._error(f"unmatched pattern '{pat}' for type {tp}")
 
         return pat
 

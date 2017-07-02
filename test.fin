@@ -21,18 +21,16 @@ def test()
     let opt = Opt::Some(1)
     opt = Opt::None()
 
-    match opt
+    let i = match opt
         Opt::Some(val) => val
         Opt::None() => 0
-    .rt::print()
 
-    # match i + 1
-    #     j
-    #         rt::print(j + 2)
+    match i + 1
+        j => rt::print(j + 2)
 
     # let v = Vec(3., 4.) + Vec(1., 1.)
     # match v
-    #     Vec(x, y)
+    #     Vec(x, y) => begin
     #         x.rt::print()
     #         y.rt::print()
 
