@@ -16,6 +16,19 @@ void input(Fin::Runtime &rt, Fin::Stack &st)
     st.push(val);
 }
 
+void write(Fin::Runtime &rt, Fin::Stack &st)
+{
+    auto c = static_cast<char>(st.pop<int32_t>());
+    std::cout.put(c);
+}
+
+void read(Fin::Runtime &rt, Fin::Stack &st)
+{
+    char c;
+    std::cin.get(c);
+    st.push(static_cast<int32_t>(c));
+}
+
 void backtrace(Fin::Runtime &rt, Fin::Stack &st)
 {
     rt.backtrace(std::cout);
@@ -46,6 +59,8 @@ int main(int argc, const char *argv[])
     fin.addFunction("input()Int", Fin::Function{input<int32_t>});
     fin.addFunction("input()Float", Fin::Function{input<float>});
     fin.addFunction("input()Bool", Fin::Function{input<bool>});
+    fin.addFunction("write(Int)", Fin::Function{write});
+    fin.addFunction("read()Int", Fin::Function{read});
     fin.addFunction("backtrace()", Fin::Function{backtrace});
 
     try
