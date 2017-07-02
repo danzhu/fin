@@ -390,12 +390,10 @@ class Block(SymbolTable):
     def __init__(self, parent: SymbolTable, offset: int) -> None:
         super().__init__(parent)
 
-        self.offset = 0
-        self.parent_offset = offset
+        self.offset = offset
 
     def add_local(self, name: str, tp: Type) -> Variable:
-        offset = self.parent_offset + self.offset
-        var = Variable(name, tp, offset)
+        var = Variable(name, tp, self.offset)
         self.offset += tp.size()
 
         self._add_symbol(var)

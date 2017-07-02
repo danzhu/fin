@@ -397,7 +397,7 @@ class Node:
 
             self.children[0].variables = vs  # params
 
-            assert offset + syms.offset == 0
+            assert syms.offset == 0
 
         elif self.type == 'STRUCT':
             syms = self.struct
