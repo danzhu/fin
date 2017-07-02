@@ -294,6 +294,13 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
+            case Opcode::AddrSt:
+                {
+                    auto offset = readConst<int16_t>();
+                    opStack.push(static_cast<Ptr>(opStack.size() + offset));
+                }
+                continue;
+
             case Opcode::AddrOffset:
                 {
                     auto size = readConst<uint16_t>();

@@ -342,15 +342,22 @@ def accept_type(self: Type, other: Type, gens: Dict[str, Type]) -> float:
     assert False, f'unknown type {self}'
 
 
+# structs
 BOOL = Struct('Bool', 1)
 INT = Struct('Int', 4)
 FLOAT = Struct('Float', 4)
+
+# types
+BOOL_TYPE = StructType(BOOL)
+INT_TYPE = StructType(INT)
+FLOAT_TYPE = StructType(FLOAT)
 UNKNOWN = Special('?')
 DIVERGE = Special('Diverge')
 VOID = Special('Void')
 
-TRUE = Constant('TRUE', StructType(BOOL), True)
-FALSE = Constant('FALSE', StructType(BOOL), False)
+# constants
+TRUE = Constant('TRUE', BOOL_TYPE, True)
+FALSE = Constant('FALSE', BOOL_TYPE, False)
 
 MATCH_PERFECT = 3.0
 MATCH_TO_VOID = 1.0

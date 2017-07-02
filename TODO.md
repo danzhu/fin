@@ -43,12 +43,16 @@
 - [ ] generics
   - [x] struct / enum
   - [ ] function
-- [ ] pattern matching
-  - [ ] constant
-  - [ ] deconstruction
+- [x] pattern matching
+  - [x] matching
+  - [x] destructuring
 - [ ] traits
 - [ ] iterators
   - [ ] continuation-based iteration
+- [ ] mutability
+  - [x] constants
+  - [ ] immutable bindings
+  - [x] mutable variables
 
 ## Compiler
 
@@ -104,8 +108,11 @@
 - [ ] show token of unsized type error
   - [ ] first bring back recursive definition check
 - [ ] optimize `and` / `or` short-circuit
-- [ ] restrict struct construction to call syntax
+- [x] ~~restrict struct construction to call syntax~~
 - [ ] make parentheses after enum optional
+- pattern matching
+  - [ ] struct destructuring
+  - [ ] ref binding
 
 ## Runtime
 

@@ -309,8 +309,11 @@ class Variant(Scope, Invokable):
     def __init__(self, name: str, parent: Enumeration) -> None:
         super().__init__()
 
+        assert isinstance(parent, Enumeration)
+
         self.name = name
         self.parent = parent
+        self.enum = parent
 
         self.value = parent.counter
         self.struct = Struct('<variant>', parent.size)
@@ -324,10 +327,8 @@ class Variant(Scope, Invokable):
         return field
 
     def overloads(self) -> Set['Match']:
-        assert isinstance(self.parent, Enumeration)
-
-        ret = EnumerationType(self.parent)
-        return {Match(self, self.parent.generics, self.struct.fields, ret)}
+        ret = EnumerationType(self.enum)
+        return {Match(self, self.enum.generics, self.struct.fields, ret)}
 
 
 class Function(Scope):
@@ -585,6 +586,7 @@ class StructType(Type):
             self.generics = cast(List[Type], struct.generics)
 
         self._finalized = False
+        self.resolved_fields: List[Variable] = None
         self.symbols: Dict[str, Variable] = None
 
     def __str__(self) -> str:
@@ -642,11 +644,15 @@ class StructType(Type):
         if self._finalized:
             return
 
-        size = 0
+        size = self.struct.size
+        self.resolved_fields = []
         self.symbols = {}
         for f in self.fields:
-            self.symbols[f.name] = Variable(f.name, f.type, size)
+            var = Variable(f.name, f.type, size)
             size += f.type.size()
+
+            self.resolved_fields.append(var)
+            self.symbols[f.name] = var
 
         self._finalized = True
 

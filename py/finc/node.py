@@ -3,10 +3,12 @@ from typing import Sequence, Set, List, Dict, Union, TypeVar, Callable, Any, \
 from functools import wraps
 from .tokens import Token
 from . import symbols
+from . import pattern
 from .reflect import Module, Function, Struct, Block, Type, Reference, Array, \
     StructType, Special, Match, SymbolTable, Variable, Constant, Generic, \
     FunctionGroup, Symbol, Enumeration, Variant, EnumerationType
 from .error import AnalyzerError
+from .pattern import Pattern
 
 
 TFn = TypeVar('TFn', bound=Callable[..., Any])
@@ -30,8 +32,15 @@ class StackNode:
         self.type = tp
         self.next = nxt
 
-    def __str__(self) -> str:
-        return f'{self.next} {self.type}'
+
+def print_stack(node: StackNode) -> str:
+    if node is None:
+        return ''
+
+    if node.next is None:
+        return str(node.type)
+
+    return print_stack(node.next) + f' {node.type}'
 
 
 class Node:
@@ -68,6 +77,8 @@ class Node:
         self.stack_next: StackNode = None
         self.variable: Union[Variable, Constant] = None
         self.block: Block = None
+        self.pattern: pattern.Pattern = None
+        self.variables: List[Variable] = None
 
         # code generation
         self.context: Dict[str, str] = None
@@ -79,6 +90,8 @@ class Node:
             content += f' {self.match}'
         elif self.function:
             content += f' {self.function}'
+        elif self.pattern:
+            content += f' {self.pattern}'
         elif self.value:
             content += f' {self.value}'
 
@@ -90,6 +103,11 @@ class Node:
 
         if self.level:
             content += f' {self.level}'
+
+        if self.stack_end:
+            content += ' << ' + \
+                print_stack(self.stack_end) + \
+                ' >>'
 
         return content
 
@@ -264,6 +282,54 @@ class Node:
         assert False, 'unknown AST node type'
 
     @error
+    def _pattern(self, syms: Block, tp: Type) -> Pattern:
+        pat: pattern.Pattern
+
+        if self.type == 'PAT_ANY':
+            pat = pattern.Any()
+
+        elif self.type == 'PAT_NUM':
+            pat = pattern.Int(int(self.value))
+
+        elif self.type == 'PAT_FLOAT':
+            pat = pattern.Float(float(self.value))
+
+        elif self.type == 'PAT_VAR':
+            name = self.children[0].value
+            pat = pattern.Variable(name, tp)
+
+        elif self.type == 'PAT_STRUCT':
+            sym = self.children[0]._symbol(syms, Struct, Variant)
+            if isinstance(sym, Struct):
+                assert False, 'TODO'
+
+            elif isinstance(sym, Variant):
+                pat = pattern.Variant(sym)
+                if len(self.children[1].children) != len(sym.struct.fields):
+                    self._error('unmatched fields')
+
+                gens: Dict[str, Type] = {}
+                if symbols.accept_type(pat.type, tp, gens) is None:
+                    self._error(f"unmatched pattern '{pat}' for type {tp}")
+
+                pat.resolve(gens)
+
+                # get resolved variant
+                assert isinstance(pat.type, EnumerationType)
+                var = pat.variant_struct
+
+                for c, f in zip(self.children[1].children, var.fields):
+                    pat.add_field(c._pattern(syms, f.type))
+
+            else:
+                assert False
+
+        else:
+            assert False, 'unknown pattern type'
+
+        return pat
+
+    @error
     def _resolve_overload(self,
                           refs: Set[Function],
                           args: List[Type],
@@ -318,8 +384,13 @@ class Node:
         if self.type == 'DEF':
             offset = -sum(f.type.size() for f in self.function.params)
             syms = Block(self.function, offset)
+            vs = []
+
             for f in self.function.params:
-                syms.add_local(f.name, f.type)
+                var = syms.add_local(f.name, f.type)
+                vs.append(var)
+
+            self.children[0].variables = vs  # params
 
             assert offset + syms.offset == 0
 
@@ -329,7 +400,7 @@ class Node:
         elif self.type == 'ENUM':
             syms = self.enum
 
-        elif self.type == 'BLOCK':
+        elif self.type in ('BLOCK', 'ARM'):
             assert isinstance(syms, Block)
 
             syms = Block(syms, syms.offset)
@@ -348,13 +419,13 @@ class Node:
             self.expr_type = self.variable.var_type()
 
         elif self.type == 'NUM':
-            self.expr_type = StructType(symbols.INT)
+            self.expr_type = symbols.INT_TYPE
 
         elif self.type == 'FLOAT':
-            self.expr_type = StructType(symbols.FLOAT)
+            self.expr_type = symbols.FLOAT_TYPE
 
         elif self.type == 'TEST':
-            self.expr_type = StructType(symbols.BOOL)
+            self.expr_type = symbols.BOOL_TYPE
 
         elif self.type == 'CALL':
             sym = self.children[0]._symbol(
@@ -423,7 +494,7 @@ class Node:
             self.variable = tp.field(self.children[1].value)
             self.expr_type = self.variable.var_type()
 
-        elif self.type == 'BLOCK':
+        elif self.type in ('BLOCK', 'ARM'):
             self.expr_type = self.children[-1].expr_type
 
         elif self.type == 'IF':
@@ -452,6 +523,23 @@ class Node:
             self.variable = syms.add_local(name, tp)
             self.expr_type = symbols.VOID
 
+        elif self.type == 'MATCH':
+            arms = self.children[1].children
+            tps = {arm.expr_type for arm in arms}
+
+            self.expr_type = symbols.interpolate_types(tps, {})
+
+        elif self.type == 'PATTERN':
+            assert isinstance(syms, Block)
+
+            tp = self.ancestor('MATCH').children[0].expr_type
+
+            self.pattern = self.children[0]._pattern(syms, tp)
+
+            self.variables = []
+            for v in self.pattern.variables():
+                self.variables.append(syms.add_local(v.name, v.type))
+
         elif self.type == 'WHILE':
             bks = self.children[1].decedents('BREAK')
             tps = {node.children[0].expr_type for node in bks}
@@ -467,12 +555,9 @@ class Node:
 
     @error
     def _analyze_expect(self, refs: Set[Function], stack: StackNode) -> None:
-        self.stack_start = stack
-        self.stack_next = stack
-
         if self.type == 'TEST':
             for c in self.children:
-                c._expect_type(StructType(symbols.BOOL))
+                c._expect_type(symbols.BOOL_TYPE)
 
         elif self.type == 'ASSN':
             tp = symbols.to_level(self.children[0].expr_type, self.level + 1)
@@ -542,18 +627,31 @@ class Node:
                 c._expect_type(symbols.VOID)
             self.children[-1]._expect_type(self.expr_type)
 
+        elif self.type == 'ARM':
+            self.expr_type = self.target_type
+
+            self.children[1]._expect_type(self.expr_type)
+
         elif self.type == 'IF':
-            self.children[0]._expect_type(StructType(symbols.BOOL))
+            self.children[0]._expect_type(symbols.BOOL_TYPE)
 
             self.expr_type = self.target_type
 
             self.children[1]._expect_type(self.expr_type)
             self.children[2]._expect_type(self.expr_type)
 
+        elif self.type == 'MATCH':
+            self.expr_type = self.target_type
+
+            # TODO: this is inefficient
+            self.children[0]._expect_type(self.children[0].expr_type)
+            for c in self.children[1].children:
+                c._expect_type(self.expr_type)
+
         elif self.type == 'WHILE':
             self.expr_type = self.target_type
 
-            self.children[0]._expect_type(StructType(symbols.BOOL))
+            self.children[0]._expect_type(symbols.BOOL_TYPE)
             self.children[1]._expect_type(symbols.VOID)
             self.children[2]._expect_type(self.expr_type)
 
@@ -577,22 +675,36 @@ class Node:
 
                 self.children[1]._expect_type(self.variable.type)
 
-            self.stack_next = StackNode(self.variable.type, stack)
+        self.stack_start = stack
 
-        if self.target_type is not None \
+        # stack_next
+        if self.type == 'LET':
+            stack = StackNode(self.variable.type, stack)
+
+        elif self.type in ['PARAMS', 'PATTERN']:
+            for var in self.variables:
+                stack = StackNode(var.type, stack)
+
+        elif self.target_type is not None \
                 and self.target_type != symbols.VOID:
-            self.stack_next = StackNode(self.target_type, stack)
+            stack = StackNode(self.target_type, stack)
+
+        self.stack_next = stack
 
         # recurse
-        if self.type in ['IF', 'WHILE', 'TEST']:
+        if len(self.children) == 0:
+            pass
+
+        elif self.type in ['IF', 'MATCH', 'ARMS', 'WHILE', 'TEST']:
             # these nodes don't leave data on the stack
             for c in self.children:
-                c._analyze_expect(refs, stack)
+                c._analyze_expect(refs, self.stack_start)
 
             # the result stack after children is the same as final result stack
             self.stack_end = self.stack_next
+
         elif self.type == 'INC_ASSN':
-            self.children[0]._analyze_expect(refs, stack)
+            self.children[0]._analyze_expect(refs, self.stack_start)
 
             # the ref is duplicated on the stack and loaded
             stack = StackNode(self.match.args[0],
@@ -601,9 +713,10 @@ class Node:
             self.children[1]._analyze_expect(refs, stack)
 
             self.stack_end = self.children[1].stack_next
-        else:
-            for c in self.children:
-                c._analyze_expect(refs, stack)
-                stack = c.stack_next
 
-            self.stack_end = stack
+        else:
+            self.stack_end = self.stack_start
+
+            for c in self.children:
+                c._analyze_expect(refs, self.stack_end)
+                self.stack_end = c.stack_next

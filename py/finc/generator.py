@@ -1,8 +1,9 @@
 from typing import Any, Dict, Set, cast
 from io import TextIOBase
 from .reflect import Reference, Variable, Constant, Function, Struct, Type, \
-    Match, StructType, Variant, Enumeration
+    Match, StructType, Variant, Enumeration, EnumerationType
 from . import symbols
+from . import pattern
 from .node import Node, StackNode
 
 
@@ -179,6 +180,92 @@ class Generator:
         name = match.args[0].fullname()[0].lower()
         self._write(f'{op}_{name}')
 
+    def _match(self, pat: pattern.Pattern, tp: Type, nxt: str) -> None:
+        self._write(f'# match {pat}')
+        self._cast(tp, pat.type)
+
+        if isinstance(pat, pattern.Int):
+            self._write('const_i', pat.value)
+            self._write('eq_i')
+            self._write('br_false', nxt)
+
+        elif isinstance(pat, pattern.Float):
+            self._write('const_f', pat.value)
+            self._write('eq_f')
+            self._write('br_false', nxt)
+
+        elif isinstance(pat, pattern.Variant):
+            assert isinstance(pat.type, EnumerationType)
+
+            fail = self._label('MATCH_FAIL')
+            succ = self._label('MATCH_SUCC')
+            size = pat.type.size()  # size of enum
+
+            self._write('addr_st', -size)
+            self._write('load', pat.type.enum.size)  # int of variant
+            self._write('const_i', pat.variant.value)
+            self._write('eq_i')
+            self._write('br_false', fail)
+
+            self.indent += 1
+            for p, var in zip(pat.fields, pat.variant_struct.resolved_fields):
+                if not p.TESTED:
+                    continue
+
+                self._match(p, var.type, fail)
+
+            self.indent -= 1
+
+            self._write('br', succ)
+
+            self._write(f'{fail}:')
+            self._write('pop', size)
+            self._write('br', nxt)
+
+            self._write(f'{succ}:')
+            self._write('pop', size)
+
+        else:
+            assert False
+
+    def _destructure(self, pat: pattern.Pattern, tp: Type) -> int:
+        self._write(f'# destructure {pat}')
+
+        if isinstance(pat, (pattern.Int, pattern.Float, pattern.Any)):
+            self._write('pop', tp.size())
+            return 0
+
+        self._cast(tp, pat.type)
+
+        if isinstance(pat, pattern.Variable):
+            return pat.type.size()
+
+        if isinstance(pat, pattern.Variant):
+            assert isinstance(pat.type, EnumerationType)
+
+            src_size = pat.type.size()
+            red_size = 0
+
+            self.indent += 1
+            for p, var in zip(pat.fields, pat.variant_struct.resolved_fields):
+                if not p.BOUND:
+                    continue
+
+                offset = var.offset - src_size
+                self._write('addr_st', offset)
+                self._write('load', var.type.size())
+                red_size += self._destructure(p, var.type)
+
+            self.indent -= 1
+
+            if red_size > 0:
+                self._write('reduce', red_size, src_size)
+            else:
+                self._write('pop', src_size)
+            return red_size
+
+        assert False
+
     def _FILE(self, node: Node) -> None:
         ref_list = []
         for ref in self.refs:
@@ -253,11 +340,49 @@ class Generator:
         self._gen(node.children[0])  # comp
         self._write('br_false', els if has_else else end)
         self._gen(node.children[1])
+
         if has_else:
             self._write('br', end)
             self._write(els + ':')
             self._gen(node.children[2])
+
         self._write(end + ':')
+
+    def _MATCH(self, node: Node) -> None:
+        end = self._label('END_MATCH')
+
+        node.context = {
+            'end': end
+        }
+
+        self._gen(node.children[0])
+
+        for c in node.children[1].children:
+            self._gen(c)
+
+        # pop value if unmatched
+        # TODO: maybe error?
+        self._write('pop', node.children[0].target_type.size())
+        self._write(end + ':')
+
+    def _ARM(self, node: Node) -> None:
+        match = node.ancestor('MATCH')
+
+        nxt = self._label('ARM')
+
+        pat = node.children[0].pattern
+        tp = match.children[0].target_type
+
+        if pat.TESTED:
+            self._write('dup', tp.size())
+            self._match(pat, tp, nxt)
+
+        self._destructure(pat, tp)
+
+        self._gen(node.children[1])
+
+        self._write('br', match.context['end'])
+        self._write(nxt + ':')
 
     def _WHILE(self, node: Node) -> None:
         start = self._label('WHILE')
