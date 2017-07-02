@@ -498,7 +498,7 @@ class Generator:
 
         self._call(node.match)
 
-    def _INC_ASSN(self, node) -> None:
+    def _INC_ASSN(self, node: Node) -> None:
         # left
         self._gen(node.children[0])
         self._write('dup', node.children[0].target_type.size())
@@ -512,7 +512,7 @@ class Generator:
 
         # assn
         ret = symbols.to_level(node.children[0].target_type, 0)
-        self._cast(node.match.ret, ret)
+        self._cast(node.match.result, ret)
         self._write('store', ret.size())
 
     def _CAST(self, node: Node) -> None:
