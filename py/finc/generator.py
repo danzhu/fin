@@ -502,7 +502,7 @@ class Generator:
         # left
         self._gen(node.children[0])
         self._write('dup', node.children[0].target_type.size())
-        self._cast(node.children[0].target_type, node.match.params[0])
+        self._cast(node.children[0].target_type, node.match.args[0])
 
         # right
         self._gen(node.children[1])
