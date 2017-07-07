@@ -1,4 +1,5 @@
-from typing import List, Union, Any
+from typing import List, Union, Any, Iterator
+from itertools import chain
 from . import builtin
 from . import types
 from . import symbols
@@ -13,8 +14,8 @@ class Pattern:
     def bound(self) -> bool:
         raise NotImplementedError()
 
-    def variables(self) -> List['Variable']:
-        return []
+    def variables(self) -> Iterator['Variable']:
+        return iter([])
 
     def resolve(self, res: types.Resolution) -> None:
         self.type = self.type.resolve(res)
@@ -66,8 +67,8 @@ class Variable(Pattern):
     def bound(self) -> bool:
         return True
 
-    def variables(self) -> List['Variable']:
-        return [self]
+    def variables(self) -> Iterator['Variable']:
+        return iter([self])
 
 
 class Struct(Pattern):
@@ -102,8 +103,8 @@ class Struct(Pattern):
     def bound(self) -> bool:
         return any(p.bound() for p in self.subpatterns)
 
-    def variables(self) -> List[Variable]:
-        return [var for pat in self.subpatterns for var in pat.variables()]
+    def variables(self) -> Iterator[Variable]:
+        return chain.from_iterable(pat.variables() for pat in self.subpatterns)
 
     def resolve(self, res: types.Resolution) -> None:
         super().resolve(res)
