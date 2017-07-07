@@ -314,17 +314,17 @@ class Node:
                 self._error('unmatched number of fields')
 
         elif self.type == 'PAT_ANY':
-            pat = pattern.Any()
+            pat = pattern.Wildcard()
 
         elif self.type == 'PAT_VAR':
             name = self.children[0].value
             pat = pattern.Variable(name, tp)
 
         elif self.type == 'PAT_NUM':
-            pat = pattern.Int(int(self.value))
+            pat = pattern.Constant(int(self.value), builtin.INT)
 
         elif self.type == 'PAT_FLOAT':
-            pat = pattern.Float(float(self.value))
+            pat = pattern.Constant(float(self.value), builtin.FLOAT)
 
         else:
             assert False, 'unknown pattern type'

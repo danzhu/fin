@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Any
 from . import builtin
 from . import types
 from . import symbols
@@ -23,7 +23,7 @@ class Pattern:
         return self.type.finalize()
 
 
-class Any(Pattern):
+class Wildcard(Pattern):
     def __init__(self) -> None:
         self.type = builtin.VOID
 
@@ -37,25 +37,10 @@ class Any(Pattern):
         return False
 
 
-class Int(Pattern):
-    def __init__(self, value: int) -> None:
+class Constant(Pattern):
+    def __init__(self, value: Any, tp: types.Type) -> None:
         self.value = value
-        self.type = builtin.INT
-
-    def __str__(self) -> str:
-        return str(self.value)
-
-    def tested(self) -> bool:
-        return True
-
-    def bound(self) -> bool:
-        return False
-
-
-class Float(Pattern):
-    def __init__(self, value: float) -> None:
-        self.value = value
-        self.type = builtin.FLOAT
+        self.type = tp
 
     def __str__(self) -> str:
         return str(self.value)

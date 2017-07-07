@@ -19,7 +19,7 @@ def fib(n Int) Int
 
 def print(v Vec)
     match v
-        Vec(0., 0.) => 0
+        Vec(0., 0.) => return
         Vec(x, 0.) => x.rt::print()
         Vec(0., y) => y.rt::print()
         Vec(x, y) => begin

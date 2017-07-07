@@ -185,14 +185,16 @@ class Generator:
         self._write(f'# match {pat}')
         self._cast(tp, pat.type)
 
-        if isinstance(pat, pattern.Int):
-            self._write('const_i', pat.value)
-            self._write('eq_i')
-            self._write('br_false', nxt)
+        if isinstance(pat, pattern.Constant):
+            if isinstance(pat.value, int):
+                self._write('const_i', pat.value)
+                self._write('eq_i')
+            elif isinstance(pat.value, float):
+                self._write('const_f', pat.value)
+                self._write('eq_f')
+            else:
+                assert False
 
-        elif isinstance(pat, pattern.Float):
-            self._write('const_f', pat.value)
-            self._write('eq_f')
             self._write('br_false', nxt)
 
         elif isinstance(pat, pattern.Struct):
@@ -239,11 +241,6 @@ class Generator:
 
     def _destructure(self, pat: pattern.Pattern, tp: types.Type) -> int:
         self._write(f'# destructure {pat}')
-
-        if isinstance(pat, (pattern.Int, pattern.Float, pattern.Any)):
-            self._write('pop', tp.size())
-            return 0
-
         self._cast(tp, pat.type)
 
         if isinstance(pat, pattern.Variable):
@@ -270,10 +267,8 @@ class Generator:
 
             self.indent -= 1
 
-            if red_size > 0:
-                self._write('reduce', red_size, src_size)
-            else:
-                self._write('pop', src_size)
+            assert red_size != 0
+            self._write('reduce', red_size, src_size)
 
             return red_size
 
@@ -390,7 +385,10 @@ class Generator:
             self._write('dup', tp.size())
             self._match(pat, tp, nxt)
 
-        self._destructure(pat, tp)
+        if pat.bound():
+            self._destructure(pat, tp)
+        else:
+            self._write('pop', tp.size())
 
         self._gen(node.children[1])
 
