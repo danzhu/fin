@@ -1,363 +1,394 @@
-from typing import Dict, Set, List, Iterable
-import math
-import os
-from .reflect import Module, StructType, Function, Reference, Array, \
-    SymbolTable, Type, Struct, Match, Generic, EnumerationType, Special, \
-    Constant
-
-
-def load_builtins() -> Module:
-    mod = Module('', None, None)
-
-    NUM_TYPES = {StructType(tp) for tp in {INT, FLOAT}}
-
-    # classes
-    for struct in {BOOL, INT, FLOAT}:
-        mod.add_struct(struct)
-
-    # constants
-    for const in {TRUE, FALSE}:
-        mod.add_constant(const)
-
-    # builtin operations
-    for tp in NUM_TYPES:
-        # binary
-        for op in ['plus', 'minus', 'multiplies', 'divides', 'modulus']:
-            fn = Function(op, tp)
-            fn.add_param('left', tp)
-            fn.add_param('right', tp)
-            mod.add_function(fn)
-
-        # unary
-        for op in ['pos', 'neg']:
-            fn = Function(op, tp)
-            fn.add_param('value', tp)
-            mod.add_function(fn)
-
-        # comparison
-        for op in ['equal', 'notEqual', 'less', 'lessEqual', 'greater',
-                   'greaterEqual']:
-            fn = Function(op, StructType(BOOL))
-            fn.add_param('left', tp)
-            fn.add_param('right', tp)
-            mod.add_function(fn)
-
-    for val in NUM_TYPES:
-        for res in NUM_TYPES:
-            if val == res:
-                continue
-
-            fn = Function('cast', res)
-            fn.add_param('value', val)
-            mod.add_function(fn)
-
-    # array subscript
-    fn = Function('subscript', None)
-    t = fn.add_generic('T')
-    fn.add_param('arr', Reference(Array(t), 1))
-    fn.add_param('index', StructType(INT))
-    fn.ret = Reference(t, 1)
-    mod.add_function(fn)
-
-    # alloc
-    fn = Function('alloc', None)
-    t = fn.add_generic('T')
-    fn.ret = Reference(t, 1)
-    mod.add_function(fn)
-
-    fn = Function('alloc', None)
-    t = fn.add_generic('T')
-    fn.add_param('length', StructType(INT))
-    fn.ret = Reference(Array(t), 1)
-    mod.add_function(fn)
-
-    # dealloc
-    fn = Function('dealloc', VOID)
-    t = fn.add_generic('T')
-    fn.add_param('reference', Reference(t, 1))
-    mod.add_function(fn)
-
-    # realloc
-    fn = Function('realloc', VOID)
-    t = fn.add_generic('T')
-    fn.add_param('array', Reference(Array(t), 1))
-    fn.add_param('length', StructType(INT))
-    mod.add_function(fn)
-
-    return mod
-
-
-def to_type(val: str, syms: SymbolTable) -> Type:
-    if val[0] == '&':
-        sub = val.lstrip('&')
-
-        tp = to_type(sub, syms)
-        lvl = len(val) - len(sub)
-        return Reference(tp, lvl)
-    elif val[0] == '[':
-        sub = val[1:-1]
-
-        # TODO: sized arrays
-        # maybe we should use the lexer for this
-        tp = to_type(sub, syms)
-        return Array(tp)
+from typing import Tuple, Dict, Any, Set, List, TypeVar
+import typing
+from . import types
+from . import builtin
 
-    struct = syms.get(val, Struct)
-    assert isinstance(struct, Struct)
-    return StructType(struct)
 
+TTbl = TypeVar('TTbl', bound='SymbolTable')
 
-def to_level(tp: Type, lvl: int) -> Type:
-    assert tp is not None
-    assert tp != UNKNOWN
 
-    if isinstance(tp, Reference):
-        tp = tp.type
+def check_type(sym: 'Symbol', tps: Tuple[type, ...]):
+    for tp in tps:
+        if isinstance(sym, tp):
+            return
 
-    if lvl > 0:
-        tp = Reference(tp, lvl)
+    exp = ' or '.join(t.__name__ for t in tps)
+    raise LookupError(f"expecting {exp}, but got {type(sym).__name__} '{sym}'")
 
-    return tp
 
+class Symbol:
+    name: str
 
-def to_ref(tp: Type) -> Reference:
-    assert tp is not None
-    assert tp != UNKNOWN
 
-    if not isinstance(tp, Reference):
-        tp = Reference(tp, 0)
+class Invokable:
+    def overloads(self) -> Set['types.Match']:
+        raise NotImplementedError()
 
-    return tp
 
+class SymbolTable:
+    def __init__(self, parent: 'SymbolTable' = None) -> None:
+        self.parent = parent
 
-def interpolate_types(tps: Iterable[Type], gens: Dict[str, Type]) -> Type:
-    res: Type = DIVERGE
-    unknown = False
-    for other in tps:
-        if other == UNKNOWN:
-            unknown = True
-            continue
+        self.symbols: Dict[str, Symbol] = {}
+        self.references: Dict[str, Module] = {}
 
-        if other == VOID:
-            return VOID
+    def _add_symbol(self, sym: Symbol) -> None:
+        if sym.name in self.symbols:
+            raise LookupError(
+                f"symbol '{sym.name}' exists as {self.symbols[sym.name]}")
 
-        # diverge does not affect any type
-        if res == DIVERGE:
-            res = other
-            continue
-        elif other == DIVERGE:
-            continue
+        self.symbols[sym.name] = sym
 
-        if isinstance(res, Reference):
-            if not isinstance(other, Reference):
-                other = Reference(other, 0)
+    def _find(self, name: str) -> Symbol:
+        if name in self.symbols:
+            return self.symbols[name]
 
-            if not match_type(res.type, other.type, gens):
-                return VOID
+        if name in self.references:
+            return self.references[name]
 
-            lvl = min(res.level, other.level)
-            res = to_level(res.type, lvl)
-            continue
+        if self.parent:
+            return self.parent._find(name)
 
-        if isinstance(other, Reference):
-            other = other.type
-
-        if not match_type(res, other, gens):
-            return VOID
-
-    if unknown:
-        return UNKNOWN
-
-    return res
-
-
-def load_module(mod_name: str, parent: Module) -> Module:
-    # TODO: a better way to locate
-    loc = os.path.dirname(os.path.realpath(__file__))
-    filename = os.path.join(loc, 'ref', f'{mod_name}.fd')
-    mod = Module(mod_name, parent)
-    with open(filename) as f:
-        for line in f:
-            segs: List[str] = line.split()
-            tp: str = segs[0]
-
-            if tp == 'def':
-                ret: Type
-                if len(segs) % 2 == 0:  # void
-                    [tp, name, *params] = segs
-                    ret = VOID
-                else:
-                    [tp, name, *params, rt] = segs
-                    ret = to_type(rt, mod)
-
-                fn = Function(name, ret)
-                for i in range(len(params) // 2):
-                    name = params[i * 2]
-                    param: Type = to_type(params[i * 2 + 1], mod)
-                    fn.add_param(name, param)
-                mod.add_function(fn)
-
-            else:
-                raise ValueError('invalid declaration type')
-
-    return mod
-
-
-def resolve_overload(overloads: Set[Match],
-                     args: List[Type],
-                     ret: Type) -> Set[Match]:
-    assert None not in args and ret is not None
-
-    res: Set[Match] = set()
-
-    for match in overloads:
-        if not match.update(args, ret):
-            continue
-
-        res = {r for r in res if not r < match}
-
-        for other in res:
-            if match < other:
-                break
-        else:
-            res.add(match)
-
-    return res
-
-
-def match_type(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
-    if isinstance(other, Generic):
-        if other.name not in gens:
-            gens[other.name] = self
-            return True
-
-        other = gens[other.name]
-
-    if isinstance(self, Generic):
-        if self.name not in gens:
-            gens[self.name] = other
-            return True
-
-        self = gens[self.name]
-
-    if isinstance(self, Reference):
-        return isinstance(other, Reference) \
-            and self.level == other.level \
-            and match_unsized(self.type, other.type, gens)
-
-    if isinstance(self, Array):
-        return isinstance(other, Array) \
-            and self.length == other.length \
-            and match_type(self.type, other.type, gens)
-
-    if isinstance(self, StructType):
-        if not isinstance(other, StructType):
-            return False
-
-        if self.struct != other.struct:
-            return False
-
-        for gen, other_gen in zip(self.generics, other.generics):
-            if not match_type(gen, other_gen, gens):
-                return False
-
-        return True
-
-    if isinstance(self, EnumerationType):
-        if not isinstance(other, EnumerationType):
-            return False
-
-        if self.enum != other.enum:
-            return False
-
-        for gen, other_gen in zip(self.generics, other.generics):
-            if not match_type(gen, other_gen, gens):
-                return False
-
-        return True
-
-    assert False, f'unknown type {self}'
-
-
-def match_unsized(self: Type, other: Type, gens: Dict[str, Type]) -> bool:
-    if isinstance(self, Array) and isinstance(other, Array):
-        if not match_type(self.type, other.type, gens):
-            return False
-
-        return self.length is None or self.length == other.length
-
-    return match_type(self, other, gens)
-
-
-def accept_type(self: Type, other: Type, gens: Dict[str, Type]) -> float:
-    if other == DIVERGE:
-        return MATCH_PERFECT
-
-    if self == UNKNOWN or other == UNKNOWN:
-        return math.nan
-
-    if self == VOID:
-        if other == VOID:
-            return MATCH_PERFECT
-
-        return MATCH_TO_VOID
-
-    if other == VOID:
         return None
 
-    if isinstance(other, Generic):
-        if other.name not in gens:
-            gens[other.name] = self
-            return MATCH_PERFECT
+    def _member(self, name: str) -> Symbol:
+        if name in self.symbols:
+            return self.symbols[name]
 
-        other = gens[other.name]
+        return None
 
-    if isinstance(self, Generic):
-        if self.name not in gens:
-            gens[self.name] = other
-            return MATCH_PERFECT
+    def add_reference(self, mod: 'Module') -> None:
+        if mod.name in self.references:
+            raise LookupError(f"reference '{mod.name}' already in scope")
 
-        self = gens[self.name]
+        self.references[mod.name] = mod
 
-    if isinstance(self, Reference):
-        if not isinstance(other, Reference) or self.level > other.level \
-                or not match_unsized(self.type, other.type, gens):
-            return None
+    def get(self, name: str, *tps: type) -> Symbol:
+        sym = self._find(name)
 
-        return MATCH_PERFECT - 1.0 + self.level / other.level
+        if sym is None:
+            raise LookupError(f"cannot find symbol '{name}'")
 
-    if isinstance(other, Reference):
-        # auto reduction to level 0
-        other = other.type
-        reduction = 1.0
-    else:
-        reduction = 0.0
+        check_type(sym, tps)
+        return sym
 
-    if isinstance(self, (Array, StructType, EnumerationType)):
-        if not match_type(self, other, gens):
-            return None
+    def member(self, name: str, *tps: type) -> Symbol:
+        sym = self._member(name)
 
-        return MATCH_PERFECT - reduction
+        if sym is None:
+            raise LookupError(f"cannot find member '{name}'")
 
-    assert False, f'unknown type {self}'
+        check_type(sym, tps)
+        return sym
+
+    def ancestor(self, tp: typing.Type[TTbl]) -> TTbl:
+        if self.parent is None:
+            raise LookupError(f'cannot find ancestor of type {tp.__name__}')
+
+        if isinstance(self.parent, tp):
+            return self.parent
+
+        return self.parent.ancestor(tp)
+
+    def module(self) -> 'Module':
+        mod = self.ancestor(Module)
+        assert isinstance(mod, Module)
+        return mod
 
 
-# structs
-BOOL = Struct('Bool', 1)
-INT = Struct('Int', 4)
-FLOAT = Struct('Float', 4)
+class Constant(Symbol):
+    def __init__(self, name: str, tp: 'types.Type', val: Any) -> None:
+        self.name = name
+        self.type = tp
+        self.value = val
 
-# types
-BOOL_TYPE = StructType(BOOL)
-INT_TYPE = StructType(INT)
-FLOAT_TYPE = StructType(FLOAT)
-UNKNOWN = Special('?')
-DIVERGE = Special('Diverge')
-VOID = Special('Void')
+    def var_type(self) -> 'types.Type':
+        return self.type
 
-# constants
-TRUE = Constant('TRUE', BOOL_TYPE, True)
-FALSE = Constant('FALSE', BOOL_TYPE, False)
 
-MATCH_PERFECT = 3.0
-MATCH_TO_VOID = 1.0
+class Variable(Symbol):
+    def __init__(self, name: str, tp: 'types.Type', off: int = None) -> None:
+        self.name = name
+        self.type = tp
+        self.offset = off
+
+    def __str__(self) -> str:
+        return f'{self.name} {self.type}'
+
+    def var_type(self) -> 'types.Type':
+        if isinstance(self.type, types.Reference):
+            lvl = self.type.level
+        else:
+            lvl = 0
+
+        return types.to_level(self.type, lvl + 1)
+
+
+class Generic(Symbol):
+    def __init__(self, name: str, tp: 'types.Type' = None) -> None:
+        self.name = name
+        self.type = tp
+
+        if tp is None:
+            self.type = types.Generic(name)
+
+    def __str__(self) -> str:
+        if self.type is None:
+            return self.name
+
+        return f'{self.name}={self.type}'
+
+
+class Scope(Symbol, SymbolTable):
+    def __str__(self):
+        return self.name
+
+    def fullname(self) -> str:
+        return self.name
+
+    def fullpath(self) -> str:
+        if self.parent is None:
+            return self.fullname()
+
+        return self.module().path() + self.fullname()
+
+
+class Module(Scope):
+    def __init__(self, name: str,
+                 parent: 'Module',
+                 builtins: 'Module' = None) -> None:
+        super().__init__(parent)
+
+        self.name = name
+        self.builtins = builtins
+
+        if parent is not None:
+            parent.add_module(self)
+
+            if builtins is None:
+                self.builtins = parent.builtins
+
+    def __lt__(self, other: 'Module') -> bool:
+        return self.name < other.name
+
+    def _find(self, name: str) -> Symbol:
+        if name in self.symbols:
+            return self.symbols[name]
+
+        if name in self.references:
+            return self.references[name]
+
+        if name in self.builtins.symbols:
+            return self.builtins.symbols[name]
+
+        return None
+
+    def path(self, sep: str = ':') -> str:
+        path = self.fullpath()
+        if path != '':
+            path += sep
+
+        return path
+
+    def add_module(self, mod: 'Module') -> None:
+        self._add_symbol(mod)
+        mod.parent = self
+
+    def add_struct(self, struct: 'Struct') -> None:
+        self._add_symbol(struct)
+        struct.parent = self
+
+    def add_enum(self, enum: 'Enumeration') -> None:
+        self._add_symbol(enum)
+        enum.parent = self
+
+    def add_function(self, fn: 'Function') -> None:
+        if fn.name not in self.symbols:
+            group = FunctionGroup(fn.name)
+            self.symbols[fn.name] = group
+
+        else:
+            sym = self.symbols[fn.name]
+
+            if not isinstance(sym, FunctionGroup):
+                raise LookupError(f"redefining '{group}' as function")
+
+            group = sym
+
+        group.add(fn)
+        fn.parent = self
+
+    def add_variable(self, name: str, tp: 'types.Type') -> None:
+        raise NotImplementedError()
+
+    def add_constant(self, const: Constant) -> None:
+        self._add_symbol(const)
+
+    def operators(self, name: str) -> Set['types.Match']:
+        ops: Set[types.Match]
+
+        fns = self.symbols.get(name, None)
+        if isinstance(fns, FunctionGroup):
+            ops = fns.overloads()
+        else:
+            ops = set()
+
+        fns = self.builtins.symbols.get(name, None)
+        if isinstance(fns, FunctionGroup):
+            ops |= fns.overloads()
+
+        for ref in self.references.values():
+            fns = ref.symbols.get(name, None)
+            if isinstance(fns, FunctionGroup):
+                ops |= fns.overloads()
+
+        return ops
+
+
+class Struct(Scope, Invokable):
+    def __init__(self, name: str, size: int = 0) -> None:
+        super().__init__()
+
+        self.name = name
+        self.size = size
+        self.generics: List[Generic] = []
+        self.fields: List[Variable] = []
+
+    def add_generic(self, name: str) -> Generic:
+        gen = Generic(name)
+        self.generics.append(gen)
+        self._add_symbol(gen)
+        return gen
+
+    def add_field(self, name: str, tp: 'types.Type') -> Variable:
+        field = Variable(name, tp)
+        self.fields.append(field)
+        self._add_symbol(field)
+        return field
+
+    def overloads(self) -> Set['types.Match']:
+        return {types.Match(self,
+                            self.generics,
+                            self.fields,
+                            types.StructType(self))}
+
+
+class Enumeration(Scope):
+    def __init__(self, name: str) -> None:
+        super().__init__()
+
+        self.name = name
+
+        self.size = 4
+        self.counter = 0
+        self.generics: List['Generic'] = []
+        self.variants: List['Variant'] = []
+
+    def add_generic(self, name: str) -> 'Generic':
+        gen = Generic(name)
+        self.generics.append(gen)
+        self._add_symbol(gen)
+        return gen
+
+    def add_variant(self, name: str) -> 'Variant':
+        var = Variant(name, self)
+        self.counter += 1
+
+        self._add_symbol(var)
+        self.variants.append(var)
+        return var
+
+
+class Variant(Scope, Invokable):
+    def __init__(self, name: str, parent: Enumeration) -> None:
+        super().__init__()
+
+        assert isinstance(parent, Enumeration)
+
+        self.name = name
+        self.parent = parent
+        self.enum = parent
+
+        self.value = parent.counter
+        self.fields: List[Variable] = []
+
+    def __str__(self) -> str:
+        return f'{self.parent}:{self.name}'
+
+    def add_field(self, name: str, tp: 'types.Type') -> Variable:
+        field = Variable(name, tp)
+        self.fields.append(field)
+        self._add_symbol(field)
+        return field
+
+    def overloads(self) -> Set['types.Match']:
+        ret = types.EnumerationType(self.enum)
+        return {types.Match(self, self.enum.generics, self.fields, ret)}
+
+
+class Function(Scope):
+    def __init__(self, name: str) -> None:
+        super().__init__()
+
+        self.name = name
+
+        self.ret: types.Type = None
+        self.params: List[Variable] = []
+        self.generics: List[Generic] = []
+
+    def fullname(self) -> str:
+        params = ','.join(p.type.fullname() for p in self.params)
+        ret = self.ret.fullname() if self.ret != builtin.VOID else ''
+
+        return f'{self.name}({params}){ret}'
+
+    def add_param(self, name: str, tp: 'types.Type') -> Variable:
+        assert isinstance(name, str)
+
+        param = Variable(name, tp)
+
+        self._add_symbol(param)
+        self.params.append(param)
+        return param
+
+    def add_generic(self, name: str) -> 'Generic':
+        assert isinstance(name, str)
+
+        gen = Generic(name)
+
+        self._add_symbol(gen)
+        self.generics.append(gen)
+
+        return gen
+
+
+class FunctionGroup(Symbol):
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.functions: Set[Function] = set()
+
+    def __str__(self) -> str:
+        return self.name
+
+    def add(self, fn: Function) -> None:
+        self.functions.add(fn)
+
+    def overloads(self) -> Set['types.Match']:
+        return {types.Match(f, f.generics, f.params, f.ret)
+                for f in self.functions}
+
+
+class Block(SymbolTable):
+    def __init__(self, parent: SymbolTable, offset: int) -> None:
+        super().__init__(parent)
+
+        self.offset = offset
+
+    def add_local(self, name: str, tp: 'types.Type') -> Variable:
+        tp.finalize()
+
+        var = Variable(name, tp, self.offset)
+        self.offset += tp.size()
+
+        self._add_symbol(var)
+        return var

@@ -1,8 +1,8 @@
 from typing import Any, Dict, Set, cast
 from io import TextIOBase
-from .reflect import Reference, Variable, Constant, Function, Struct, Type, \
-    Match, StructType, Variant, Enumeration, EnumerationType
+from . import builtin
 from . import symbols
+from . import types
 from . import pattern
 from .node import Node, StackNode
 
@@ -11,14 +11,14 @@ class Generator:
     def __init__(self) -> None:
         self._labels: Dict[str, int] = {}
         self.module_name: str = None
-        self.refs: Set[Function] = None
+        self.refs: Set[symbols.Function] = None
         self.out: TextIOBase = None
         self.indent: int = None
 
     def generate(self,
                  tree: Node,
                  name: str,
-                 refs: Set[Function],
+                 refs: Set[symbols.Function],
                  out: TextIOBase) -> None:
         self.module_name = name
         self.refs = refs
@@ -42,34 +42,34 @@ class Generator:
 
         self.indent -= 1
 
-    def _cast(self, tp: Type, tar: Type) -> None:
+    def _cast(self, tp: types.Type, tar: types.Type) -> None:
         # diverge will never return so we can ignore casting
-        if tp is None or tp == symbols.DIVERGE:
+        if tp is None or tp == builtin.DIVERGE:
             return
 
         assert tar is not None
-        assert tar != symbols.UNKNOWN
-        assert tar != symbols.DIVERGE
+        assert tar != builtin.UNKNOWN
+        assert tar != builtin.DIVERGE
 
-        if tar == symbols.VOID:
-            if tp != symbols.VOID and tp.size() > 0:
+        if tar == builtin.VOID:
+            if tp != builtin.VOID and tp.size() > 0:
                 self._write('pop', tp.size())
 
             return
 
-        assert tp != symbols.UNKNOWN
-        assert tp != symbols.VOID
+        assert tp != builtin.UNKNOWN
+        assert tp != builtin.VOID
 
         # TODO: need to change when cast is more than level reduction
-        if not isinstance(tp, Reference):
+        if not isinstance(tp, types.Reference):
             return
 
         lvl = tp.level
-        tar_lvl = symbols.to_ref(tar).level
+        tar_lvl = types.to_ref(tar).level
 
         while lvl > tar_lvl:
             lvl -= 1
-            tp = symbols.to_level(tp, lvl)
+            tp = types.to_level(tp, lvl)
             self._write('load', tp.size())
 
     def _pop_size(self, stack: StackNode, target: StackNode) -> int:
@@ -91,7 +91,8 @@ class Generator:
             self._write('pop', amount)
 
     def _reduce(self, stack: StackNode, target: StackNode) -> None:
-        assert symbols.match_type(target.type, stack.type, {})
+        # FIXME: this looks weird
+        assert types.Resolution().match_type(target.type, stack.type)
 
         size = stack.type.size()
         amount = self._pop_size(stack.next, target.next)
@@ -105,19 +106,19 @@ class Generator:
         self._labels[name] = count + 1
         return f'{name}_{count}'
 
-    def _call(self, match: Match) -> None:
-        assert isinstance(match.source, Function)
+    def _call(self, match: types.Match) -> None:
+        assert isinstance(match.source, symbols.Function)
 
-        fn: Function = match.source
+        fn = match.source
 
         # user-defined function
         if fn.module().name != '':
-            arg_size = sum(p.size() for p in match.args)
+            arg_size = match.params.size()
             self._write('call', fn.fullpath(), arg_size)
             return
 
         if fn.name == 'alloc':
-            size = match.resolved_gens['T'].size()
+            size = match.generics[0].type.size()
             self._write('const_i', size)
 
             if len(fn.params) > 0:
@@ -131,20 +132,20 @@ class Generator:
             return
 
         if fn.name == 'realloc':
-            tp = match.resolved_gens['T']
-            self._write('const_i', tp.size())
+            size = match.generics[0].type.size()
+            self._write('const_i', size)
             self._write('mult_i')
             self._write('realloc')
             return
 
         if fn.name == 'subscript':
-            tp = match.resolved_gens['T']
-            self._write('addr_offset', tp.size())
+            size = match.generics[0].type.size()
+            self._write('addr_offset', size)
             return
 
         if fn.name == 'cast':
-            frm = match.args[0].fullname()[0].lower()
-            tar = match.result.fullname()[0].lower()
+            frm = match.params[0].type.fullname()[0].lower()
+            tar = match.ret.fullname()[0].lower()
             self._write(f'cast_{frm}_{tar}')
             return
 
@@ -177,10 +178,10 @@ class Generator:
         else:
             assert False, f'unknown operator {fn.name}'
 
-        name = match.args[0].fullname()[0].lower()
+        name = match.params[0].type.fullname()[0].lower()
         self._write(f'{op}_{name}')
 
-    def _match(self, pat: pattern.Pattern, tp: Type, nxt: str) -> None:
+    def _match(self, pat: pattern.Pattern, tp: types.Type, nxt: str) -> None:
         self._write(f'# match {pat}')
         self._cast(tp, pat.type)
 
@@ -195,7 +196,7 @@ class Generator:
             self._write('br_false', nxt)
 
         elif isinstance(pat, pattern.Variant):
-            assert isinstance(pat.type, EnumerationType)
+            assert isinstance(pat.type, types.EnumerationType)
 
             fail = self._label('MATCH_FAIL')
             succ = self._label('MATCH_SUCC')
@@ -208,7 +209,7 @@ class Generator:
             self._write('br_false', fail)
 
             self.indent += 1
-            for p, var in zip(pat.fields, pat.variant_struct.resolved_fields):
+            for p, var in zip(pat.field_patterns, pat.fields):
                 if not p.TESTED:
                     continue
 
@@ -228,7 +229,7 @@ class Generator:
         else:
             assert False
 
-    def _destructure(self, pat: pattern.Pattern, tp: Type) -> int:
+    def _destructure(self, pat: pattern.Pattern, tp: types.Type) -> int:
         self._write(f'# destructure {pat}')
 
         if isinstance(pat, (pattern.Int, pattern.Float, pattern.Any)):
@@ -241,14 +242,14 @@ class Generator:
             return pat.type.size()
 
         if isinstance(pat, pattern.Variant):
-            assert isinstance(pat.type, EnumerationType)
+            assert isinstance(pat.type, types.EnumerationType)
 
             src_size = pat.type.size()
             red_size = 0
 
             self.indent += 1
-            for p, var in zip(pat.fields, pat.variant_struct.resolved_fields):
-                if not p.BOUND:
+            for p, var in zip(pat.field_patterns, pat.fields):
+                if not p.bound():
                     continue
 
                 offset = var.offset - src_size
@@ -305,7 +306,7 @@ class Generator:
         self._write('function', node.function.fullname(), end)
         self._gen(node.children[2])
 
-        if node.function.ret == symbols.VOID:
+        if node.function.ret == builtin.VOID:
             self._write('return')
         else:
             self._write('return_val', node.function.ret.size())
@@ -318,7 +319,7 @@ class Generator:
             self._gen(c)
             self._write('')
 
-        if node.target_type == symbols.VOID:
+        if node.target_type == builtin.VOID:
             self._exit(node.stack_end, node.parent.stack_start)
         else:
             self._reduce(node.stack_end, node.parent.stack_end)
@@ -409,7 +410,7 @@ class Generator:
 
         self._gen(node.children[0])
 
-        if node.children[0].target_type == symbols.VOID:
+        if node.children[0].target_type == builtin.VOID:
             self._exit(node.stack_end, tar.stack_start)
         else:
             self._reduce(node.stack_end, tar.stack_end)
@@ -431,7 +432,7 @@ class Generator:
 
         self._gen(node.children[0])
 
-        if node.children[0].target_type == symbols.VOID:
+        if node.children[0].target_type == builtin.VOID:
             self._exit(node.stack_end, tar.stack_end)
             self._write('return')
         else:
@@ -473,18 +474,18 @@ class Generator:
         self._write('store', size)
 
     def _CALL(self, node: Node) -> None:
-        if isinstance(node.match.source, Variant):
+        if isinstance(node.match.source, symbols.Variant):
             self._write('const_i', node.match.source.value)
 
         for c in node.children[1].children:
             self._gen(c)
 
-        if isinstance(node.match.source, Function):
+        if isinstance(node.match.source, symbols.Function):
             self._call(node.match)
-        elif isinstance(node.match.source, Struct):
+        elif isinstance(node.match.source, symbols.Struct):
             pass  # struct construction
-        elif isinstance(node.match.source, Variant):
-            enum = cast(Enumeration, node.match.source.parent).size
+        elif isinstance(node.match.source, symbols.Variant):
+            enum = cast(symbols.Enumeration, node.match.source.parent).size
             args = sum(c.target_type.size() for c in node.children[1].children)
             size = node.target_type.size() - enum - args
             if size > 0:
@@ -502,7 +503,7 @@ class Generator:
         # left
         self._gen(node.children[0])
         self._write('dup', node.children[0].target_type.size())
-        self._cast(node.children[0].target_type, node.match.args[0])
+        self._cast(node.children[0].target_type, node.match.params[0].type)
 
         # right
         self._gen(node.children[1])
@@ -511,8 +512,8 @@ class Generator:
         self._call(node.match)
 
         # assn
-        ret = symbols.to_level(node.children[0].target_type, 0)
-        self._cast(node.match.result, ret)
+        ret = types.to_level(node.children[0].target_type, 0)
+        self._cast(node.match.ret, ret)
         self._write('store', ret.size())
 
     def _CAST(self, node: Node) -> None:
@@ -520,7 +521,7 @@ class Generator:
         self._call(node.match)
 
     def _MEMBER(self, node: Node) -> None:
-        assert isinstance(node.variable, Variable)
+        assert isinstance(node.variable, symbols.Variable)
 
         self._gen(node.children[0])
 
@@ -534,12 +535,12 @@ class Generator:
         self._write('const_f', node.value)
 
     def _VAR(self, node: Node) -> None:
-        if isinstance(node.variable, Constant):
-            cons = node.variable.type
-            if not isinstance(cons, StructType):
-                raise NotADirectoryError()
+        if isinstance(node.variable, symbols.Constant):
+            tp = node.variable.type
+            if not isinstance(tp, types.StructType):
+                raise NotImplementedError()
 
-            if cons.struct == symbols.BOOL:
+            if tp.struct == builtin.BOOL:
                 if node.variable.value:
                     self._write('const_true')
                 else:
@@ -547,7 +548,7 @@ class Generator:
             else:
                 raise NotImplementedError()
 
-        elif isinstance(node.variable, Variable):
+        elif isinstance(node.variable, symbols.Variable):
             self._write('addr_frame', node.variable.offset)
 
         else:
