@@ -28,11 +28,11 @@ def test()
     match i + 1
         j => rt::print(j + 2)
 
-    # let v = Vec(3., 4.) + Vec(1., 1.)
-    # match v
-    #     Vec(x, y) => begin
-    #         x.rt::print()
-    #         y.rt::print()
+    let v = Vec(3., 4.) + Vec(1., 1.)
+    match v
+        Vec(x, y) => begin
+            x.rt::print()
+            y.rt::print()
 
 fib(10).rt::print()
 test()

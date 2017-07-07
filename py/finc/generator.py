@@ -195,22 +195,26 @@ class Generator:
             self._write('eq_f')
             self._write('br_false', nxt)
 
-        elif isinstance(pat, pattern.Variant):
-            assert isinstance(pat.type, types.EnumerationType)
-
+        elif isinstance(pat, pattern.Struct):
             fail = self._label('MATCH_FAIL')
             succ = self._label('MATCH_SUCC')
-            size = pat.type.size()  # size of enum
+            size = pat.type.size()
 
             self._write('addr_st', -size)
-            self._write('load', pat.type.enum.size)  # int of variant
-            self._write('const_i', pat.variant.value)
-            self._write('eq_i')
-            self._write('br_false', fail)
+
+            if isinstance(pat.type, types.EnumerationType):
+                assert isinstance(pat.source, symbols.Variant)
+
+                self._write('load', pat.type.enum.size)  # int of variant
+                self._write('const_i', pat.source.value)
+                self._write('eq_i')
+                self._write('br_false', fail)
+            else:
+                assert isinstance(pat.type, types.StructType)
 
             self.indent += 1
-            for p, var in zip(pat.field_patterns, pat.fields):
-                if not p.TESTED:
+            for p, var in zip(pat.subpatterns, pat.fields):
+                if not p.tested():
                     continue
 
                 self._match(p, var.type, fail)
@@ -241,18 +245,21 @@ class Generator:
         if isinstance(pat, pattern.Variable):
             return pat.type.size()
 
-        if isinstance(pat, pattern.Variant):
-            assert isinstance(pat.type, types.EnumerationType)
+        if isinstance(pat, pattern.Struct):
+            # note: works for both structs and enums
 
             src_size = pat.type.size()
             red_size = 0
 
             self.indent += 1
-            for p, var in zip(pat.field_patterns, pat.fields):
+            for p, var in zip(pat.subpatterns, pat.fields):
                 if not p.bound():
                     continue
 
-                offset = var.offset - src_size
+                # skip what we put on the stack,
+                # go back to the start of the struct / enum,
+                # and move forward to the field offset
+                offset = var.offset - src_size - red_size
                 self._write('addr_st', offset)
                 self._write('load', var.type.size())
                 red_size += self._destructure(p, var.type)
@@ -263,6 +270,7 @@ class Generator:
                 self._write('reduce', red_size, src_size)
             else:
                 self._write('pop', src_size)
+
             return red_size
 
         assert False
@@ -374,7 +382,7 @@ class Generator:
         pat = node.children[0].pattern
         tp = match.children[0].target_type
 
-        if pat.TESTED:
+        if pat.tested():
             self._write('dup', tp.size())
             self._match(pat, tp, nxt)
 

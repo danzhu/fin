@@ -1,12 +1,14 @@
-from typing import List
+from typing import List, Union
 from . import builtin
 from . import types
 from . import symbols
 
 
 class Pattern:
-    TESTED: bool
     type: types.Type
+
+    def tested(self) -> bool:
+        raise NotImplementedError()
 
     def bound(self) -> bool:
         raise NotImplementedError()
@@ -22,21 +24,20 @@ class Pattern:
 
 
 class Any(Pattern):
-    TESTED = False
-
     def __init__(self) -> None:
         self.type = builtin.VOID
 
     def __str__(self) -> str:
         return '_'
 
+    def tested(self) -> bool:
+        return False
+
     def bound(self) -> bool:
         return False
 
 
 class Int(Pattern):
-    TESTED = True
-
     def __init__(self, value: int) -> None:
         self.value = value
         self.type = builtin.INT
@@ -44,13 +45,14 @@ class Int(Pattern):
     def __str__(self) -> str:
         return str(self.value)
 
+    def tested(self) -> bool:
+        return True
+
     def bound(self) -> bool:
         return False
 
 
 class Float(Pattern):
-    TESTED = True
-
     def __init__(self, value: float) -> None:
         self.value = value
         self.type = builtin.FLOAT
@@ -58,19 +60,23 @@ class Float(Pattern):
     def __str__(self) -> str:
         return str(self.value)
 
+    def tested(self) -> bool:
+        return True
+
     def bound(self) -> bool:
         return False
 
 
 class Variable(Pattern):
-    TESTED = False
-
     def __init__(self, name: str, tp: types.Type) -> None:
         self.name = name
         self.type = tp
 
     def __str__(self) -> str:
         return f'{self.name} {self.type}'
+
+    def tested(self) -> bool:
+        return False
 
     def bound(self) -> bool:
         return True
@@ -80,50 +86,55 @@ class Variable(Pattern):
 
 
 class Struct(Pattern):
-    def __init__(self, struct: symbols.Struct) -> None:
-        self.struct = struct
-        self.type = types.StructType(struct)
+    def __init__(self, src: Union[symbols.Struct, symbols.Variant]) -> None:
+        self.source = src
 
-    def bound(self) -> bool:
-        return False
+        if isinstance(src, symbols.Struct):
+            self.type = types.StructType(src)
+        elif isinstance(src, symbols.Variant):
+            self.type = types.EnumerationType(src.enum)
+        else:
+            assert False
 
-
-class Variant(Pattern):
-    TESTED = True
-
-    def __init__(self, variant: symbols.Variant) -> None:
-        self.variant = variant
-        self.type = types.EnumerationType(variant.enum)
-
-        self.field_patterns: List[Pattern] = []
+        self.subpatterns: List[Pattern] = []
         self.fields: types.Variables = None
 
     def __str__(self) -> str:
-        res = str(self.variant)
-        if len(self.field_patterns) > 0:
-            res += '(' + ', '.join(str(f) for f in self.field_patterns) + ')'
+        res = str(self.source)
+        if len(self.subpatterns) > 0:
+            res += '(' + ', '.join(str(f) for f in self.subpatterns) + ')'
 
         return res
 
+    def tested(self) -> bool:
+        # variants are always tested
+        if isinstance(self.source, symbols.Variant):
+            return True
+
+        # otherwise, depends on fields
+        return any(p.tested() for p in self.subpatterns)
+
     def bound(self) -> bool:
-        return any(f.bound() for f in self.field_patterns)
+        return any(p.bound() for p in self.subpatterns)
 
     def variables(self) -> List[Variable]:
-        vs = []
-        for pat in self.field_patterns:
-            vs.extend(pat.variables())
-
-        return vs
+        return [var for pat in self.subpatterns for var in pat.variables()]
 
     def resolve(self, res: types.Resolution) -> None:
         super().resolve(res)
 
-        # get the actual fields of the variant
-        assert isinstance(self.type, types.EnumerationType)
-        self.fields = self.type.variants[self.variant.value].resolve(res)
+        # get the actual fields and resolve them
+        if isinstance(self.type, types.StructType):
+            self.fields = self.type.fields.resolve(res)
+        elif isinstance(self.type, types.EnumerationType):
+            assert isinstance(self.source, symbols.Variant)
+
+            self.fields = self.type.variants[self.source.value].resolve(res)
+        else:
+            assert False
 
     def finalize(self) -> bool:
         return super().finalize() and self.fields.finalize()
 
     def add_field(self, pat: Pattern) -> None:
-        self.field_patterns.append(pat)
+        self.subpatterns.append(pat)

@@ -307,16 +307,11 @@ class Node:
             sym = self.children[0]._symbol(syms,
                                            symbols.Struct,
                                            symbols.Variant)
-            if isinstance(sym, symbols.Struct):
-                assert False, 'TODO'
+            assert isinstance(sym, (symbols.Struct, symbols.Variant))
 
-            elif isinstance(sym, symbols.Variant):
-                pat = pattern.Variant(sym)
-                if len(self.children[1].children) != len(sym.fields):
-                    self._error('unmatched number of fields')
-
-            else:
-                assert False
+            pat = pattern.Struct(sym)
+            if len(self.children[1].children) != len(sym.fields):
+                self._error('unmatched number of fields')
 
         elif self.type == 'PAT_ANY':
             pat = pattern.Any()
@@ -344,9 +339,6 @@ class Node:
 
         # subpatterns
         if isinstance(pat, pattern.Struct):
-            assert False, 'TODO'
-
-        elif isinstance(pat, pattern.Variant):
             for c, f in zip(self.children[1].children, pat.fields):
                 pat.add_field(c._pattern(syms, f.type))
 
