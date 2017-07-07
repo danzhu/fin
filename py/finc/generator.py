@@ -200,11 +200,10 @@ class Generator:
             succ = self._label('MATCH_SUCC')
             size = pat.type.size()
 
-            self._write('addr_st', -size)
-
             if isinstance(pat.type, types.EnumerationType):
                 assert isinstance(pat.source, symbols.Variant)
 
+                self._write('addr_st', -size)
                 self._write('load', pat.type.enum.size)  # int of variant
                 self._write('const_i', pat.source.value)
                 self._write('eq_i')
@@ -212,11 +211,16 @@ class Generator:
             else:
                 assert isinstance(pat.type, types.StructType)
 
+            src_size = pat.type.size()
+
             self.indent += 1
             for p, var in zip(pat.subpatterns, pat.fields):
                 if not p.tested():
                     continue
 
+                offset = var.offset - src_size
+                self._write('addr_st', offset)
+                self._write('load', var.type.size())
                 self._match(p, var.type, fail)
 
             self.indent -= 1

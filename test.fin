@@ -11,11 +11,20 @@ enum Opt{T}
 def plus(left Vec, right Vec) Vec
     Vec(left.x + right.x, left.y + right.y)
 
-def fib(n Int) Float
+def fib(n Int) Int
     match n
-        0 => 0.
-        1 => 1.
+        0 => 0
+        1 => 1
         i => fib(i - 2) + fib(i - 1)
+
+def print(v Vec)
+    match v
+        Vec(0., 0.) => 0
+        Vec(x, 0.) => x.rt::print()
+        Vec(0., y) => y.rt::print()
+        Vec(x, y) => begin
+            x.rt::print()
+            y.rt::print()
 
 def test()
     let opt = Opt::Some(1)
@@ -28,11 +37,10 @@ def test()
     match i + 1
         j => rt::print(j + 2)
 
-    let v = Vec(3., 4.) + Vec(1., 1.)
-    match v
-        Vec(x, y) => begin
-            x.rt::print()
-            y.rt::print()
+    Vec(0., 0.).print()
+    Vec(0., 1.).print()
+    Vec(2., 0.).print()
+    Vec(3., 4.).print()
 
 fib(10).rt::print()
 test()

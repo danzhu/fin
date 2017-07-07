@@ -40,7 +40,7 @@
   - [x] import
   - [ ] encapsulation
   - [ ] export
-- [ ] generics
+- [x] generics
   - [x] struct / enum
   - [ ] function
 - [x] pattern matching
@@ -50,7 +50,7 @@
 - [ ] iterators
   - [ ] continuation-based iteration
 - [ ] mutability
-  - [x] constants
+  - [ ] constants
   - [ ] immutable bindings
   - [x] mutable variables
 
@@ -111,8 +111,12 @@
 - [x] ~~restrict struct construction to call syntax~~
 - [ ] make parentheses after enum optional
 - pattern matching
-  - [ ] struct destructuring
+  - [x] struct destructuring
   - [ ] ref binding
+  - [ ] optimize destructuring
+  - [ ] array destructuring
+- arrays
+  - [ ] inline initialization
 
 ## Runtime
 
