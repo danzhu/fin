@@ -368,9 +368,8 @@ class Generator:
         for c in node.children[1].children:
             self._gen(c)
 
-        # pop value if unmatched
-        # TODO: maybe error?
-        self._write('pop', node.children[0].target_type.size())
+        # no match found
+        self._write('error')
         self._write(end + ':')
 
     def _ARM(self, node: Node) -> None:
