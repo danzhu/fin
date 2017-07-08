@@ -38,6 +38,9 @@ class Resolution:
 
     def match_type(self, tp: Type, other: Type) -> bool:
         if isinstance(other, Generic):
+            if isinstance(tp, Generic):
+                assert False, 'what happens?'
+
             if other.name not in self.generics:
                 self.generics[other.name] = tp
                 return True
@@ -104,6 +107,9 @@ class Resolution:
             return None
 
         if isinstance(other, Generic):
+            if isinstance(tp, Generic):
+                assert False, 'what happens?'
+
             if other.name not in self.generics:
                 self.generics[other.name] = tp
                 return MATCH_PERFECT
