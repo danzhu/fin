@@ -550,7 +550,7 @@ class Generator:
             if not isinstance(tp, types.StructType):
                 raise NotImplementedError()
 
-            if tp.struct == builtin.BOOL:
+            if isinstance(node.variable.value, bool):
                 if node.variable.value:
                     self._write('const_true')
                 else:

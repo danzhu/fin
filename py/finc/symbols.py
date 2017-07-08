@@ -211,7 +211,7 @@ class Module(Scope):
             sym = self.symbols[fn.name]
 
             if not isinstance(sym, FunctionGroup):
-                raise LookupError(f"redefining '{group}' as function")
+                raise LookupError(f"redefining '{sym}' as function")
 
             group = sym
 

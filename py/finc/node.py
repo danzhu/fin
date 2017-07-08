@@ -485,13 +485,10 @@ class Node:
         elif self.type == 'INC_ASSN':
             assert len(self.children) == 2
 
-            sym = syms.get(self.value, symbols.FunctionGroup)
-            assert isinstance(sym, symbols.FunctionGroup)
-
             self.expr_type = builtin.VOID
-            self.matches = sym.overloads()
+            self.matches = syms.ancestor(symbols.Module).operators(self.value)
 
-            # no need to check empty since there are always operator overloads
+            assert len(self.matches) > 0
 
             self.args = [c.expr_type for c in self.children]
             ret = types.to_level(self.args[0], 0)
