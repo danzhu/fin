@@ -22,14 +22,14 @@ def load_builtins() -> symbols.Module:
             fn = symbols.Function(op)
             fn.add_param('left', tp)
             fn.add_param('right', tp)
-            fn.ret = tp
+            fn.set_ret(tp)
             mod.add_function(fn)
 
         # unary
         for op in ['pos', 'neg']:
             fn = symbols.Function(op)
             fn.add_param('value', tp)
-            fn.ret = tp
+            fn.set_ret(tp)
             mod.add_function(fn)
 
         # comparison
@@ -38,7 +38,7 @@ def load_builtins() -> symbols.Module:
             fn = symbols.Function(op)
             fn.add_param('left', tp)
             fn.add_param('right', tp)
-            fn.ret = BOOL
+            fn.set_ret(BOOL)
             mod.add_function(fn)
 
     for val in NUM_TYPES:
@@ -48,42 +48,42 @@ def load_builtins() -> symbols.Module:
 
             fn = symbols.Function('cast')
             fn.add_param('value', val)
-            fn.ret = res
+            fn.set_ret(res)
             mod.add_function(fn)
 
     # array subscript
     fn = symbols.Function('subscript')
-    t = fn.add_generic('T').type
-    fn.add_param('arr', types.Reference(types.Array(t), 1))
+    t = fn.add_generic('T')
+    fn.add_param('arr', types.Reference(types.Array(types.Generic(t)), 1))
     fn.add_param('index', INT)
-    fn.ret = types.Reference(t, 1)
+    fn.set_ret(types.Reference(types.Generic(t), 1))
     mod.add_function(fn)
 
     # alloc
     fn = symbols.Function('alloc')
-    t = fn.add_generic('T').type
-    fn.ret = types.Reference(t, 1)
+    t = fn.add_generic('T')
+    fn.set_ret(types.Reference(types.Generic(t), 1))
     mod.add_function(fn)
 
     fn = symbols.Function('alloc')
-    t = fn.add_generic('T').type
+    t = fn.add_generic('T')
     fn.add_param('length', INT)
-    fn.ret = types.Reference(types.Array(t), 1)
+    fn.set_ret(types.Reference(types.Array(types.Generic(t)), 1))
     mod.add_function(fn)
 
     # dealloc
     fn = symbols.Function('dealloc')
-    t = fn.add_generic('T').type
-    fn.add_param('reference', types.Reference(t, 1))
-    fn.ret = VOID
+    t = fn.add_generic('T')
+    fn.add_param('reference', types.Reference(types.Generic(t), 1))
+    fn.set_ret(VOID)
     mod.add_function(fn)
 
     # realloc
     fn = symbols.Function('realloc')
-    t = fn.add_generic('T').type
-    fn.add_param('array', types.Reference(types.Array(t), 1))
+    t = fn.add_generic('T')
+    fn.add_param('array', types.Reference(types.Array(types.Generic(t)), 1))
     fn.add_param('length', INT)
-    fn.ret = VOID
+    fn.set_ret(types.Reference(types.Array(types.Generic(t)), 1))
     mod.add_function(fn)
 
     return mod

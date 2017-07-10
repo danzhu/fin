@@ -5,25 +5,43 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include "typedefs.h"
 
 namespace Fin
 {
     class Runtime;
     class Stack;
-    struct Module;
+    struct Contract;
+    struct Library;
 
-    typedef std::function<void(Runtime &rt, Stack &st)> NativeFunction;
+    typedef std::function<void(Runtime &rt, Contract &ctr, Stack &st)>
+        NativeFunction;
 
     struct Function
     {
+        Library *library = nullptr;
         std::string name;
-        Module *module = nullptr;
+        Count generics;
+        Count contracts;
         NativeFunction native = nullptr;
-        uint32_t location;
+        Pc init;
+        Pc location;
 
-        Function() {}
-        explicit Function(const NativeFunction &fn): native{fn} {}
-        explicit Function(uint32_t loc): location{loc} {}
+        Function(std::string name, NativeFunction fn, Count gens = 0,
+                Count ctrs = 0):
+            name{std::move(name)}, generics{gens}, contracts{ctrs},
+            native{std::move(fn)} {}
+
+        Function(std::string name, Pc init, Pc loc, Count gens = 0,
+                Count ctrs = 0):
+            name{std::move(name)}, generics{gens}, contracts{ctrs}, init{init},
+            location{loc} {}
+
+        Function(const Function &other) = delete;
+        Function(Function &&other) = default;
+
+        Function &operator=(const Function &other) = delete;
+        Function &operator=(Function &&other) = default;
     };
 }
 

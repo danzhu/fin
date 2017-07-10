@@ -8,41 +8,48 @@
 #include <vector>
 #include "allocator.h"
 #include "frame.h"
-#include "function.h"
+#include "library.h"
 #include "log.h"
-#include "module.h"
 #include "stack.h"
+#include "typedefs.h"
 
 namespace Fin
 {
+    struct Contract;
+    struct Function;
+    struct Library;
+    struct Type;
+
     class Runtime
     {
         Stack opStack;
         Allocator alloc;
+        Frame frame;
         std::deque<Frame> rtStack;
-        std::vector<std::unique_ptr<Module>> modules;
-        std::map<ModuleID, Module *> modulesByID;
+        std::map<LibraryID, std::unique_ptr<Library>> libraries;
         std::vector<char> instrs;
-        const Module *execModule;
-        const Function *execFunction;
-        uint32_t pc;
-        uint32_t fp;
+        std::unique_ptr<Contract> mainContract;
 
         std::string readStr();
-        Function &readFn();
-        void jump(uint32_t target);
+        Function &readFunction();
+        Contract &readContract();
+        TypeInfo &readType();
+        Offset readOffset();
+        void jump(std::size_t target);
         void ret();
+        void call(Contract &ctr);
+        void sign();
+        void checkLibrary();
+        void checkContract();
         void execute();
-        void call(const Function &fn, uint16_t argSize);
-        void printFrame(std::ostream &out, const Function *fn) const noexcept;
 
         template<typename T> T readConst()
         {
-            T val = *reinterpret_cast<T*>(&instrs.at(pc));
+            T val = *reinterpret_cast<T*>(&instrs.at(frame.pc));
 
             LOG(1) << ' ' << val;
 
-            jump(pc + sizeof(T));
+            jump(frame.pc + sizeof(T));
             return val;
         }
         template<typename T> void readConst(T &val)
@@ -62,12 +69,13 @@ namespace Fin
             opStack.push(Op{}(op1, op2));
         }
     public:
-        Runtime();
+        Runtime(Size stackSize);
         void run(std::istream &src);
-        Module &createModule(const std::string &name);
-        Module &getModule(const std::string &name);
+        Library &createLibrary(const std::string &name);
+        Library &getLibrary(const std::string &name);
         void backtrace(std::ostream &out) const noexcept;
-        uint32_t programCounter() const noexcept;
+        Allocator &allocator() noexcept { return alloc; }
+        Stack &stack() noexcept { return opStack; }
     };
 }
 

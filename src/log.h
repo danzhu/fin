@@ -16,7 +16,7 @@ inline void LOG_HEX(const int lvl, const char val[], uint32_t size)
     LOG(lvl) << "0x";
     for (int i = size - 1; i >= 0; --i)
     {
-        LOG(lvl) << HEXMAP[val[i] >> 4 & 0xF] << HEXMAP[val[i] & 0xF];
+        LOG(lvl) << ' ' << HEXMAP[val[i] >> 4 & 0xF] << HEXMAP[val[i] & 0xF];
     }
 }
 

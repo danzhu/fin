@@ -2,34 +2,45 @@
 #include <iostream>
 #include "runtime.h"
 
-template<typename T>
-void print(Fin::Runtime &rt, Fin::Stack &st)
+template<typename T> void print(Fin::Runtime &rt, Fin::Contract &ctr,
+        Fin::Stack &st)
 {
     std::cout << st.pop<T>() << std::endl;
 }
 
-template<typename T>
-void input(Fin::Runtime &rt, Fin::Stack &st)
+template<typename T> void input(Fin::Runtime &rt, Fin::Contract &ctr,
+        Fin::Stack &st)
 {
     T val;
     std::cin >> val;
     st.push(val);
 }
 
-void write(Fin::Runtime &rt, Fin::Stack &st)
+void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
-    auto c = static_cast<char>(st.pop<int32_t>());
+    auto type = ctr.types.at(0);
+    auto len = st.pop<Fin::Int>();
+    auto size = Fin::alignTo(type.size, type.alignment) * len;
+
+    auto ptr = rt.allocator().alloc(size);
+
+    st.push(ptr);
+}
+
+void write(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+{
+    auto c = static_cast<char>(st.pop<Fin::Int>());
     std::cout.put(c);
 }
 
-void read(Fin::Runtime &rt, Fin::Stack &st)
+void read(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     char c;
     std::cin.get(c);
-    st.push(static_cast<int32_t>(c));
+    st.push(static_cast<Fin::Int>(c));
 }
 
-void backtrace(Fin::Runtime &rt, Fin::Stack &st)
+void backtrace(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     rt.backtrace(std::cout);
 }
@@ -50,18 +61,19 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    Fin::Runtime runtime;
+    Fin::Runtime runtime{2048};
 
-    auto &fin = runtime.createModule("rt");
-    fin.addFunction("print(Int)", Fin::Function{print<int32_t>});
-    fin.addFunction("print(Float)", Fin::Function{print<float>});
-    fin.addFunction("print(Bool)", Fin::Function{print<bool>});
-    fin.addFunction("input()Int", Fin::Function{input<int32_t>});
-    fin.addFunction("input()Float", Fin::Function{input<float>});
-    fin.addFunction("input()Bool", Fin::Function{input<bool>});
-    fin.addFunction("write(Int)", Fin::Function{write});
-    fin.addFunction("read()Int", Fin::Function{read});
-    fin.addFunction("backtrace()", Fin::Function{backtrace});
+    auto &fin = runtime.createLibrary("rt");
+    fin.addFunction(Fin::Function{"print(Int)", print<Fin::Int>});
+    fin.addFunction(Fin::Function{"print(Float)", print<Fin::Float>});
+    fin.addFunction(Fin::Function{"print(Bool)", print<Fin::Bool>});
+    fin.addFunction(Fin::Function{"input()Int", input<Fin::Int>});
+    fin.addFunction(Fin::Function{"input()Float", input<Fin::Float>});
+    fin.addFunction(Fin::Function{"input()Bool", input<Fin::Bool>});
+    fin.addFunction(Fin::Function{"alloc(Int)&[0]", alloc, 1});
+    fin.addFunction(Fin::Function{"write(Int)", write});
+    fin.addFunction(Fin::Function{"read()Int", read});
+    fin.addFunction(Fin::Function{"backtrace()", backtrace});
 
     try
     {

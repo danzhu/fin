@@ -1,4 +1,5 @@
-from typing import Any, Sequence, List, Dict, Iterator, Iterable, Union, Set
+from typing import Any, Sequence, List, Dict, Iterator, Iterable, Union, Set, \
+    Sized
 import math
 from .symbols import Variable
 from . import builtin
@@ -13,13 +14,7 @@ class Type:
     def fullname(self) -> str:
         raise NotImplementedError()
 
-    def size(self):
-        raise NotImplementedError()
-
     def resolve(self, res: 'Resolution') -> 'Type':
-        raise NotImplementedError()
-
-    def finalize(self) -> bool:
         raise NotImplementedError()
 
 
@@ -27,42 +22,51 @@ class Resolution:
     def __init__(self) -> None:
         self.generics: Dict[str, Type] = {}
 
-    def match_unsized(self, tp: Type, other: Type) -> bool:
+    def resolved(self) -> bool:
+        return None not in self.generics.values()
+
+    def match_unsized(self, tp: Type, other: Type, ret: bool) -> bool:
+        assert tp is not None
+        assert other is not None
+
         if isinstance(tp, Array) and isinstance(other, Array):
-            if not self.match_type(tp.type, other.type):
+            if not self.match_type(tp.type, other.type, ret):
                 return False
 
             return tp.length is None or tp.length == other.length
 
-        return self.match_type(tp, other)
+        return self.match_type(tp, other, ret)
 
-    def match_type(self, tp: Type, other: Type) -> bool:
-        if isinstance(other, Generic):
-            if isinstance(tp, Generic):
-                assert False, 'what happens?'
+    def match_type(self, tp: Type, other: Type, ret: bool) -> bool:
+        # ret = if matching return type. In this case 'other' is checked for
+        # generics instead of 'tp'
 
-            if other.name not in self.generics:
-                self.generics[other.name] = tp
-                return True
+        assert tp is not None
+        assert other is not None
 
-            other = self.generics[other.name]
-
-        if isinstance(tp, Generic):
-            if tp.name not in self.generics:
+        if not ret and isinstance(tp, Generic) and tp.name in self.generics:
+            if self.generics[tp.name] is None:
                 self.generics[tp.name] = other
                 return True
 
             tp = self.generics[tp.name]
 
+        if ret and isinstance(other, Generic) and other.name in self.generics:
+            if self.generics[other.name] is None:
+                self.generics[other.name] = tp
+                return True
+
+            other = self.generics[other.name]
+
         if isinstance(tp, Reference):
             return isinstance(other, Reference) \
                 and tp.level == other.level \
-                and self.match_unsized(tp.type, other.type)
+                and self.match_unsized(tp.type, other.type, ret)
 
         if isinstance(tp, Array):
             return isinstance(other, Array) \
                 and tp.length == other.length \
-                and self.match_type(tp.type, other.type)
+                and self.match_type(tp.type, other.type, ret)
 
         if isinstance(tp, StructType):
             if not isinstance(other, StructType):
@@ -71,7 +75,7 @@ class Resolution:
             if tp.struct != other.struct:
                 return False
 
-            if not tp.generics.match(other.generics, self):
+            if not tp.generics.match(other.generics, self, ret):
                 return False
 
             return True
@@ -83,14 +87,26 @@ class Resolution:
             if tp.enum != other.enum:
                 return False
 
-            if not tp.generics.match(other.generics, self):
+            if not tp.generics.match(other.generics, self, ret):
+                return False
+
+            return True
+
+        if isinstance(tp, Generic):
+            if not isinstance(other, Generic):
+                return False
+
+            if tp.name != other.name:
                 return False
 
             return True
 
         assert False, f'unknown type {tp}'
 
-    def accept_type(self, tp: Type, other: Type) -> float:
+    def accept_type(self, tp: Type, other: Type, ret: bool) -> float:
+        assert tp is not None
+        assert other is not None
+
         if other == builtin.DIVERGE:
             return MATCH_PERFECT
 
@@ -106,27 +122,24 @@ class Resolution:
         if other == builtin.VOID:
             return None
 
-        if isinstance(other, Generic):
-            if isinstance(tp, Generic):
-                assert False, 'what happens?'
-
-            if other.name not in self.generics:
-                self.generics[other.name] = tp
-                return MATCH_PERFECT
-
-            other = self.generics[other.name]
-
-        if isinstance(tp, Generic):
-            if tp.name not in self.generics:
+        if not ret and isinstance(tp, Generic) and tp.name in self.generics:
+            if self.generics[tp.name] is None:
                 self.generics[tp.name] = other
                 return MATCH_PERFECT
 
             tp = self.generics[tp.name]
 
+        if ret and isinstance(other, Generic) and other.name in self.generics:
+            if self.generics[other.name] is None:
+                self.generics[other.name] = tp
+                return MATCH_PERFECT
+
+            other = self.generics[other.name]
+
         if isinstance(tp, Reference):
             if not isinstance(other, Reference) \
                     or tp.level > other.level \
-                    or not self.match_unsized(tp.type, other.type):
+                    or not self.match_unsized(tp.type, other.type, ret):
                 return None
 
             return MATCH_PERFECT - 1.0 + tp.level / other.level
@@ -138,10 +151,8 @@ class Resolution:
         else:
             reduction = 0.0
 
-        if isinstance(tp, (Array,
-                           StructType,
-                           EnumerationType)):
-            if not self.match_type(tp, other):
+        if isinstance(tp, (Array, StructType, EnumerationType, Generic)):
+            if not self.match_type(tp, other, ret):
                 return None
 
             return MATCH_PERFECT - reduction
@@ -170,7 +181,8 @@ class Resolution:
                 if not isinstance(other, Reference):
                     other = Reference(other, 0)
 
-                if not self.match_type(res.type, other.type):
+                # FIXME: generics might cause problems
+                if not self.match_type(res.type, other.type, False):
                     return builtin.VOID
 
                 lvl = min(res.level, other.level)
@@ -180,7 +192,8 @@ class Resolution:
             if isinstance(other, Reference):
                 other = other.type
 
-            if not self.match_type(res, other):
+            # FIXME: generics problems?
+            if not self.match_type(res, other, False):
                 return builtin.VOID
 
         if unknown:
@@ -224,6 +237,9 @@ class Match:
 
         return f'{self.source}{self.generics}({self.params}){ret}'
 
+    def __repr__(self) -> str:
+        return f'{self} {self._levels}'
+
     def update(self, args: List[Type], ret: Type) -> bool:
         # None: type mismatch
         # 1: casting to none
@@ -231,14 +247,15 @@ class Match:
         # 3: exact match
         # nan: unknown
 
-        self.resolution = Resolution()
+        self.resolution = self.generics.resolution()
         self._levels = self.params.accept(args, self.resolution)
 
+        # for incorrect number of arguments
         if self._levels is None:
             return False
 
         if ret is not None:
-            lvl = self.resolution.accept_type(ret, self.ret)
+            lvl = self.resolution.accept_type(ret, self.ret, True)
         else:
             lvl = math.nan
 
@@ -249,76 +266,89 @@ class Match:
     def resolve(self) -> bool:
         assert not self._resolved
 
-        gens = self.generics.resolve(self.resolution)
-        params = self.params.resolve(self.resolution)
-        ret = self.ret.resolve(self.resolution)
-
-        if not gens.finalize():
+        if not self.resolution.resolved():
             return False
 
-        if not params.finalize():
-            return False
-
-        if not ret.finalize():
-            return False
-
-        self.generics = gens
-        self.params = params
-        self.ret = ret
+        self.generics = self.generics.resolve(self.resolution)
+        self.params = self.params.resolve(self.resolution)
+        self.ret = self.ret.resolve(self.resolution)
 
         self._resolved = True
         return True
 
 
-class Generics(Iterable['symbols.Generic']):
-    def __init__(self, gens: Sequence['symbols.Generic']) -> None:
+class Generics(Iterable[Type], Sized):
+    def __init__(self,
+                 gens: Sequence['symbols.Generic'],
+                 args: Sequence[Type] = None) -> None:
         self.generics = gens
+        self.args = args
+
+        if args is not None:
+            assert len(gens) == len(args)
+            self._resolved = True
+        else:
+            self.args = [Generic(g) for g in gens]
+            self._resolved = len(gens) == 0
 
     def __str__(self) -> str:
         if len(self.generics) == 0:
             return ''
 
-        return '{' + ', '.join(str(g.type) for g in self.generics) + '}'
+        lst: Sequence[Any]
+        if self._resolved:
+            lst = self.args
+        else:
+            lst = self.generics
 
-    def __iter__(self) -> Iterator['symbols.Generic']:
-        return iter(self.generics)
+        return '{' + ', '.join(str(a) for a in lst) + '}'
 
-    def __getitem__(self, idx: int) -> symbols.Generic:
-        return self.generics[idx]
+    def __iter__(self) -> Iterator[Type]:
+        assert self._resolved
+        return iter(self.args)
+
+    def __getitem__(self, idx: int) -> Type:
+        assert self._resolved
+        return self.args[idx]
+
+    def __len__(self) -> int:
+        return len(self.generics)
 
     def fullname(self) -> str:
+        assert self._resolved
+
         if len(self.generics) == 0:
             return ''
 
-        return '{' + ','.join(g.type.fullname() for g in self.generics) + '}'
+        return '{' + ','.join(a.fullname() for a in self.args) + '}'
 
-    def match(self, other: 'Generics', res: Resolution) -> bool:
+    def match(self, other: 'Generics', res: Resolution, ret: bool) -> bool:
         # FIXME: problematic generic matching
-        for g, o in zip(self.generics, other.generics):
-            if not res.match_type(g.type, o.type):
+        for i in range(len(self.generics)):
+            if not ret and self.args[i] is None:
+                res.generics[self.generics[i].name] = other.args[i]
+                continue
+
+            if ret and other.args[i] is None:
+                res.generics[other.generics[i].name] = self.args[i]
+                continue
+
+            if not res.match_type(self.args[i], other.args[i], ret):
                 return False
 
         return True
 
     def resolve(self, res: Resolution) -> 'Generics':
-        return Generics([symbols.Generic(g.name, g.type.resolve(res))
-                         for g in self.generics])
+        return Generics(self.generics, [a.resolve(res) for a in self.args])
 
-    def finalize(self) -> bool:
-        for g in self.generics:
-            if isinstance(g.type, Generic):
-                return False
-
-        return True
-
-    def fill(self, gen_args: Sequence[Type]) -> 'Generics':
-        return Generics([symbols.Generic(g.name, a)
-                         for g, a in zip(self.generics, gen_args)])
-
-    def create_resolution(self) -> Resolution:
+    def resolution(self) -> Resolution:
         res = Resolution()
-        for g in self.generics:
-            res.generics[g.name] = g.type
+        if self._resolved:
+            for gen, arg in zip(self.generics, self.args):
+                res.generics[gen.name] = arg
+        else:
+            for gen in self.generics:
+                res.generics[gen.name] = None
 
         return res
 
@@ -327,8 +357,7 @@ class Variables(Iterable['symbols.Variable']):
     def __init__(self, vs: Sequence['symbols.Variable']) -> None:
         self.variables = vs
 
-        self._size: int = None
-        self._symbols: Dict[str, symbols.Variable] = None
+        self._symbols = {var.name: var for var in vs}
 
     def __str__(self) -> str:
         return ', '.join(str(v) for v in self.variables)
@@ -341,15 +370,9 @@ class Variables(Iterable['symbols.Variable']):
             return self.variables[idx]
 
         if isinstance(idx, str):
-            assert self._symbols is not None
             return self._symbols.get(idx, None)
 
         assert False
-
-    def size(self) -> int:
-        assert self._size is not None
-
-        return self._size
 
     def accept(self,
                args: Sequence[Type],
@@ -357,26 +380,12 @@ class Variables(Iterable['symbols.Variable']):
         if len(self.variables) != len(args):
             return None
 
-        return [res.accept_type(p.type, a)
+        return [res.accept_type(p.type, a, False)
                 for p, a in zip(self.variables, args)]
 
     def resolve(self, res: Resolution) -> 'Variables':
         return Variables([symbols.Variable(f.name, f.type.resolve(res))
                           for f in self.variables])
-
-    def finalize(self) -> bool:
-        size = 0
-        self._symbols = {}
-        for field in self.variables:
-            if not field.type.finalize():
-                return False
-
-            field.offset = size
-            size += field.type.size()
-            self._symbols[field.name] = field
-
-        self._size = size
-        return True
 
 
 class Reference(Type):
@@ -395,14 +404,9 @@ class Reference(Type):
     def fullname(self) -> str:
         return self.__format(self.type.fullname())
 
-    def size(self) -> int:
-        return 8  # size of pointer
-
     def resolve(self, res: Resolution) -> 'Reference':
-        return Reference(self.type.resolve(res), self.level)
-
-    def finalize(self) -> bool:
-        return self.type.finalize()
+        tp = self.type.resolve(res)
+        return Reference(tp, self.level)
 
 
 class Array(Type):
@@ -423,37 +427,24 @@ class Array(Type):
     def fullname(self) -> str:
         return self.__format(self.type.fullname(), ';')
 
-    def size(self) -> int:
-        if self.length is None:
-            raise TypeError('array is unsized')
-
-        return self.type.size() * self.length
-
     def resolve(self, res: Resolution) -> 'Array':
-        return Array(self.type.resolve(res), self.length)
-
-    def finalize(self) -> bool:
-        return self.type.finalize()
+        tp = self.type.resolve(res)
+        return Array(tp, self.length)
 
 
 class Generic(Type):
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self, sym: symbols.Generic) -> None:
+        self.name = sym.name
+        self.symbol = sym
 
     def __str__(self) -> str:
         return self.name
 
     def fullname(self) -> str:
-        assert False, 'should not use fullname on generic'
-
-    def size(self) -> int:
-        assert False, 'should not use size on generic'
+        return str(self.symbol.index)
 
     def resolve(self, res: Resolution) -> Type:
         return res.generics.get(self.name, self)
-
-    def finalize(self) -> bool:
-        return False
 
 
 class Special(Type):
@@ -466,17 +457,8 @@ class Special(Type):
     def fullname(self) -> str:
         assert False, 'should not use fullname on special'
 
-    def fullpath(self) -> str:
-        assert False, 'should not use fullpath on special'
-
-    def size(self) -> int:
-        assert False, 'should not use size on special'
-
     def resolve(self, res: Resolution) -> 'Special':
         return self
-
-    def finalize(self) -> bool:
-        return True
 
 
 class StructType(Type):
@@ -493,6 +475,8 @@ class StructType(Type):
 
         if flds is None:
             self.fields = Variables(struct.fields)
+            if gens is not None:
+                self.fields = self.fields.resolve(gens.resolution())
 
     def __str__(self) -> str:
         return f'{self.struct}{self.generics}'
@@ -500,33 +484,13 @@ class StructType(Type):
     def fullname(self) -> str:
         return f'{self.struct.fullname()}{self.generics.fullname()}'
 
-    def size(self) -> int:
-        # note: struct size is only for builtins
-        return self.struct.size + self.fields.size()
-
-    def fill(self, gen_args: Sequence[Type]) -> 'StructType':
-        gens = self.generics.fill(gen_args)
+    def resolve(self, res: Resolution) -> 'StructType':
+        gens = self.generics.resolve(res)
         return StructType(
             self.struct,
             gens,
-            self.fields.resolve(gens.create_resolution())
-        )
-
-    def resolve(self, res: Resolution) -> 'StructType':
-        return StructType(
-            self.struct,
-            self.generics.resolve(res),
             self.fields.resolve(res)
         )
-
-    def finalize(self) -> bool:
-        if not self.generics.finalize():
-            return False
-
-        if not self.fields.finalize():
-            return False
-
-        return True
 
 
 class EnumerationType(Type):
@@ -543,6 +507,9 @@ class EnumerationType(Type):
 
         if variants is None:
             self.variants = [Variables(v.fields) for v in enum.variants]
+            if gens is not None:
+                res = gens.resolution()
+                self.variants = [v.resolve(res) for v in self.variants]
 
     def __str__(self) -> str:
         return f'{self.enum}{self.generics}'
@@ -550,37 +517,13 @@ class EnumerationType(Type):
     def fullname(self) -> str:
         return self.enum.fullname()
 
-    def fullpath(self) -> str:
-        return self.enum.fullpath()
-
-    def size(self) -> int:
-        return self.enum.size + max(v.size() for v in self.variants)
-
-    def fill(self, gen_args: Sequence[Type]) -> 'EnumerationType':
-        gens = self.generics.fill(gen_args)
-        res = gens.create_resolution()
+    def resolve(self, res: Resolution) -> 'EnumerationType':
+        gens = self.generics.resolve(res)
         return EnumerationType(
             self.enum,
             gens,
             [v.resolve(res) for v in self.variants]
         )
-
-    def resolve(self, res: Resolution) -> 'EnumerationType':
-        return EnumerationType(
-            self.enum,
-            self.generics.resolve(res),
-            [v.resolve(res) for v in self.variants]
-        )
-
-    def finalize(self) -> bool:
-        if not self.generics.finalize():
-            return False
-
-        for v in self.variants:
-            if not v.finalize():
-                return False
-
-        return True
 
 
 def to_level(tp: Type, lvl: int) -> Type:
@@ -614,7 +557,9 @@ def resolve_overload(overloads: Set[Match],
     res: Set[Match] = set()
 
     for match in overloads:
-        if not match.update(args, ret):
+        succ = match.update(args, ret)
+
+        if not succ:
             continue
 
         res = {r for r in res if not r < match}

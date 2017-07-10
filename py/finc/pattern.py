@@ -20,9 +20,6 @@ class Pattern:
     def resolve(self, res: types.Resolution) -> None:
         self.type = self.type.resolve(res)
 
-    def finalize(self) -> bool:
-        return self.type.finalize()
-
 
 class Wildcard(Pattern):
     def __init__(self) -> None:
@@ -118,9 +115,6 @@ class Struct(Pattern):
             self.fields = self.type.variants[self.source.value].resolve(res)
         else:
             assert False
-
-    def finalize(self) -> bool:
-        return super().finalize() and self.fields.finalize()
 
     def add_field(self, pat: Pattern) -> None:
         self.subpatterns.append(pat)

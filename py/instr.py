@@ -11,7 +11,7 @@ FORMAT = """
 
 **Opcode**: 0x{ins.opcode:x}
 
-**Format**: `{format}`
+**Format**: `{ins}`
 
 {ins.comment}"""
 
@@ -30,10 +30,10 @@ class Instr:
         self.params = [Param(param) for param in segs[1:]]
         self.comment = ''
 
-    def format(self) -> str:
+    def __str__(self) -> str:
         val = self.opname
         for p in self.params:
-            val += ' ' + p.format()
+            val += f' {p}'
         return val
 
 
@@ -44,7 +44,7 @@ class Param:
         self.name = segs[0]
         self.type = segs[1]
 
-    def format(self) -> str:
+    def __str__(self) -> str:
         return f'{self.name}:{self.type}'
 
 
@@ -104,7 +104,7 @@ def main() -> None:
     print(HEADER)
 
     for ins in instrs:
-        print(FORMAT.format(ins=ins, format=ins.format()), end='')
+        print(FORMAT.format(ins=ins), end='')
 
 
 if __name__ == '__main__':

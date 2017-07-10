@@ -20,11 +20,6 @@ class Symbol:
     name: str
 
 
-class Invokable:
-    def overloads(self) -> Set['types.Match']:
-        raise NotImplementedError()
-
-
 class SymbolTable:
     def __init__(self, parent: 'SymbolTable' = None) -> None:
         self.parent = parent
@@ -107,10 +102,13 @@ class Constant(Symbol):
 
 
 class Variable(Symbol):
-    def __init__(self, name: str, tp: 'types.Type', off: int = None) -> None:
+    def __init__(self,
+                 name: str,
+                 tp: 'types.Type',
+                 is_arg: bool = False) -> None:
         self.name = name
         self.type = tp
-        self.offset = off
+        self.is_arg = is_arg
 
     def __str__(self) -> str:
         return f'{self.name} {self.type}'
@@ -125,18 +123,12 @@ class Variable(Symbol):
 
 
 class Generic(Symbol):
-    def __init__(self, name: str, tp: 'types.Type' = None) -> None:
+    def __init__(self, name: str, idx: int) -> None:
         self.name = name
-        self.type = tp
-
-        if tp is None:
-            self.type = types.Generic(name)
+        self.index = idx
 
     def __str__(self) -> str:
-        if self.type is None:
-            return self.name
-
-        return f'{self.name}={self.type}'
+        return self.name
 
 
 class Scope(Symbol, SymbolTable):
@@ -144,13 +136,13 @@ class Scope(Symbol, SymbolTable):
         return self.name
 
     def fullname(self) -> str:
-        return self.name
-
-    def fullpath(self) -> str:
         if self.parent is None:
-            return self.fullname()
+            return self.basename()
 
-        return self.module().path() + self.fullname()
+        return self.module().path() + self.basename()
+
+    def basename(self) -> str:
+        raise NotImplementedError()
 
 
 class Module(Scope):
@@ -183,8 +175,11 @@ class Module(Scope):
 
         return None
 
+    def basename(self) -> str:
+        return self.name
+
     def path(self, sep: str = ':') -> str:
-        path = self.fullpath()
+        path = self.fullname()
         if path != '':
             path += sep
 
@@ -219,7 +214,7 @@ class Module(Scope):
         fn.parent = self
 
     def add_variable(self, name: str, tp: 'types.Type') -> None:
-        raise NotImplementedError()
+        assert False, 'TODO'
 
     def add_constant(self, const: Constant) -> None:
         self._add_symbol(const)
@@ -245,7 +240,7 @@ class Module(Scope):
         return ops
 
 
-class Struct(Scope, Invokable):
+class Struct(Scope):
     def __init__(self, name: str, size: int = 0) -> None:
         super().__init__()
 
@@ -254,8 +249,11 @@ class Struct(Scope, Invokable):
         self.generics: List[Generic] = []
         self.fields: List[Variable] = []
 
+    def basename(self) -> str:
+        return self.name
+
     def add_generic(self, name: str) -> Generic:
-        gen = Generic(name)
+        gen = Generic(name, len(self.generics))
         self.generics.append(gen)
         self._add_symbol(gen)
         return gen
@@ -267,10 +265,8 @@ class Struct(Scope, Invokable):
         return field
 
     def overloads(self) -> Set['types.Match']:
-        return {types.Match(self,
-                            self.generics,
-                            self.fields,
-                            types.StructType(self))}
+        ret = types.StructType(self)
+        return {types.Match(self, self.generics, self.fields, ret)}
 
 
 class Enumeration(Scope):
@@ -284,8 +280,11 @@ class Enumeration(Scope):
         self.generics: List['Generic'] = []
         self.variants: List['Variant'] = []
 
+    def basename(self) -> str:
+        return self.name
+
     def add_generic(self, name: str) -> 'Generic':
-        gen = Generic(name)
+        gen = Generic(name, len(self.generics))
         self.generics.append(gen)
         self._add_symbol(gen)
         return gen
@@ -299,11 +298,9 @@ class Enumeration(Scope):
         return var
 
 
-class Variant(Scope, Invokable):
+class Variant(Scope):
     def __init__(self, name: str, parent: Enumeration) -> None:
         super().__init__()
-
-        assert isinstance(parent, Enumeration)
 
         self.name = name
         self.parent = parent
@@ -314,6 +311,9 @@ class Variant(Scope, Invokable):
 
     def __str__(self) -> str:
         return f'{self.parent}:{self.name}'
+
+    def basename(self) -> str:
+        return f'{self.enum.name}:{self.name}'
 
     def add_field(self, name: str, tp: 'types.Type') -> Variable:
         field = Variable(name, tp)
@@ -336,30 +336,31 @@ class Function(Scope):
         self.params: List[Variable] = []
         self.generics: List[Generic] = []
 
-    def fullname(self) -> str:
+    def __lt__(self, other: 'Function') -> bool:
+        return self.module() < other.module() and self.name < other.name
+
+    def basename(self) -> str:
         params = ','.join(p.type.fullname() for p in self.params)
         ret = self.ret.fullname() if self.ret != builtin.VOID else ''
 
         return f'{self.name}({params}){ret}'
 
     def add_param(self, name: str, tp: 'types.Type') -> Variable:
-        assert isinstance(name, str)
-
-        param = Variable(name, tp)
+        param = Variable(name, tp, is_arg=True)
 
         self._add_symbol(param)
         self.params.append(param)
         return param
 
     def add_generic(self, name: str) -> 'Generic':
-        assert isinstance(name, str)
-
-        gen = Generic(name)
+        gen = Generic(name, len(self.generics))
 
         self._add_symbol(gen)
         self.generics.append(gen)
-
         return gen
+
+    def set_ret(self, ret: 'types.Type') -> None:
+        self.ret = ret
 
 
 class FunctionGroup(Symbol):
@@ -379,16 +380,13 @@ class FunctionGroup(Symbol):
 
 
 class Block(SymbolTable):
-    def __init__(self, parent: SymbolTable, offset: int) -> None:
+    def __init__(self, parent: SymbolTable) -> None:
         super().__init__(parent)
 
-        self.offset = offset
+        self.locals: List[Variable] = []
 
     def add_local(self, name: str, tp: 'types.Type') -> Variable:
-        tp.finalize()
-
-        var = Variable(name, tp, self.offset)
-        self.offset += tp.size()
-
+        var = Variable(name, tp)
+        self.locals.append(var)
         self._add_symbol(var)
         return var

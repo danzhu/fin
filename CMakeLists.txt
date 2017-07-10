@@ -19,9 +19,10 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     -Wno-c++98-compat-pedantic \
     -Wno-missing-prototypes \
     -Wno-padded \
+    -Wno-shadow-field-in-constructor \
     -Wno-sign-conversion \
-    -Wno-unused-parameter \
     -Wno-unused-exception-parameter \
+    -Wno-unused-parameter \
     -pedantic")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
@@ -71,7 +72,7 @@ add_custom_command(
     COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test.fin" -o test.fm)
 
 # targets
-add_executable(fin ${SOURCES} ${HEADERS} opcode.h opcode.cc)
+add_executable(fin ${SOURCES} ${HEADERS} opcode.h opcode.cc ${PY}/instructions)
 
 add_custom_target(doc DEPENDS instructions.md)
 

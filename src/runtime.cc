@@ -1,114 +1,150 @@
 #include "runtime.h"
 
+#include <cassert>
 #include <cmath>
 #include <functional>
 #include <iostream>
+#include "contract.h"
+#include "function.h"
+#include "library.h"
 #include "opcode.h"
+#include "type.h"
+#include "util.h"
 
-void move(const char *src, char *dest, uint16_t size)
+void move(const char *src, char *dest, Fin::Size size)
 {
     LOG(2) << std::endl << "  = ";
     LOG_HEX(2, src, size);
 
-    for (uint16_t i = 0; i < size; ++i)
+    for (Fin::Size i = 0; i < size; ++i)
         dest[i] = src[i];
 }
 
-void Fin::Runtime::jump(uint32_t target)
+void Fin::Runtime::jump(Pc target)
 {
     if (target > instrs.size())
         throw std::out_of_range{"jump target " + std::to_string(target)
             + " out of range " + std::to_string(instrs.size())};
-    pc = target;
+    frame.pc = target;
 }
 
 std::string Fin::Runtime::readStr()
 {
-    auto len = readConst<uint16_t>();
-    auto val = std::string{&instrs.at(pc), len};
+    auto len = readConst<std::uint16_t>();
+    auto val = std::string{&instrs.at(frame.pc), len};
 
     LOG(1) << " '" << val << "'";
 
-    jump(pc + len);
+    jump(frame.pc + len);
     return val;
 }
 
-Fin::Function &Fin::Runtime::readFn()
+Fin::Function &Fin::Runtime::readFunction()
 {
-    auto idx = readConst<uint32_t>();
-    auto &fn = *execModule->refFunctions.at(idx);
+    auto idx = readConst<std::uint32_t>();
+    auto &fn = *frame.library->refFunctions.at(idx);
 
     LOG(1) << " [" << fn.name << "]";
 
     return fn;
 }
 
-void Fin::Runtime::ret()
+Fin::Contract &Fin::Runtime::readContract()
 {
-    auto frame = rtStack.back();
-    rtStack.pop_back();
+    auto idx = readConst<Index>();
+    auto &ctr = frame.contract->contracts.at(idx);
 
-    // restore previous frame
-    opStack.resize(fp - frame.argSize);
+    LOG(1) << " [" << ctr.name << "]";
 
-    execModule = frame.module;
-    execFunction = frame.function;
-    pc = frame.returnAddress;
-    fp = frame.framePointer;
+    return ctr;
 }
 
-void Fin::Runtime::call(const Function &fn, uint16_t argSize)
+Fin::TypeInfo &Fin::Runtime::readType()
+{
+    auto idx = readConst<Index>();
+    auto &type = frame.contract->types.at(idx);
+
+    LOG(1) << " [" << type.size << " | " << type.alignment << "]";
+
+    return type;
+}
+
+Fin::Offset Fin::Runtime::readOffset()
+{
+    auto idx = readConst<Index>();
+    auto offset = frame.contract->offsets.at(idx);
+
+    LOG(1) << " [" << offset << "]";
+
+    return offset;
+}
+
+void Fin::Runtime::ret()
+{
+    opStack.resize(frame.param);
+
+    frame = pop(rtStack);
+}
+
+void Fin::Runtime::call(Contract &ctr)
 {
     // store current frame
-    auto frame = Frame{execModule, execFunction, pc, fp, argSize};
     rtStack.emplace_back(frame);
 
     // update frame
-    execModule = fn.module;
-    execFunction = &fn;
+    frame.contract = &ctr;
+    frame.local = frame.param = opStack.size();
 
-    if (fn.native)
+    frame.library = ctr.library;
+
+    if (ctr.native)
     {
-        fn.native(*this, opStack);
+        ctr.native(*this, ctr, opStack);
 
         // emplace and pop even for native functions so that we can get full
         // backtrace
-        rtStack.pop_back();
-
-        execModule = frame.module;
-        execFunction = frame.function;
+        frame = pop(rtStack);
     }
     else
     {
-        fp = opStack.size();
-        jump(fn.location);
+        if (ctr.initialized)
+        {
+            jump(ctr.location);
+            sign();
+        }
+        else
+        {
+            jump(ctr.init);
+            ctr.initialized = true;
+        }
     }
 }
 
-void Fin::Runtime::printFrame(std::ostream &out, const Function *fn)
-    const noexcept
+void Fin::Runtime::sign()
 {
-    out << "  in ";
-    if (!fn)
-        out << "<module>";
-    else if (fn->native)
-        out << fn->name << " [native]";
-    else
-        out << fn->name;
-    out << std::endl;
+    frame.param = frame.local - frame.contract->argOffset;
+    opStack.resize(opStack.size() + frame.contract->localOffset);
+
+    // cleanup unneeded data
+    frame.contract->refType = nullptr;
+}
+
+void Fin::Runtime::checkLibrary()
+{
+    if (!frame.library)
+        throw std::runtime_error{"no library active"};
+}
+
+void Fin::Runtime::checkContract()
+{
+    if (!frame.contract)
+        throw std::runtime_error{"no contract active"};
 }
 
 void Fin::Runtime::execute()
 {
-    pc = 0;
-    fp = 0;
-
-    Module *declModule = nullptr;
-    Module *refModule = nullptr;
-    execModule = nullptr;
-    execFunction = nullptr;
-
-    LOG(1) << "Logging at level " << DEBUG << "...";
+    Library *refLibrary = nullptr;
+    Type *refType = nullptr;
 
     while (true)
     {
@@ -124,204 +160,372 @@ void Fin::Runtime::execute()
 
             case Opcode::Cookie:
                 // skip shebang
-                while (instrs.at(pc++) != '\n');
+                while (instrs.at(frame.pc++) != '\n');
                 continue;
 
-            case Opcode::Module:
+            case Opcode::Lib:
                 {
                     auto name = readStr();
 
-                    auto module = &createModule(name);
-                    execModule = refModule = declModule = module;
+                    auto &lib = createLibrary(name);
+                    frame.library = &lib;
                 }
                 continue;
 
-            case Opcode::Function:
+            case Opcode::Fn:
                 {
-                    if (!declModule)
-                        throw std::runtime_error{"no declaring module"};
+                    checkLibrary();
 
                     auto name = readStr();
-                    auto skip = readConst<uint32_t>();
-                    auto target = pc + skip;
+                    auto gens = readConst<std::uint16_t>();
+                    auto ctrs = readConst<std::uint16_t>();
+                    auto _loc = readConst<std::uint32_t>();
+                    auto loc = frame.pc + _loc;
+                    auto _end = readConst<std::uint32_t>();
+                    auto end = frame.pc + _end;
 
-                    Function *fn = &declModule->addFunction(name, Function{pc});
-                    declModule->refFunctions.emplace_back(fn);
-                    jump(target);
+                    frame.library->addFunction(
+                            Function{name, frame.pc, loc, gens, ctrs});
+                    jump(end);
                 }
                 continue;
 
-            case Opcode::RefModule:
+            case Opcode::Type:
                 {
                     auto name = readStr();
+                    auto gens = readConst<std::uint16_t>();
+                    auto _end = readConst<std::uint32_t>();
+                    auto end = frame.pc + _end;
 
-                    refModule = &getModule(name);
+                    refType = &frame.library->addType(
+                            Type{name, gens, frame.pc});
+                    jump(end);
                 }
                 continue;
 
-            case Opcode::RefFunction:
+            case Opcode::Member:
                 {
-                    if (!declModule)
-                        throw std::runtime_error{"no declaring module"};
-
-                    if (!refModule)
-                        throw std::runtime_error{"no referencing module"};
+                    if (!refType)
+                        throw std::runtime_error{"no referencing type"};
 
                     auto name = readStr();
 
-                    auto it = refModule->functions.find(name);
-                    if (it == refModule->functions.end())
-                        throw std::runtime_error{"unable to find functions '"
+                    auto &mem = refType->addMember(name);
+                    frame.library->refMembers.emplace_back(&mem);
+                }
+                continue;
+
+            case Opcode::RefLib:
+                {
+                    auto name = readStr();
+
+                    refLibrary = &getLibrary(name);
+                }
+                continue;
+
+            case Opcode::RefFn:
+                {
+                    checkLibrary();
+
+                    if (!refLibrary)
+                        throw std::runtime_error{"no referencing library"};
+
+                    auto name = readStr();
+
+                    auto it = refLibrary->functions.find(name);
+                    if (it == refLibrary->functions.end())
+                        throw std::runtime_error{"unable to find function '"
                             + name + "'"};
 
-                    declModule->refFunctions.emplace_back(&it->second);
+                    frame.library->refFunctions.emplace_back(&it->second);
                 }
+                continue;
+
+            case Opcode::RefType:
+                {
+                    checkLibrary();
+
+                    if (!refLibrary)
+                        throw std::runtime_error{"no referencing library"};
+
+                    auto name = readStr();
+
+                    auto it = refLibrary->types.find(name);
+                    if (it == refLibrary->types.end())
+                        throw std::runtime_error{"unable to find type "
+                            + name + "'"};
+
+                    frame.library->refTypes.emplace_back(&it->second);
+                }
+                continue;
+
+            case Opcode::SizeI:
+                {
+                    checkContract();
+
+                    auto type = TypeInfo::native<Int>();
+                    frame.contract->types.emplace_back(type);
+                }
+                continue;
+
+            case Opcode::SizeF:
+                {
+                    checkContract();
+
+                    auto type = TypeInfo::native<Float>();
+                    frame.contract->types.emplace_back(type);
+                }
+                continue;
+
+            case Opcode::SizeB:
+                {
+                    checkContract();
+
+                    auto type = TypeInfo::native<Bool>();
+                    frame.contract->types.emplace_back(type);
+                }
+                continue;
+
+            case Opcode::SizeP:
+                {
+                    checkContract();
+
+                    auto type = TypeInfo::native<Ptr>();
+                    frame.contract->types.emplace_back(type);
+                }
+                continue;
+
+            case Opcode::SizeDup:
+                {
+                    checkContract();
+
+                    auto idx = readConst<std::uint16_t>();
+
+                    auto type = frame.contract->types.at(idx);
+                    frame.contract->types.emplace_back(type);
+                }
+                continue;
+
+            case Opcode::SizeArr:
+                {
+                    checkContract();
+
+                    auto len = readConst<Int>();
+
+                    auto type = pop(frame.contract->types);
+
+                    type.size = alignTo(type.size, type.alignment) * len;
+                    frame.contract->types.emplace_back(type);
+                }
+                continue;
+
+            case Opcode::TypeCall:
+                {
+                    checkLibrary();
+                    checkContract();
+
+                    // TODO: possibly move this to match readFunction()
+                    auto idx = readConst<std::uint32_t>();
+
+                    auto &type = *frame.library->refTypes.at(idx);
+
+                    frame.contract->refType = std::make_unique<Contract>(type);
+                    frame.contract->refType->types =
+                        popRange(frame.contract->types, type.generics);
+                    call(*frame.contract->refType);
+                }
+                continue;
+
+            case Opcode::TypeRet:
+                {
+                    checkLibrary();
+                    checkContract();
+
+                    TypeInfo type{frame.contract->localOffset,
+                        frame.contract->localAlign};
+                    ret();
+                    frame.contract->types.emplace_back(type);
+                }
+                continue;
+
+            case Opcode::TypeMem:
+                {
+                    checkLibrary();
+                    checkContract();
+
+                    auto idx = readConst<std::uint32_t>();
+
+                    auto mem = frame.library->refMembers.at(idx);
+                    auto off = frame.contract->refType->offsets.at(mem->index);
+                    frame.contract->addOffset(off);
+                }
+                continue;
+
+            case Opcode::Param:
+                {
+                    checkContract();
+
+                    auto type = readType();
+
+                    auto offset = frame.contract->argOffset;
+                    frame.contract->addOffset(offset);
+                    frame.contract->argOffset += type.aligned;
+                }
+                continue;
+
+            case Opcode::Local:
+                {
+                    checkContract();
+
+                    auto type = readType();
+
+                    auto offset = alignTo(frame.contract->localOffset,
+                            type.alignment);
+                    frame.contract->addOffset(offset);
+                    frame.contract->localOffset = offset + type.size;
+                }
+                continue;
+
+            case Opcode::Field:
+                {
+                    checkContract();
+
+                    auto type = readType();
+
+                    auto offset = alignTo(frame.contract->localOffset,
+                            type.alignment);
+                    frame.contract->addOffset(offset);
+                    frame.contract->localOffset = offset + type.size;
+                    frame.contract->localAlign = std::max(
+                            frame.contract->localAlign, type.alignment);
+                }
+                continue;
+
+            case Opcode::Contract:
+                {
+                    checkLibrary();
+                    checkContract();
+
+                    auto &fn = readFunction();
+
+                    Contract ctr{fn};
+                    ctr.types = popRange(frame.contract->types, fn.generics);
+                    ctr.contracts = popRange(frame.contract->contracts,
+                            fn.contracts);
+
+                    frame.contract->addContract(std::move(ctr));
+                }
+                continue;
+
+            case Opcode::Sign:
+                sign();
                 continue;
 
             case Opcode::Call:
                 {
-                    if (!execModule)
-                        throw std::runtime_error{"no executing module"};
+                    checkLibrary();
 
-                    auto &fn = readFn();
-                    auto argSize = readConst<uint16_t>();
-
-                    call(fn, argSize);
-                }
-                continue;
-
-            case Opcode::Reduce:
-                {
-                    auto size = readConst<uint16_t>();
-                    auto amount = readConst<uint16_t>();
-
-                    auto loc = opStack.size() - size;
-                    auto src = opStack.at(loc, size);
-                    auto dest = opStack.at(loc - amount, size);
-                    move(src, dest, size);
-                    opStack.pop(amount);
-                }
-                continue;
-
-            case Opcode::Return:
-                ret();
-                continue;
-
-            case Opcode::ReturnVal:
-                {
-                    auto size = readConst<uint16_t>();
-
-                    auto src = opStack.pop(size);
-                    ret();
-                    auto dest = opStack.push(size);
-                    move(src, dest, size);
+                    auto &ctr = readContract();
+                    call(ctr);
                 }
                 continue;
 
             case Opcode::Term:
-                LOG(1) << std::endl << "Terminating..." << std::endl;
                 return;
 
-            case Opcode::Alloc:
-                opStack.push(alloc.alloc(opStack.pop<int32_t>()));
+            case Opcode::End:
+                ret();
                 continue;
 
-            case Opcode::Dealloc:
-                alloc.dealloc(opStack.pop<Ptr>());
-                continue;
-
-            case Opcode::Realloc:
+            case Opcode::Ret:
                 {
-                    auto size = opStack.pop<int32_t>();
-                    auto ptr = opStack.top<Ptr>();
+                    auto type = readType();
 
-                    alloc.realloc(ptr, size);
+                    auto src = opStack.topSize(type.aligned);
+
+                    ret();
+
+                    auto dest = opStack.pushSize(type.aligned);
+                    move(src, dest, type.size);
                 }
                 continue;
 
             case Opcode::Push:
                 {
-                    auto size = readConst<uint16_t>();
+                    auto type = readType();
 
-                    opStack.push(size);
+                    opStack.pushSize(type.aligned);
                 }
                 continue;
 
             case Opcode::Pop:
                 {
-                    auto size = readConst<uint16_t>();
+                    auto type = readType();
 
-                    opStack.pop(size);
+                    opStack.popSize(type.aligned);
                 }
                 continue;
 
             case Opcode::Dup:
                 {
-                    auto size = readConst<uint16_t>();
+                    auto type = readType();
 
-                    auto src = opStack.top(size);
-                    auto dest = opStack.push(size);
-                    move(src, dest, size);
+                    auto src = opStack.topSize(type.aligned);
+                    auto dest = opStack.pushSize(type.aligned);
+                    move(src, dest, type.size);
                 }
                 continue;
 
             case Opcode::Load:
                 {
-                    auto size = readConst<uint16_t>();
+                    auto type = readType();
 
                     auto ptr = opStack.pop<Ptr>();
-                    auto src = alloc.read(ptr, size);
-                    auto dest = opStack.push(size);
-                    move(src, dest, size);
+                    auto src = alloc.read(ptr, type.size);
+                    auto dest = opStack.pushSize(type.aligned);
+                    move(src, dest, type.size);
                 }
                 continue;
 
             case Opcode::Store:
                 {
-                    auto size = readConst<uint16_t>();
+                    auto type = readType();
 
-                    auto src = opStack.pop(size);
+                    auto src = opStack.popSize(type.aligned);
                     auto ptr = opStack.pop<Ptr>();
-                    auto dest = alloc.write(ptr, size);
-                    move(src, dest, size);
+                    auto dest = alloc.write(ptr, type.size);
+                    move(src, dest, type.size);
                 }
                 continue;
 
-            case Opcode::AddrFrame:
+            case Opcode::AddrArg:
                 {
-                    auto offset = readConst<int16_t>();
-                    opStack.push(static_cast<Ptr>(fp + offset));
+                    auto offset = readOffset();
+
+                    opStack.push<Ptr>(frame.param + offset);
                 }
                 continue;
 
-            case Opcode::AddrSt:
+            case Opcode::AddrVar:
                 {
-                    auto offset = readConst<int16_t>();
-                    opStack.push(static_cast<Ptr>(opStack.size() + offset));
+                    auto offset = readOffset();
+
+                    opStack.push<Ptr>(frame.local + offset);
                 }
                 continue;
 
-            case Opcode::AddrOffset:
+            case Opcode::AddrMem:
                 {
-                    auto size = readConst<uint16_t>();
+                    auto offset = readOffset();
 
-                    auto offset = opStack.pop<uint32_t>();
-                    auto ptr = opStack.pop<Ptr>();
-                    opStack.push(ptr + offset * size);
-                }
-                continue;
-
-            case Opcode::Offset:
-                {
-                    auto offset = readConst<uint32_t>();
-                    opStack.push(opStack.pop<uint64_t>() + offset);
+                    opStack.top<Ptr>() += offset;
                 }
                 continue;
 
             case Opcode::Br:
                 {
                     auto offset = readConst<int16_t>();
-                    auto target = pc + offset;
+                    auto target = frame.pc + offset;
 
                     jump(target);
                 }
@@ -330,7 +534,7 @@ void Fin::Runtime::execute()
             case Opcode::BrFalse:
                 {
                     auto offset = readConst<int16_t>();
-                    auto target = pc + offset;
+                    auto target = frame.pc + offset;
 
                     if (!opStack.pop<bool>())
                         jump(target);
@@ -340,7 +544,7 @@ void Fin::Runtime::execute()
             case Opcode::BrTrue:
                 {
                     auto offset = readConst<int16_t>();
-                    auto target = pc + offset;
+                    auto target = frame.pc + offset;
 
                     if (opStack.pop<bool>())
                         jump(target);
@@ -360,81 +564,81 @@ void Fin::Runtime::execute()
                 continue;
 
             case Opcode::ConstI:
-                loadConst<int32_t>();
+                loadConst<Int>();
                 continue;
 
             case Opcode::AddI:
-                binaryOp<std::plus<int32_t>>();
+                binaryOp<std::plus<Int>>();
                 continue;
 
             case Opcode::SubI:
-                binaryOp<std::minus<int32_t>>();
+                binaryOp<std::minus<Int>>();
                 continue;
 
             case Opcode::MultI:
-                binaryOp<std::multiplies<int32_t>>();
+                binaryOp<std::multiplies<Int>>();
                 continue;
 
             case Opcode::DivI:
-                binaryOp<std::divides<int32_t>>();
+                binaryOp<std::divides<Int>>();
                 continue;
 
             case Opcode::ModI:
-                binaryOp<std::modulus<int32_t>>();
+                binaryOp<std::modulus<Int>>();
                 continue;
 
             case Opcode::NegI:
-                opStack.push(-opStack.pop<int32_t>());
+                opStack.push(-opStack.pop<Int>());
                 continue;
 
             case Opcode::EqI:
-                binaryOp<std::equal_to<int32_t>>();
+                binaryOp<std::equal_to<Int>>();
                 continue;
 
             case Opcode::NeI:
-                binaryOp<std::not_equal_to<int32_t>>();
+                binaryOp<std::not_equal_to<Int>>();
                 continue;
 
             case Opcode::LtI:
-                binaryOp<std::less<int32_t>>();
+                binaryOp<std::less<Int>>();
                 continue;
 
             case Opcode::LeI:
-                binaryOp<std::less_equal<int32_t>>();
+                binaryOp<std::less_equal<Int>>();
                 continue;
 
             case Opcode::GtI:
-                binaryOp<std::greater<int32_t>>();
+                binaryOp<std::greater<Int>>();
                 continue;
 
             case Opcode::GeI:
-                binaryOp<std::greater_equal<int32_t>>();
+                binaryOp<std::greater_equal<Int>>();
                 continue;
 
             case Opcode::ConstF:
-                loadConst<float>();
+                loadConst<Float>();
                 continue;
 
             case Opcode::AddF:
-                binaryOp<std::plus<float>>();
+                binaryOp<std::plus<Float>>();
                 continue;
 
             case Opcode::SubF:
-                binaryOp<std::minus<float>>();
+                binaryOp<std::minus<Float>>();
                 continue;
 
             case Opcode::MultF:
-                binaryOp<std::multiplies<float>>();
+                binaryOp<std::multiplies<Float>>();
                 continue;
 
             case Opcode::DivF:
-                binaryOp<std::divides<float>>();
+                binaryOp<std::divides<Float>>();
                 continue;
 
             case Opcode::ModF:
                 {
-                    auto op2 = opStack.pop<float>();
-                    auto op1 = opStack.pop<float>();
+                    auto op2 = opStack.pop<Float>();
+                    auto op1 = opStack.pop<Float>();
                     opStack.push(std::fmod(op1, op2));
                 }
                 continue;
@@ -444,35 +648,35 @@ void Fin::Runtime::execute()
                 continue;
 
             case Opcode::EqF:
-                binaryOp<std::equal_to<float>>();
+                binaryOp<std::equal_to<Float>>();
                 continue;
 
             case Opcode::NeF:
-                binaryOp<std::not_equal_to<float>>();
+                binaryOp<std::not_equal_to<Float>>();
                 continue;
 
             case Opcode::LtF:
-                binaryOp<std::less<float>>();
+                binaryOp<std::less<Float>>();
                 continue;
 
             case Opcode::LeF:
-                binaryOp<std::less_equal<float>>();
+                binaryOp<std::less_equal<Float>>();
                 continue;
 
             case Opcode::GtF:
-                binaryOp<std::greater<float>>();
+                binaryOp<std::greater<Float>>();
                 continue;
 
             case Opcode::GeF:
-                binaryOp<std::greater_equal<float>>();
+                binaryOp<std::greater_equal<Float>>();
                 continue;
 
             case Opcode::CastIF:
-                opStack.push(static_cast<float>(opStack.pop<int32_t>()));
+                opStack.push(static_cast<Float>(opStack.pop<Int>()));
                 continue;
 
             case Opcode::CastFI:
-                opStack.push(static_cast<int32_t>(opStack.pop<float>()));
+                opStack.push(static_cast<Int>(opStack.pop<Float>()));
                 continue;
         }
 
@@ -481,7 +685,7 @@ void Fin::Runtime::execute()
     }
 }
 
-Fin::Runtime::Runtime()
+Fin::Runtime::Runtime(Size stackSize): opStack{stackSize}
 {
     alloc.add(opStack.content(), opStack.capacity());
 }
@@ -491,42 +695,51 @@ void Fin::Runtime::run(std::istream &src)
     instrs.assign(std::istreambuf_iterator<char>(src),
             std::istreambuf_iterator<char>());
     instrs.emplace_back(static_cast<char>(Opcode::Term));
+
+    frame = Frame{};
+    frame.pc = 0;
+
+    LOG(1) << "Logging at level " << DEBUG << "..." << std::endl;
+
+    LOG(1) << "Loading..." << std::endl;
     execute();
+
+    LOG(1) << "Executing..." << std::endl;
+    checkLibrary();
+    mainContract = std::make_unique<Contract>(
+            frame.library->functions.at("main()"));
+    frame.pc = static_cast<Pc>(instrs.size() - 1);
+    call(*mainContract);
+    execute();
+
+    LOG(1) << std::endl << "Terminating..." << std::endl;
 }
 
-uint32_t Fin::Runtime::programCounter() const noexcept
+Fin::Library &Fin::Runtime::createLibrary(const std::string &name)
 {
-    return pc;
-}
+    LibraryID id{name};
+    auto lib = std::make_unique<Library>(id);
 
-Fin::Module &Fin::Runtime::createModule(const std::string &name)
-{
-    ModuleID id;
-    id.name = name;
-
-    auto module = std::make_unique<Module>();
-    module->id = static_cast<decltype(Module::id)>(modules.size());
-
-    auto p = module.get();
-    modules.emplace_back(std::move(module));
-    modulesByID.emplace(id, p);
+    auto p = lib.get();
+    libraries.emplace(std::move(id), std::move(lib));
     return *p;
 }
 
-Fin::Module &Fin::Runtime::getModule(const std::string &name)
+Fin::Library &Fin::Runtime::getLibrary(const std::string &name)
 {
-    ModuleID id;
+    LibraryID id;
     id.name = name;
 
-    // TODO: load module if not available
-    return *modulesByID.at(id);
+    // TODO: load library if not available
+    return *libraries.at(id);
 }
 
 void Fin::Runtime::backtrace(std::ostream &out) const noexcept
 {
     out << "Backtrace:" << std::endl;
 
-    for (const auto &frame : rtStack)
-        printFrame(out, frame.function);
-    printFrame(out, execFunction);
+    for (const auto &fr : rtStack)
+        out << fr << std::endl;
+
+    out << frame << std::endl;
 }

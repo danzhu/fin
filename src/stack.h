@@ -6,32 +6,38 @@
 #include <stdexcept>
 #include <string>
 #include "log.h"
+#include "typedefs.h"
+#include "util.h"
 
 namespace Fin
 {
     class Stack
     {
         char *_content = nullptr;
-        uint32_t _cap;
-        uint32_t _size = 0;
+        std::uint32_t _cap;
+        std::uint32_t _size = 0;
     public:
-        explicit Stack(uint32_t cap = 256): _content{new char[cap]}, _cap{cap}
-        {}
+        explicit Stack(Size cap):
+            _content{new char[cap]}, _cap{cap} {}
+
         Stack(const Stack &other) = delete;
+        Stack(Stack &&other) = delete;
+
         ~Stack()
         {
             delete[] _content;
         }
 
         Stack &operator=(const Stack &other) = delete;
+        Stack &operator=(Stack &&other) = delete;
 
-        uint32_t size() const noexcept { return _size; }
-        void resize(uint32_t size) noexcept { _size = size; }
+        std::uint32_t size() const noexcept { return _size; }
+        void resize(std::uint32_t size) noexcept { _size = size; }
 
         char *content() const noexcept { return _content; }
-        uint32_t capacity() const noexcept { return _cap; }
+        std::uint32_t capacity() const noexcept { return _cap; }
 
-        char *at(uint32_t idx, uint32_t size)
+        char *at(Offset idx, Size size)
         {
             if (idx + size > _size)
                 throw std::out_of_range{"invalid stack access at "
@@ -40,32 +46,31 @@ namespace Fin
             return _content + idx;
         }
 
-        char *push(uint16_t size)
+        char *pushSize(Size size)
         {
             if (_size + size > _cap)
                 throw std::overflow_error{"stack overflow"};
 
             auto val = &_content[_size];
-            _size += size;
 
             LOG(2) << std::endl << "  < [" << _size << ", " << size << "]";
 
+            _size += size;
             return val;
         }
 
-        char *pop(uint16_t size)
+        char *popSize(Size size)
         {
             if (_size < size)
                 throw std::overflow_error{"negative stack size"};
 
-            _size -= size;
-
             LOG(2) << std::endl << "  > [" << _size << ", " << size << "]";
 
+            _size -= size;
             return &_content[_size];
         }
 
-        char *top(uint16_t size)
+        char *topSize(Size size)
         {
             if (_size < size)
                 throw std::overflow_error{"accessing at negative index"};
@@ -75,21 +80,42 @@ namespace Fin
             return &_content[_size - size];
         }
 
-        template<typename T> T &at(uint32_t idx)
+        template<typename T> T &at(Offset idx)
         {
-            return *reinterpret_cast<T*>(at(idx, sizeof(T)));
+            // TODO: try constexpr
+            auto size = alignTo(sizeof(T), MAX_ALIGN);
+
+            return *reinterpret_cast<T*>(at(idx, size));
+        }
+
+        template<typename T> void push(T val)
+        {
+            auto size = alignTo(sizeof(T), MAX_ALIGN);
+
+            if (_size + size > _cap)
+                throw std::overflow_error{"stack overflow"};
+
+            LOG(2) << std::endl << "  < " << val;
+            LOG(2) << " [" << _size << ", " << size << "]";
+
+            auto addr = _size;
+            _size += size;
+            at<T>(addr) = val;
         }
 
         template<typename T> void pop(T &val)
         {
-            if (_size < sizeof(T))
+            auto size = alignTo(sizeof(T), MAX_ALIGN);
+
+            if (_size < size)
                 throw std::overflow_error{"negative stack size"};
 
-            val = at<T>(_size - sizeof(T));
-            _size -= sizeof(T);
+            val = at<T>(_size - size);
 
             LOG(2) << std::endl << "  > " << val;
-            LOG(2) << " [" << _size << ", " << sizeof(T) << "]";
+            LOG(2) << " [" << _size << ", " << size << "]";
+
+            _size -= size;
         }
 
         template<typename T> T pop()
@@ -99,30 +125,19 @@ namespace Fin
             return val;
         }
 
-        template<typename T> T top()
+        template<typename T> T &top()
         {
-            if (_size < sizeof(T))
+            auto size = alignTo(sizeof(T), MAX_ALIGN);
+
+            if (_size < size)
                 throw std::runtime_error{"accessing at negative index"};
 
-            auto val = at<T>(_size - sizeof(T));
+            auto &val = at<T>(_size - size);
 
             LOG(2) << std::endl << "  ^ " << val;
-            LOG(2) << " [" << _size << ", " << sizeof(T) << "]";
+            LOG(2) << " [" << _size << ", " << size << "]";
 
             return val;
-        }
-
-        template<typename T> void push(T val)
-        {
-            if (_size + sizeof(T) > _cap)
-                throw std::overflow_error{"stack overflow"};
-
-            LOG(2) << std::endl << "  < " << val;
-            LOG(2) << " [" << _size << ", " << sizeof(T) << "]";
-
-            auto addr = _size;
-            _size += sizeof(T);
-            at<T>(addr) = val;
         }
     };
 }

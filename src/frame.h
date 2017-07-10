@@ -2,20 +2,24 @@
 #define FIN_FRAME_H
 
 #include <cstdint>
+#include <iostream>
+#include "typedefs.h"
 
 namespace Fin
 {
-    struct Function;
-    struct Module;
+    struct Contract;
+    struct Library;
 
     struct Frame
     {
-        const Module *module;
-        const Function *function;
-        uint32_t returnAddress;
-        uint32_t framePointer;
-        uint16_t argSize;
+        Library *library = nullptr;
+        Contract *contract = nullptr;
+        Pc pc;
+        Size local = 0;
+        Size param = 0;
     };
+
+    std::ostream &operator<<(std::ostream &out, const Frame &fr);
 }
 
 #endif

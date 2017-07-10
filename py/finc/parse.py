@@ -1,15 +1,15 @@
 from typing import Iterable, Iterator, List, Callable
-from .tokens import Token
-from .node import Node
-from .error import ParserError
+from . import error
+from . import node
+from . import tokens
 
 
 class Parser:
     def __init__(self) -> None:
-        self._src: Iterator[Token] = None
-        self._lookahead: Token = None
+        self._src: Iterator[tokens.Token] = None
+        self._lookahead: tokens.Token = None
 
-    def parse(self, src: Iterable[Token]):
+    def parse(self, src: Iterable[tokens.Token]):
         self._src = iter(src)
         self._next()
         return self._file()
@@ -28,14 +28,14 @@ class Parser:
         self._next()
 
     def _error(self, msg: str):
-        raise ParserError(msg, self._lookahead)
+        raise error.ParserError(msg, self._lookahead)
 
     def _id(self) -> str:
         name = self._lookahead.value
         self._expect('ID')
         return name
 
-    def _params(self, fn: Callable[[], Node]) -> List[Node]:
+    def _params(self, fn: Callable[[], node.Node]) -> List[node.Node]:
         self._expect('LPAREN')
         if self._lookahead.type == 'RPAREN':
             self._next()
@@ -52,7 +52,7 @@ class Parser:
 
         return children
 
-    def _children(self, tp: str, fn: Callable[[], Node]) -> Node:
+    def _children(self, tp: str, fn: Callable[[], node.Node]) -> node.Node:
         self._expect('EOL')
         self._expect('INDENT')
 
@@ -62,12 +62,12 @@ class Parser:
 
         self._next()  # DEDENT
 
-        return Node(tp, None, children)
+        return node.Node(tp, None, children)
 
-    def _empty(self) -> Node:
-        return Node('EMPTY', self._lookahead, ())
+    def _empty(self) -> node.Node:
+        return node.Node('EMPTY', self._lookahead, ())
 
-    def _file(self) -> Node:
+    def _file(self) -> node.Node:
         children = []
         while self._lookahead.type != 'EOF':
             if self._lookahead.type == 'IMPORT':
@@ -81,40 +81,43 @@ class Parser:
             else:
                 children.append(self._test())
                 self._expect('EOL')
-        return Node('FILE', None, children)
+        return node.Node('FILE', None, children)
 
-    def _import(self) -> Node:
+    def _import(self) -> node.Node:
         token = self._lookahead
         self._expect('IMPORT')
         name = self._name()
         self._expect('EOL')
-        return Node('IMPORT', token, (name,))
+        return node.Node('IMPORT', token, (name,))
 
-    def _pattern(self) -> Node:
+    def _pattern(self) -> node.Node:
         token = self._lookahead
 
         if token.type == 'UNDERSCORE':
             self._next()
-            return Node('PAT_ANY', token, ())
+            return node.Node('PAT_ANY', token, ())
 
         if token.type in ('NUM', 'FLOAT'):
             self._next()
-            return Node(f'PAT_{token.type}', token, (), token.value)
+            return node.Node(f'PAT_{token.type}', token, (), token.value)
 
         name = self._name()
 
         if self._lookahead.type != 'LPAREN':
-            return Node('PAT_VAR', token, (name,))
+            return node.Node('PAT_VAR', token, (name,))
 
-        children = Node('PAT_PARAMS', None, self._params(self._pattern))
-        return Node('PAT_STRUCT', token, (name, children))
+        children = node.Node('PAT_PARAMS', None, self._params(self._pattern))
+        return node.Node('PAT_STRUCT', token, (name, children))
 
-    def _gens(self) -> Node:
+    def _gens(self) -> node.Node:
         children = []
         self._expect('LBRACE')
 
         while True:
-            children.append(self._gen())
+            token = self._lookahead
+            name = self._id()
+
+            children.append(node.Node('ID', token, (), name))
 
             tp = self._lookahead.type
             self._expect('COMMA', 'RBRACE')
@@ -122,14 +125,9 @@ class Parser:
             if tp == 'RBRACE':
                 break
 
-        return Node('GEN_PARAMS', None, children)
+        return node.Node('GEN_PARAMS', None, children)
 
-    def _gen(self) -> Node:
-        token = self._lookahead
-        self._expect('ID')
-        return Node('GEN', token, (), token.value)
-
-    def _struct(self) -> Node:
+    def _struct(self) -> node.Node:
         self._expect('STRUCT')
         token = self._lookahead
         name = self._id()
@@ -142,16 +140,16 @@ class Parser:
         fields = self._children('FIELDS', self._field)
         self._expect('EOL')
 
-        return Node('STRUCT', token, (gens, fields), name)
+        return node.Node('STRUCT', token, (gens, fields), name)
 
-    def _field(self) -> Node:
+    def _field(self) -> node.Node:
         token = self._lookahead
         name = self._id()
         tp = self._type()
         self._expect('EOL')
-        return Node('FIELD', token, (tp,), name)
+        return node.Node('FIELD', token, (tp,), name)
 
-    def _enum(self) -> Node:
+    def _enum(self) -> node.Node:
         self._expect('ENUM')
         token = self._lookahead
         name = self._id()
@@ -164,9 +162,9 @@ class Parser:
         variants = self._children('VARIANTS', self._variant)
         self._expect('EOL')
 
-        return Node('ENUM', token, (gens, variants), name)
+        return node.Node('ENUM', token, (gens, variants), name)
 
-    def _variant(self) -> Node:
+    def _variant(self) -> node.Node:
         token = self._lookahead
         name = self._id()
 
@@ -177,25 +175,31 @@ class Parser:
 
         self._expect('EOL')
 
-        return Node('VARIANT', token, params, name)
+        return node.Node('VARIANT', token, params, name)
 
-    def _def(self) -> Node:
+    def _def(self) -> node.Node:
         self._expect('DEF')
         token = self._lookahead
 
         name = self._id()
-        params = Node('PARAMS', None, self._params(self._param))
 
-        if self._lookahead.type == 'EOL':
-            ret = self._empty()
+        if self._lookahead.type == 'LBRACE':
+            gens = self._gens()
         else:
+            gens = self._empty()
+
+        params = node.Node('PARAMS', None, self._params(self._param))
+
+        if self._lookahead.type != 'EOL':
             ret = self._type()
+        else:
+            ret = self._empty()
 
         cont = self._block()
         self._expect('EOL')
-        return Node('DEF', token, (params, ret, cont), name)
+        return node.Node('DEF', token, (gens, params, ret, cont), name)
 
-    def _let(self) -> Node:
+    def _let(self) -> node.Node:
         token = self._lookahead
         self._expect('LET')
         name = self._id()
@@ -219,24 +223,24 @@ class Parser:
         else:
             self._expect()
 
-        return Node('LET', token, (tp, val), name, lvl)
+        return node.Node('LET', token, (tp, val), name, lvl)
 
-    def _if(self) -> Node:
+    def _if(self) -> node.Node:
         token = self._lookahead
         self._expect('IF')
         cond = self._test()
         succ = self._block()
         fail = self._else()
-        return Node('IF', token, (cond, succ, fail))
+        return node.Node('IF', token, (cond, succ, fail))
 
-    def _else(self) -> Node:
+    def _else(self) -> node.Node:
         if self._lookahead.type == 'ELIF':
             token = self._lookahead
             self._next()
             cond = self._test()
             succ = self._block()
             fail = self._else()
-            return Node('IF', token, (cond, succ, fail))
+            return node.Node('IF', token, (cond, succ, fail))
 
         if self._lookahead.type == 'ELSE':
             self._next()
@@ -244,15 +248,15 @@ class Parser:
 
         return self._empty()
 
-    def _match(self) -> Node:
+    def _match(self) -> node.Node:
         token = self._lookahead
         self._expect('MATCH')
         val = self._test()
         arms = self._children('ARMS', self._arm)
-        return Node('MATCH', token, (val, arms))
+        return node.Node('MATCH', token, (val, arms))
 
-    def _arm(self) -> Node:
-        pat = Node('PATTERN', None, (self._pattern(),))
+    def _arm(self) -> node.Node:
+        pat = node.Node('PATTERN', None, (self._pattern(),))
 
         tp = self._lookahead.type
         self._expect('ARM', 'EOL')
@@ -266,9 +270,9 @@ class Parser:
 
         self._expect('EOL')
 
-        return Node('ARM', None, (pat, cont))
+        return node.Node('ARM', None, (pat, cont))
 
-    def _while(self) -> Node:
+    def _while(self) -> node.Node:
         token = self._lookahead
         self._expect('WHILE')
         cond = self._test()
@@ -280,13 +284,13 @@ class Parser:
         else:
             fail = self._empty()
 
-        return Node('WHILE', token, (cond, cont, fail))
+        return node.Node('WHILE', token, (cond, cont, fail))
 
-    def _begin(self) -> Node:
+    def _begin(self) -> node.Node:
         self._expect('BEGIN')
         return self._block()
 
-    def _return(self) -> Node:
+    def _return(self) -> node.Node:
         token = self._lookahead
         self._expect('RETURN')
         if self._lookahead.type != 'EOL':
@@ -294,29 +298,29 @@ class Parser:
         else:
             val = self._empty()
 
-        return Node('RETURN', token, (val,))
+        return node.Node('RETURN', token, (val,))
 
-    def _param(self) -> Node:
+    def _param(self) -> node.Node:
         token = self._lookahead
         name = self._id()
         tp = self._type()
-        return Node('PARAM', token, (tp,), name)
+        return node.Node('PARAM', token, (tp,), name)
 
-    def _name(self) -> Node:
+    def _name(self) -> node.Node:
         token = self._lookahead
         name = self._id()
 
-        node = Node('ID', token, (), name)
+        n = node.Node('ID', token, (), name)
 
         while self._lookahead.type == 'SCOPE':
             self._next()
             token = self._lookahead
-            member = Node('ID', self._lookahead, (), self._id())
-            node = Node('SCOPE', token, (node, member))
+            member = node.Node('ID', self._lookahead, (), self._id())
+            n = node.Node('SCOPE', token, (n, member))
 
-        return node
+        return n
 
-    def _type(self) -> Node:
+    def _type(self) -> node.Node:
         token = self._lookahead
 
         if self._lookahead.type == 'AMP':
@@ -325,24 +329,24 @@ class Parser:
                 self._next()
                 lvl += 1
 
-            node = self._type()
-            return Node('REF', token, (node,), None, lvl)
+            tp = self._type()
+            return node.Node('REF', token, (tp,), None, lvl)
 
         if self._lookahead.type == 'LBRACKET':
             self._next()  # LBRACKET
-            node = self._type()
+            tp = self._type()
 
             if self._lookahead.type == 'SEMICOLON':
                 self._next()
 
                 num = self._lookahead
                 self._expect('NUM')
-                size = Node(num.type, num, (), num.value)
+                size = node.Node(num.type, num, (), num.value)
             else:
                 size = self._empty()
 
             self._expect('RBRACKET')
-            return Node('ARRAY', token, (node, size))
+            return node.Node('ARRAY', token, (tp, size))
 
         if self._lookahead.type == 'ID':
             name = self._name()
@@ -354,45 +358,45 @@ class Parser:
                 while True:
                     children.append(self._type())
 
-                    tp = self._lookahead.type
+                    sym = self._lookahead.type
                     self._expect('COMMA', 'RBRACE')
-                    if tp == 'RBRACE':
+                    if sym == 'RBRACE':
                         break
 
-            gens = Node('GEN_ARGS', None, children)
-            return Node('TYPE', token, (name, gens))
+            gens = node.Node('GEN_ARGS', None, children)
+            return node.Node('TYPE', token, (name, gens))
 
         self._expect()
         assert False
 
-    def _block(self) -> Node:
+    def _block(self) -> node.Node:
         self._expect('EOL')
         token = self._lookahead
         stmts = []
         self._expect('INDENT')
         while self._lookahead.type != 'DEDENT':
             if self._lookahead.type == 'LET':
-                node = self._let()
+                stmt = self._let()
             else:
-                node = self._test()
+                stmt = self._test()
             self._expect('EOL')
-            stmts.append(node)
+            stmts.append(stmt)
 
         self._next()
-        return Node('BLOCK', token, stmts)
+        return node.Node('BLOCK', token, stmts)
 
-    def _test(self) -> Node:
-        node = self._or_test()
+    def _test(self) -> node.Node:
+        n = self._or_test()
 
         if self._lookahead.type not in ['ASSN', 'INC_ASSN', 'COLON']:
-            return node
+            return n
 
         if self._lookahead.type == 'INC_ASSN':
             token = self._lookahead
             op = self._lookahead.variant.split('_', 1)[0].lower()
             self._next()  # INC_ASSN
             val = self._test()
-            return Node('INC_ASSN', token, (node, val), op)
+            return node.Node('INC_ASSN', token, (n, val), op)
 
         token = self._lookahead
         lvl = 0
@@ -403,37 +407,37 @@ class Parser:
         self._expect('ASSN')
 
         val = self._test()
-        return Node('ASSN', token, (node, val), op, lvl)
+        return node.Node('ASSN', token, (n, val), op, lvl)
 
-    def _or_test(self) -> Node:
-        node = self._and_test()
+    def _or_test(self) -> node.Node:
+        n = self._and_test()
         while self._lookahead.type == 'OR':
             token = self._lookahead
             self._next()
             r = self._and_test()
-            node = Node('TEST', token, (node, r), 'OR')
-        return node
+            n = node.Node('TEST', token, (n, r), 'OR')
+        return n
 
-    def _and_test(self) -> Node:
-        node = self._not_test()
+    def _and_test(self) -> node.Node:
+        n = self._not_test()
         while self._lookahead.type == 'AND':
             token = self._lookahead
             self._next()
             r = self._not_test()
-            node = Node('TEST', token, (node, r), 'AND')
-        return node
+            n = node.Node('TEST', token, (n, r), 'AND')
+        return n
 
-    def _not_test(self) -> Node:
+    def _not_test(self) -> node.Node:
         if self._lookahead.type == 'NOT':
             token = self._lookahead
             self._next()
             val = self._not_test()
-            return Node('TEST', token, (val,), 'NOT')
+            return node.Node('TEST', token, (val,), 'NOT')
 
         return self._comp()
 
-    def _comp(self) -> Node:
-        node = self._expr()
+    def _comp(self) -> node.Node:
+        n = self._expr()
         if self._lookahead.type == 'COMP':
             token = self._lookahead
             if self._lookahead.variant == 'EQ':
@@ -452,30 +456,30 @@ class Parser:
                 assert False
             self._next()
             r = self._expr()
-            node = Node('OP', token, (node, r), op)
-        return node
+            n = node.Node('OP', token, (n, r), op)
+        return n
 
-    def _expr(self) -> Node:
-        node = self._term()
+    def _expr(self) -> node.Node:
+        n = self._term()
         while self._lookahead.type in ['PLUS', 'MINUS']:
             token = self._lookahead
             op = self._lookahead.type.lower()
             self._next()
             r = self._term()
-            node = Node('OP', token, (node, r), op)
-        return node
+            n = node.Node('OP', token, (n, r), op)
+        return n
 
-    def _term(self) -> Node:
-        node = self._factor()
+    def _term(self) -> node.Node:
+        n = self._factor()
         while self._lookahead.type in ['MULTIPLIES', 'DIVIDES', 'MODULUS']:
             token = self._lookahead
             op = self._lookahead.type.lower()
             self._next()
             r = self._factor()
-            node = Node('OP', token, (node, r), op)
-        return node
+            n = node.Node('OP', token, (n, r), op)
+        return n
 
-    def _factor(self) -> Node:
+    def _factor(self) -> node.Node:
         if self._lookahead.type in ['PLUS', 'MINUS']:
             token = self._lookahead
             if self._lookahead.type == 'PLUS':
@@ -486,12 +490,12 @@ class Parser:
                 assert False
             self._next()
             val = self._factor()
-            return Node('OP', token, (val,), op)
+            return node.Node('OP', token, (val,), op)
         else:
             return self._atom_expr()
 
-    def _atom_expr(self) -> Node:
-        node = self._atom()
+    def _atom_expr(self) -> node.Node:
+        n = self._atom()
 
         while True:
             if self._lookahead.type == 'DOT':
@@ -501,41 +505,41 @@ class Parser:
 
                 if self._lookahead.type == 'LPAREN':
                     # method call
-                    children = [node] + self._params(self._test)
-                    args = Node('ARGS', None, children)
-                    node = Node('CALL', token, (name, args))
+                    children = [n] + self._params(self._test)
+                    args = node.Node('ARGS', None, children)
+                    n = node.Node('CALL', token, (name, args))
                 else:
                     # member access
-                    node = Node('MEMBER', token, (node, name))
+                    n = node.Node('MEMBER', token, (n, name))
 
             elif self._lookahead.type == 'LBRACKET':
                 token = self._lookahead
                 self._next()  # LBRACKET
                 idx = self._test()
                 self._expect('RBRACKET')
-                node = Node('OP', token, (node, idx), 'subscript')
+                n = node.Node('OP', token, (n, idx), 'subscript')
 
             elif self._lookahead.type == 'ARROW':
                 token = self._lookahead
                 self._next()
                 tp = self._type()
-                node = Node('CAST', token, (node, tp))
+                n = node.Node('CAST', token, (n, tp))
 
             else:
                 break
 
-        return node
+        return n
 
-    def _atom(self) -> Node:
+    def _atom(self) -> node.Node:
         if self._lookahead.type == 'ID':
             token = self._lookahead
             name = self._name()
 
             if self._lookahead.type == 'LPAREN':
-                args = Node('ARGS', None, self._params(self._test))
-                return Node('CALL', token, (name, args))
+                args = node.Node('ARGS', None, self._params(self._test))
+                return node.Node('CALL', token, (name, args))
 
-            return Node('VAR', token, (name,))
+            return node.Node('VAR', token, (name,))
 
         if self._lookahead.type in ['NUM', 'FLOAT']:
             return self._const()
@@ -569,18 +573,18 @@ class Parser:
             else:
                 val = self._empty()
 
-            return Node('BREAK', token, (val,))
+            return node.Node('BREAK', token, (val,))
 
         if self._lookahead.type in ['CONTINUE', 'REDO']:
             token = self._lookahead
             tp = self._lookahead.type
             self._next()
-            return Node(tp, token, ())
+            return node.Node(tp, token, ())
 
         self._expect()
         assert False
 
-    def _const(self) -> Node:
+    def _const(self) -> node.Node:
         token = self._lookahead
         self._expect('NUM', 'FLOAT')
-        return Node(token.type, token, (), token.value)
+        return node.Node(token.type, token, (), token.value)

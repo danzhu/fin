@@ -6,72 +6,81 @@ cookie=35
     used for shebang at the start of the program. This also allows comments
     embedded in the binary.
 
-module name:s
+lib name:str
     Declare new module, and set declaring module to this module.
 
-function name:s skip:I
+fn name:str gens:H ctrs:H begin:I end:I
     Declare function `name` of declaring module.
 
-ref_module name:s
+type name:str gens:H end:I
+
+member name:str
+
+ref_lib name:str
     Set referencing module.
 
-ref_function name:s
+ref_fn name:str
     Add function `name` of referencing module to list of references of declaring
     module.
 
-call fn:r argSize:H
-    Call function `fn` of references in executing module.
+ref_type name:str
 
-reduce size:H amount:H
-    Pop value of size `size`, pop `amount` bytes from stack, and then push the
-    value.
+size_i
 
-return
-    Return from the current function.
+size_f
 
-return_val size:H
-    Return from function with a return value.
+size_b
+
+size_p
+
+size_dup type:sz
+
+size_arr length:i
+
+type_call type:tp
+
+type_ret
+
+type_mem member:mem
+
+param size:sz
+
+local size:sz
+
+field size:sz
+
+contract function:fn
+
+sign
+
+call fn:ctr
 
 term
     Stop program execution. Automatically added to the end of every module.
 
-alloc
-    Pop int from stack, allocate that many bytes of heap memory, and push
-    pointer onto stack.
+end
+    Return from the current function.
 
-dealloc
-    Pop pointer from stack and deallocate memory used by that pointer.
+ret size:sz
+    Return from the current function with a return value.
 
-realloc
-    Pop pointer and int from stack, and reallocate the pointer to that size.
+push size:sz
 
-push amount:H
-    Push `amount` bytes onto stack.
+pop size:sz
 
-pop amount:H
-    Pop `amount` bytes from stack.
+dup size:sz
 
-dup amount:H
-    Duplicate `amount` bytes on stack.
-
-load size:H
+load size:sz
     Load value of pointer onto stack.
 
-store size:H
+store size:sz
     Store value from stack to pointer.
 
-addr_frame offset:h
-    Load address of frame at `offset` onto stack.
+addr_arg slot:off
 
-addr_st offset:h
-    Load address of stack at `offset` onto stack.
+addr_var slot:off
 
-addr_offset size:H
-    Pop address and index from stack, and push the address of that element onto
-    stack.
-
-offset offset:I
-    Increment the value on stack by `offset`.
+addr_mem slot:off
 
 br offset:h
     Unconditionally branch to `pc + offset`, where pc is at the end of the

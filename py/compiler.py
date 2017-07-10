@@ -19,7 +19,6 @@ class Compiler:
     def __init__(self) -> None:
         self.lexer = lexer.Lexer()
         self.parser = parse.Parser()
-        self.generator = generator.Generator()
         self.assembler = Assembler()
 
     def to_type(self, val: str, syms: symbols.SymbolTable) -> types.Type:
@@ -87,46 +86,32 @@ class Compiler:
         if stage == 'lex':
             for t in tokens:
                 print(t)
-            return
 
         ast = self.parser.parse(tokens)
 
         if stage == 'parse':
             ast.print()
-            return
 
         builtins = builtin.load_builtins()
         root = symbols.Module('', None, builtins)
         self.load_module('rt', root)
 
-        refs: Set[symbols.Function] = set()
-
         mod = symbols.Module(name, root)
-        ast.analyze(mod, root, refs)
+        ast.analyze(mod, root)
 
         if stage == 'ast':
             ast.print()
-            return
 
         with io.StringIO() as asm:
             assembly = cast(io.StringIO, asm)
 
-            self.generator.generate(ast,
-                                    name,
-                                    refs,
-                                    cast(io.TextIOBase, assembly))
+            generator.Generator(ast, cast(io.TextIOBase, assembly))
 
             if stage == 'asm':
                 print(assembly.getvalue())
-                return
 
             assembly.seek(0)
             self.assembler.assemble(assembly, out)
-
-            if stage == 'exec':
-                return
-
-        raise error.CompilerError('invalid stage', None)
 
 
 def main() -> None:

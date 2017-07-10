@@ -7,11 +7,10 @@
 #include <string>
 #include <vector>
 #include "log.h"
+#include "typedefs.h"
 
 namespace Fin
 {
-    typedef uint64_t Ptr;
-
     class Allocator
     {
         enum class State
@@ -50,7 +49,7 @@ namespace Fin
             for (auto val : heap)
             {
                 if (val.state == State::Allocated)
-                    delete[] val.value;
+                    std::free(val.value);
             }
         }
 
@@ -86,7 +85,7 @@ namespace Fin
             val.state = State::Freed;
         }
 
-        void realloc(Ptr ptr, uint32_t size)
+        Ptr realloc(Ptr ptr, uint32_t size)
         {
             uint32_t blk = ptr >> 32;
             auto &val = heap.at(blk);
@@ -100,6 +99,8 @@ namespace Fin
                 throw std::runtime_error{"failed to reallocate"};
 
             val.size = size;
+
+            return ptr;
         }
 
         void remove(Ptr ptr)
