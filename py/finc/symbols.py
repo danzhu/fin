@@ -130,6 +130,9 @@ class Generic(Symbol):
     def __str__(self) -> str:
         return self.name
 
+    def fullname(self) -> str:
+        return str(self.index)
+
 
 class Scope(Symbol, SymbolTable):
     def __str__(self):

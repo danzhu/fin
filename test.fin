@@ -4,7 +4,24 @@ struct Vector
     x Float
     y Float
 
+def fib(n Int) Int
+    if n == 0
+        0
+    elif n == 1
+        1
+    else
+        fib(n - 2) + fib(n - 1)
+
+struct Vec{T}
+    content &[T]
+    size Int
+    capacity Int
+
+struct Pair{K, V}
+    key K
+    value V
+
 def main()
-    let v Vector
-    v.x = 1.
-    v.x.rt::print()
+    let v Pair{Int, Float}
+    v.key = 5
+    v.key.rt::print()

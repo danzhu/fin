@@ -45,8 +45,6 @@ class Writer:
         self._instrs.extend(writer._instrs)
 
     def type(self, tp: types.Type) -> None:
-        self.instr('!sz', type_name(tp))
-
         if isinstance(tp, types.Reference):
             self.instr('size_p')
 
@@ -71,7 +69,7 @@ class Writer:
                 for gen in tp.generics:
                     self.type(gen)
 
-                self.instr('type_call', tp.fullname())
+                self.instr('type_call', tp.struct.fullname())
 
         else:
             assert False, f'unknown type {tp}'
@@ -226,7 +224,10 @@ class Type:
         writer.indent()
 
         writer.comment('types')
-        for tp in self.types.values():
+        for gen_sym in sym.generics:
+            writer.instr('!sz', gen_sym.fullname())
+        for tp_name, tp in self.types.items():
+            writer.instr('!sz', type_name(tp))
             writer.type(tp)
 
         writer.space()
@@ -247,7 +248,9 @@ class Type:
 
     def _type(self, tp: types.Type) -> str:
         name = type_name(tp)
-        self.types.setdefault(name, tp)
+        if not isinstance(tp, types.Generic):
+            self.types.setdefault(name, tp)
+
         return name
 
 
@@ -267,6 +270,10 @@ class Function:
 
         self.writer = Writer(writer)
         self._gen(node.children[3])
+        if node.function.ret == builtin.VOID:
+            self.writer.instr('end')
+        else:
+            self.writer.instr('ret', self._type(node.function.ret))
 
         name = node.function.basename()
         gens = len(node.function.generics)
@@ -282,6 +289,7 @@ class Function:
 
         writer.comment('types')
         for tp_name, tp in self.types.items():
+            writer.instr('!sz', tp_name)
             writer.type(tp.type)
 
             writer.indent()
@@ -327,7 +335,6 @@ class Function:
 
         writer.label(begin)
         writer.extend(self.writer)
-        writer.instr('end')
 
         writer.label(end)
         writer.space()
@@ -344,7 +351,7 @@ class Function:
 
     def _type(self, tp: types.Type) -> str:
         name = type_name(tp)
-        if name not in self.types:
+        if name not in self.types and not isinstance(tp, types.Generic):
             self.types[name] = TypeRef(tp)
 
         return name

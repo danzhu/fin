@@ -441,7 +441,7 @@ class Generic(Type):
         return self.name
 
     def fullname(self) -> str:
-        return str(self.symbol.index)
+        return self.symbol.fullname()
 
     def resolve(self, res: Resolution) -> Type:
         return res.generics.get(self.name, self)
