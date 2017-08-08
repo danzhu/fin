@@ -57,27 +57,26 @@ namespace Fin
         Ptr alloc(std::uint32_t size)
         {
             // TODO: reuse deallocated ptrs
-            auto ptr = static_cast<Ptr>(heap.size()) << 32;
-            auto mem = static_cast<char *>(std::malloc(size));
+            Ptr ptr{static_cast<std::uint32_t>(heap.size()), 0};
+            auto addr = static_cast<char *>(std::malloc(size));
 
-            if (!mem)
+            if (!addr)
                 throw std::runtime_error{"failed to allocate"};
 
-            heap.emplace_back(Block{State::Allocated, mem, size});
+            heap.emplace_back(Block{State::Allocated, addr, size});
             return ptr;
         }
 
         Ptr add(char *addr, std::uint32_t size)
         {
-            auto ptr = static_cast<Ptr>(heap.size()) << 32;
+            Ptr ptr{static_cast<std::uint32_t>(heap.size()), 0};
             heap.emplace_back(Block{State::Native, addr, size});
             return ptr;
         }
 
         void dealloc(Ptr ptr)
         {
-            std::uint32_t blk = ptr >> 32;
-            auto &val = heap.at(blk);
+            auto &val = heap.at(ptr.block);
 
             if (val.state != State::Allocated)
                 throw std::runtime_error{"invalid deallocation"};
@@ -88,8 +87,7 @@ namespace Fin
 
         Ptr realloc(Ptr ptr, uint32_t size)
         {
-            std::uint32_t blk = ptr >> 32;
-            auto &val = heap.at(blk);
+            auto &val = heap.at(ptr.block);
 
             if (val.state != State::Allocated)
                 throw std::runtime_error{"invalid reallocation"};
@@ -106,39 +104,23 @@ namespace Fin
 
         void remove(Ptr ptr)
         {
-            std::uint32_t blk = ptr >> 32;
-            auto &val = heap.at(blk);
+            auto &val = heap.at(ptr.block);
 
             val.state = State::Freed;
         }
 
         char *read(Ptr ptr, std::uint32_t size) const
         {
-            std::uint32_t blk = ptr >> 32;
-            std::uint32_t offset = ptr & 0xFFFFFFFF;
+            LOG(2) << std::endl << "  & " << ptr;
 
-            LOG(2) << std::endl << "  & " << blk << ':' << offset;
-
-            return deref(blk, offset, size);
+            return deref(ptr.block, ptr.offset, size);
         }
 
         char *write(Ptr ptr, std::uint32_t size) const
         {
-            std::uint32_t blk = ptr >> 32;
-            std::uint32_t offset = ptr & 0xFFFFFFFF;
+            LOG(2) << std::endl << "  * " << ptr;
 
-            LOG(2) << std::endl << "  * " << blk << ':' << offset;
-
-            return deref(blk, offset, size);
-        }
-
-        template<typename T> Ptr add(T &addr)
-        {
-            Ptr ptr = heap.size();
-            heap.emplace_back(Block{State::Stack,
-                    reinterpret_cast<char *>(&addr),
-                    sizeof(T)});
-            return ptr;
+            return deref(ptr.block, ptr.offset, size);
         }
     };
 }

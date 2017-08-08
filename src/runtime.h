@@ -25,6 +25,7 @@ namespace Fin
         Stack opStack;
         Allocator alloc;
         Frame frame;
+        Ptr stackPtr;
         std::deque<Frame> rtStack;
         std::map<LibraryID, std::unique_ptr<Library>> libraries;
         std::vector<char> instrs;

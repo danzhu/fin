@@ -15,8 +15,8 @@ namespace Fin
         Library *library = nullptr;
         Contract *contract = nullptr;
         Pc pc;
-        Size local = 0;
-        Size param = 0;
+        Ptr local;
+        Ptr param;
     };
 
     std::ostream &operator<<(std::ostream &out, const Frame &fr);

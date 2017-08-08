@@ -49,7 +49,7 @@ namespace Fin
 
         char *pushSize(Size size)
         {
-            if (_size + size > _cap)
+            if (_size > _cap - size)
                 throw std::overflow_error{"stack overflow"};
 
             auto val = &_content[_size];
@@ -85,23 +85,14 @@ namespace Fin
         {
             constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
 
-            if (idx + size > _size)
-                throw std::out_of_range{"invalid stack access at "
-                    + std::to_string(idx) + ", size " + std::to_string(size)};
-
-            auto &val = *reinterpret_cast<T*>(_content + idx);
-
-            LOG(2) << std::endl << "  ^ " << val;
-            LOG(2) << " [" << _size << ", " << size << "]";
-
-            return val;
+            return *reinterpret_cast<T*>(at(idx, size));
         }
 
         template<typename T> void push(T val)
         {
-            auto size = alignTo(sizeof(T), MAX_ALIGN);
+            constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
 
-            if (_size + size > _cap)
+            if (_size > _cap - size)
                 throw std::overflow_error{"stack overflow"};
 
             LOG(2) << std::endl << "  < " << val;
@@ -114,7 +105,7 @@ namespace Fin
 
         template<typename T> void pop(T &val)
         {
-            auto size = alignTo(sizeof(T), MAX_ALIGN);
+            constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
 
             if (_size < size)
                 throw std::overflow_error{"negative stack size"};
@@ -136,12 +127,15 @@ namespace Fin
 
         template<typename T> T &top()
         {
-            auto size = alignTo(sizeof(T), MAX_ALIGN);
+            constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
 
             if (_size < size)
                 throw std::runtime_error{"accessing at negative index"};
 
             auto &val = at<T>(_size - size);
+
+            LOG(2) << std::endl << "  ^ " << val;
+            LOG(2) << " [" << _size << ", " << size << "]";
 
             return val;
         }

@@ -81,7 +81,8 @@ Fin::Offset Fin::Runtime::readOffset()
 
 void Fin::Runtime::ret()
 {
-    opStack.resize(frame.param);
+    // TODO: looks a bit hacky
+    opStack.resize(frame.param.offset);
 
     frame = pop(rtStack);
 }
@@ -93,7 +94,7 @@ void Fin::Runtime::call(Contract &ctr)
 
     // update frame
     frame.contract = &ctr;
-    frame.local = frame.param = opStack.size();
+    frame.local = frame.param = stackPtr + opStack.size();
 
     frame.library = ctr.library;
 
@@ -698,7 +699,7 @@ void Fin::Runtime::execute()
 
 Fin::Runtime::Runtime(Size stackSize): opStack{stackSize}
 {
-    alloc.add(opStack.content(), opStack.capacity());
+    stackPtr = alloc.add(opStack.content(), opStack.capacity());
     instrs.emplace_back(static_cast<char>(Opcode::Term));
 }
 
@@ -707,6 +708,7 @@ void Fin::Runtime::load(std::istream &src)
     LOG(1) << "Loading...";
 
     frame = Frame{};
+    frame.local = frame.param = stackPtr;
     frame.pc = static_cast<Pc>(instrs.size());
 
     instrs.insert(instrs.end(),

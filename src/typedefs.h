@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iostream>
 
 namespace Fin
 {
@@ -23,13 +24,41 @@ namespace Fin
     typedef std::int32_t Int;
     typedef float Float;
     typedef bool Bool;
-    typedef std::uint64_t Ptr;
+
+    struct Ptr
+    {
+        std::uint32_t block;
+        std::uint32_t offset;
+
+        Ptr operator+(std::int32_t off) const noexcept
+        {
+            return Ptr{block, offset + off};
+        }
+
+        Ptr operator-(std::int32_t off) const noexcept
+        {
+            return Ptr{block, offset - off};
+        }
+
+        Ptr &operator+=(std::int32_t off) noexcept
+        {
+            offset += off;
+            return *this;
+        }
+    };
 
     constexpr std::size_t MAX_ALIGN = std::max({
             alignof(Int),
             alignof(Float),
             alignof(Bool),
             alignof(Ptr)});
+
+    template<typename CharT, class Traits>
+    std::basic_ostream<CharT, Traits> &operator<<(
+            std::basic_ostream<CharT, Traits> &out, const Ptr &ptr)
+    {
+        return out << ptr.block << ':' << ptr.offset;
+    }
 }
 
 #endif

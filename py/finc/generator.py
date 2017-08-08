@@ -311,15 +311,19 @@ class Function:
             writer.type(tp.type)
             writer.space()
 
+            if len(tp.member_refs) == 0:
+                continue
+
+            if isinstance(tp.type, types.StructType):
+                name = tp.type.struct.fullname()
+            elif isinstance(tp.type, types.EnumerationType):
+                name = tp.type.enum.fullname()
+            else:
+                assert False
+
+            # member refs
             writer.indent()
             for mem in tp.member_refs:
-                if isinstance(tp.type, types.StructType):
-                    name = tp.type.struct.fullname()
-                elif isinstance(tp.type, types.EnumerationType):
-                    name = tp.type.enum.fullname()
-                else:
-                    assert False
-
                 writer.instr('!off', f'{tp_name}:{mem}')
                 writer.instr('type_mem', f'{name}:{mem}')
                 writer.space()
@@ -328,10 +332,10 @@ class Function:
 
         writer.space()
         writer.comment('contracts')
-        for _, ctr in sorted(self.contracts.items()):
+        for ctr_name, ctr in sorted(self.contracts.items()):
             # TODO: contract params
 
-            writer.instr('!ctr', match_name(ctr))
+            writer.instr('!ctr', ctr_name)
             writer.contract(ctr)
             writer.space()
 
