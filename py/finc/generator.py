@@ -146,6 +146,8 @@ class Generator:
             else:
                 raise NotImplementedError()
 
+            body.space()
+
         writer = Writer()
         writer.instr('lib', quote(root.module.name))
         writer.space()
@@ -227,6 +229,7 @@ class Type:
         name = sym.basename()
         gens = len(sym.generics)
 
+        writer.comment(str(sym))
         writer.instr('type', quote(name), gens, end)
 
         writer.indent()
@@ -234,9 +237,12 @@ class Type:
         writer.comment('types')
         for gen_sym in sym.generics:
             writer.instr('!sz', gen_sym.fullname())
-        for tp_name, tp in self.types.items():
+            writer.space()
+
+        for tp_name, tp in sorted(self.types.items()):
             writer.instr('!sz', type_name(tp))
             writer.type(tp)
+            writer.space()
 
         writer.space()
         writer.comment('fields')
@@ -298,9 +304,12 @@ class Function:
         writer.comment('types')
         for gen_sym in node.function.generics:
             writer.instr('!sz', gen_sym.fullname())
-        for tp_name, tp in self.types.items():
+            writer.space()
+
+        for tp_name, tp in sorted(self.types.items()):
             writer.instr('!sz', tp_name)
             writer.type(tp.type)
+            writer.space()
 
             writer.indent()
             for mem in tp.member_refs:
@@ -313,30 +322,32 @@ class Function:
 
                 writer.instr('!off', f'{tp_name}:{mem}')
                 writer.instr('type_mem', f'{name}:{mem}')
+                writer.space()
 
             writer.dedent()
+
+        writer.space()
+        writer.comment('contracts')
+        for _, ctr in sorted(self.contracts.items()):
+            # TODO: contract params
+
+            writer.instr('!ctr', match_name(ctr))
+            writer.contract(ctr)
+            writer.space()
 
         writer.space()
         writer.comment('params')
         for param in node.function.params:
             writer.instr('!off', param.name)
             writer.instr('param', type_name(param.type))
+            writer.space()
 
         writer.space()
         writer.comment('locals')
         for local in self.locals:
             writer.instr('!off', local.name)
             writer.instr('local', type_name(local.type))
-
-        # TODO: struct members
-
-        writer.space()
-        writer.comment('contracts')
-        for ctr in self.contracts.values():
-            # TODO: contract params
-
-            writer.instr('!ctr', match_name(ctr))
-            writer.contract(ctr)
+            writer.space()
 
         writer.dedent()
         writer.instr('sign')
@@ -862,9 +873,7 @@ def match_name(match: types.Match) -> str:
 
     name = fn.fullname()
     if len(fn.generics) > 0:
-        name += '{' + \
-            ','.join(type_name(g) for g in match.generics) + \
-            '}'
+        name += '`' + ','.join(type_name(g) for g in match.generics)
 
     # TODO: constraints
 
