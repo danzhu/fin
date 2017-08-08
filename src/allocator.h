@@ -25,12 +25,13 @@ namespace Fin
         {
             State state;
             char *value;
-            uint32_t size;
+            std::uint32_t size;
         };
 
         std::vector<Block> heap;
 
-        char *deref(uint32_t blk, uint32_t offset, uint32_t size) const
+        char *deref(std::uint32_t blk, std::uint32_t offset,
+                std::uint32_t size) const
         {
             auto block = heap.at(blk);
             if (block.state == State::Freed || offset + size > block.size)
@@ -53,7 +54,7 @@ namespace Fin
             }
         }
 
-        Ptr alloc(uint32_t size)
+        Ptr alloc(std::uint32_t size)
         {
             // TODO: reuse deallocated ptrs
             auto ptr = static_cast<Ptr>(heap.size()) << 32;
@@ -66,7 +67,7 @@ namespace Fin
             return ptr;
         }
 
-        Ptr add(char *addr, uint32_t size)
+        Ptr add(char *addr, std::uint32_t size)
         {
             auto ptr = static_cast<Ptr>(heap.size()) << 32;
             heap.emplace_back(Block{State::Native, addr, size});
@@ -75,7 +76,7 @@ namespace Fin
 
         void dealloc(Ptr ptr)
         {
-            uint32_t blk = ptr >> 32;
+            std::uint32_t blk = ptr >> 32;
             auto &val = heap.at(blk);
 
             if (val.state != State::Allocated)
@@ -87,7 +88,7 @@ namespace Fin
 
         Ptr realloc(Ptr ptr, uint32_t size)
         {
-            uint32_t blk = ptr >> 32;
+            std::uint32_t blk = ptr >> 32;
             auto &val = heap.at(blk);
 
             if (val.state != State::Allocated)
@@ -105,26 +106,26 @@ namespace Fin
 
         void remove(Ptr ptr)
         {
-            uint32_t blk = ptr >> 32;
+            std::uint32_t blk = ptr >> 32;
             auto &val = heap.at(blk);
 
             val.state = State::Freed;
         }
 
-        char *read(Ptr ptr, uint32_t size) const
+        char *read(Ptr ptr, std::uint32_t size) const
         {
-            uint32_t blk = ptr >> 32;
-            uint32_t offset = ptr & 0xFFFFFFFF;
+            std::uint32_t blk = ptr >> 32;
+            std::uint32_t offset = ptr & 0xFFFFFFFF;
 
             LOG(2) << std::endl << "  & " << blk << ':' << offset;
 
             return deref(blk, offset, size);
         }
 
-        char *write(Ptr ptr, uint32_t size) const
+        char *write(Ptr ptr, std::uint32_t size) const
         {
-            uint32_t blk = ptr >> 32;
-            uint32_t offset = ptr & 0xFFFFFFFF;
+            std::uint32_t blk = ptr >> 32;
+            std::uint32_t offset = ptr & 0xFFFFFFFF;
 
             LOG(2) << std::endl << "  * " << blk << ':' << offset;
 

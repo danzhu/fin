@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include "log.h"
+#include "type.h"
 #include "typedefs.h"
 #include "util.h"
 
@@ -82,10 +83,18 @@ namespace Fin
 
         template<typename T> T &at(Offset idx)
         {
-            // TODO: try constexpr
-            auto size = alignTo(sizeof(T), MAX_ALIGN);
+            constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
 
-            return *reinterpret_cast<T*>(at(idx, size));
+            if (idx + size > _size)
+                throw std::out_of_range{"invalid stack access at "
+                    + std::to_string(idx) + ", size " + std::to_string(size)};
+
+            auto &val = *reinterpret_cast<T*>(_content + idx);
+
+            LOG(2) << std::endl << "  ^ " << val;
+            LOG(2) << " [" << _size << ", " << size << "]";
+
+            return val;
         }
 
         template<typename T> void push(T val)
@@ -133,9 +142,6 @@ namespace Fin
                 throw std::runtime_error{"accessing at negative index"};
 
             auto &val = at<T>(_size - size);
-
-            LOG(2) << std::endl << "  ^ " << val;
-            LOG(2) << " [" << _size << ", " << size << "]";
 
             return val;
         }

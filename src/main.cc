@@ -18,7 +18,7 @@ template<typename T> void input(Fin::Runtime &rt, Fin::Contract &ctr,
 
 void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
-    auto type = ctr.types.at(0);
+    auto type = ctr.sizes.at(0);
 
     auto len = st.pop<Fin::Int>();
 
@@ -30,7 +30,7 @@ void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 
 void realloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
-    auto type = ctr.types.at(0);
+    auto type = ctr.sizes.at(0);
 
     auto len = st.pop<Fin::Int>();
     auto ptr = st.pop<Fin::Ptr>();
@@ -100,7 +100,8 @@ int main(int argc, const char *argv[])
 
     try
     {
-        runtime.run(src);
+        runtime.load(src);
+        runtime.run();
     }
     catch (const std::exception &ex)
     {

@@ -33,7 +33,7 @@ namespace Fin
         std::string readStr();
         Function &readFunction();
         Contract &readContract();
-        TypeInfo &readType();
+        TypeInfo readSize();
         Offset readOffset();
         void jump(std::size_t target);
         void ret();
@@ -70,7 +70,8 @@ namespace Fin
         }
     public:
         Runtime(Size stackSize);
-        void run(std::istream &src);
+        void load(std::istream &src);
+        void run();
         Library &createLibrary(const std::string &name);
         Library &getLibrary(const std::string &name);
         void backtrace(std::ostream &out) const noexcept;

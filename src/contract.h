@@ -15,7 +15,7 @@ namespace Fin
     {
         Library *library;
         std::string name;
-        std::vector<TypeInfo> types;
+        std::vector<TypeInfo> sizes;
         std::vector<Contract> contracts;
         std::vector<Offset> offsets;
         std::unique_ptr<Contract> refType;
