@@ -1,13 +1,38 @@
 def print(val Int)
+    0
+
 def print(val Float)
+    0
+
 def print(val Bool)
+    0
+
 def input() Int
+    0
+
 def input() Float
+    0
+
 def input() Bool
+    0
+
 def alloc{T}() &T
+    0
+
 def alloc{T}(length Int) &[T]
+    0
+
 def realloc{T}(ref &[T], length Int) &[T]
+    0
+
 def dealloc{T}(ref &T)
+    0
+
 def write(char Int)
+    0
+
 def read() Int
+    0
+
 def backtrace()
+    0

@@ -83,6 +83,9 @@ class Node:
                 ', '.join(str(var) for var in self.function.params) + \
                 ')'
 
+            if self.function.ret != builtin.VOID:
+                content += f' {self.function.ret}'
+
         if self.expr_type and self.expr_type != builtin.VOID:
             content += f' <{self.expr_type}'
             if self.target_type:
@@ -99,9 +102,7 @@ class Node:
         for c in self.children:
             c.print(indent + 1)
 
-    def analyze(self,
-                mod: symbols.Module,
-                root: symbols.Module) -> None:
+    def analyze(self, mod: symbols.Module, root: symbols.Module) -> None:
         assert self.type == 'FILE'
 
         self.module = mod
@@ -109,6 +110,13 @@ class Node:
         self._analyze_declare(root)
         self._analyze_acquire(mod, mod)
         self._analyze_expect(mod)
+
+    def declare(self, mod: symbols.Module, root: symbols.Module) -> None:
+        assert self.type == 'FILE'
+
+        self.module = mod
+
+        self._analyze_declare(root)
 
     def ancestor(self, tp: str) -> 'Node':
         node = self.parent

@@ -498,6 +498,17 @@ void Fin::Runtime::execute()
                 }
                 continue;
 
+            case Opcode::AddrOff:
+                {
+                    auto type = readType();
+
+                    auto idx = opStack.pop<Int>();
+                    auto addr = opStack.pop<Ptr>();
+
+                    opStack.push<Ptr>(addr + idx * type.aligned);
+                }
+                continue;
+
             case Opcode::AddrArg:
                 {
                     auto offset = readOffset();
@@ -701,10 +712,10 @@ void Fin::Runtime::run(std::istream &src)
 
     LOG(1) << "Logging at level " << DEBUG << "..." << std::endl;
 
-    LOG(1) << "Loading..." << std::endl;
+    LOG(1) << "Loading...";
     execute();
 
-    LOG(1) << "Executing..." << std::endl;
+    LOG(1) << std::endl << "Executing...";
     checkLibrary();
     mainContract = std::make_unique<Contract>(
             frame.library->functions.at("main()"));

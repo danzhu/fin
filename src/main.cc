@@ -19,12 +19,33 @@ template<typename T> void input(Fin::Runtime &rt, Fin::Contract &ctr,
 void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     auto type = ctr.types.at(0);
-    auto len = st.pop<Fin::Int>();
-    auto size = Fin::alignTo(type.size, type.alignment) * len;
 
+    auto len = st.pop<Fin::Int>();
+
+    auto size = Fin::alignTo(type.size, type.alignment) * len;
     auto ptr = rt.allocator().alloc(size);
 
     st.push(ptr);
+}
+
+void realloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+{
+    auto type = ctr.types.at(0);
+
+    auto len = st.pop<Fin::Int>();
+    auto ptr = st.pop<Fin::Ptr>();
+
+    auto size = Fin::alignTo(type.size, type.alignment) * len;
+    ptr = rt.allocator().realloc(ptr, size);
+
+    st.push(ptr);
+}
+
+void dealloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+{
+    auto ptr = st.pop<Fin::Ptr>();
+
+    rt.allocator().dealloc(ptr);
 }
 
 void write(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
@@ -71,6 +92,8 @@ int main(int argc, const char *argv[])
     fin.addFunction(Fin::Function{"input()Float", input<Fin::Float>});
     fin.addFunction(Fin::Function{"input()Bool", input<Fin::Bool>});
     fin.addFunction(Fin::Function{"alloc(Int)&[0]", alloc, 1});
+    fin.addFunction(Fin::Function{"realloc(&[0],Int)&[0]", dealloc, 1});
+    fin.addFunction(Fin::Function{"dealloc(&0)", dealloc, 1});
     fin.addFunction(Fin::Function{"write(Int)", write});
     fin.addFunction(Fin::Function{"read()Int", read});
     fin.addFunction(Fin::Function{"backtrace()", backtrace});

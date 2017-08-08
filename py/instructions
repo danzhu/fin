@@ -76,6 +76,8 @@ load size:sz
 store size:sz
     Store value from stack to pointer.
 
+addr_off size:sz
+
 addr_arg slot:off
 
 addr_var slot:off

@@ -50,7 +50,7 @@ class Writer:
 
         elif isinstance(tp, types.Array):
             self.type(tp.type)
-            self.instr('size_arr', tp.length)
+            self.instr('size_arr', 0 if tp.length is None else tp.length)
 
         elif isinstance(tp, types.Generic):
             self.instr('size_dup', tp.symbol.index)
@@ -73,6 +73,14 @@ class Writer:
 
         else:
             assert False, f'unknown type {tp}'
+
+    def contract(self, ctr: types.Match) -> None:
+        assert isinstance(ctr.source, symbols.Function)
+
+        for gen in ctr.generics:
+            self.type(gen)
+
+        self.instr('contract', ctr.source.fullname())
 
 
 class KeyList(Generic[T], Iterable[T], Sized):
@@ -288,6 +296,8 @@ class Function:
         writer.indent()
 
         writer.comment('types')
+        for gen_sym in node.function.generics:
+            writer.instr('!sz', gen_sym.fullname())
         for tp_name, tp in self.types.items():
             writer.instr('!sz', tp_name)
             writer.type(tp.type)
@@ -323,12 +333,10 @@ class Function:
         writer.space()
         writer.comment('contracts')
         for ctr in self.contracts.values():
-            assert isinstance(ctr.source, symbols.Function)
-
             # TODO: contract params
 
             writer.instr('!ctr', match_name(ctr))
-            writer.instr('contract', ctr.source.fullname())
+            writer.contract(ctr)
 
         writer.dedent()
         writer.instr('sign')

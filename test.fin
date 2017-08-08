@@ -17,11 +17,35 @@ struct Vec{T}
     size Int
     capacity Int
 
-struct Pair{K, V}
-    key K
-    value V
+def new{T}(cap Int) Vec{T}
+    let v Vec{T}
+    v.content := rt::alloc(cap)
+    v.size = 0
+    v.capacity = cap
+    v
+
+def append{T}(self &Vec{T}, item T)
+    if self.size == self.capacity
+        self.capacity *= 2
+        self.content := rt::realloc(self.content, self.capacity)
+
+    self.content[self.size] = item
+    self.size += 1
+
+def subscript{T}(self &Vec{T}, idx Int) &T
+    self.content[idx]
+
+def pop{T}(self &Vec{T}) T
+    self.size -= 1
+    self.content[self.size]
+
+def drop{T}(self Vec{T})
+    rt::dealloc(self.content)
 
 def main()
-    let v Pair{Int, Float}
-    v.key = 5
-    v.key.rt::print()
+    let v Vec{Int} = new(4)
+    v.append(2)
+    v.append(3)
+    rt::print(v[0] + v[1])
+    rt::print(v.pop())
+    v.drop()
