@@ -729,7 +729,6 @@ void Fin::Runtime::run()
     mainContract = std::make_unique<Contract>(
             frame.library->functions.at("main()"));
 
-    frame = Frame{};
     frame.pc = 0;
     call(*mainContract);
     execute();

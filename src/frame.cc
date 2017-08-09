@@ -8,15 +8,19 @@
 std::ostream &Fin::operator<<(std::ostream &out, const Fin::Frame &fr)
 {
     out << "  in ";
-    if (!fr.contract)
+    if (fr.contract)
+    {
+        // TODO: show info on types in contract
+        out << fr.contract->name;
+    }
+    else if (fr.library)
     {
         // TODO: show full id (version in future)
         out << '<' << fr.library->id.name << '>';
     }
     else
     {
-        // TODO: show info on types in contract
-        out << fr.contract->name;
+        out << "<<anonymous>>";
     }
 
     return out;

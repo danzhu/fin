@@ -11,6 +11,23 @@ from .node import Node
 T = TypeVar('T')
 
 
+OP_TABLE = {
+    'pos': 'pos',
+    'neg': 'neg',
+    'less': 'lt',
+    'greater': 'gt',
+    'lessEqual': 'le',
+    'greaterEqual': 'ge',
+    'equal': 'eq',
+    'notEqual': 'ne',
+    'plus': 'add',
+    'minus': 'sub',
+    'multiplies': 'mult',
+    'divides': 'div',
+    'modulus': 'mod',
+}
+
+
 class Writer:
     def __init__(self, parent: 'Writer' = None) -> None:
         self._instrs: List[str] = []
@@ -216,13 +233,16 @@ class Type:
                  writer: Writer) -> None:
         self.types: Dict[str, types.Type] = {}
 
+        fields: Iterable[symbols.Variable]
         if isinstance(sym, symbols.Struct):
-            for field in sym.fields:
-                self._type(field.type)
+            fields = sym.fields
         elif isinstance(sym, symbols.Enumeration):
             assert False, 'TODO'
         else:
             assert False
+
+        for field in fields:
+            self._type(field.type)
 
         end = gen.label('END_TYPE')
 
@@ -246,7 +266,7 @@ class Type:
 
         writer.space()
         writer.comment('fields')
-        for field in sym.fields:
+        for field in fields:
             writer.instr('field', type_name(field.type))
 
         writer.dedent()
@@ -254,7 +274,7 @@ class Type:
         writer.label(end)
 
         writer.indent()
-        for field in sym.fields:
+        for field in fields:
             writer.instr('member', quote(field.name))
 
         writer.dedent()
@@ -433,20 +453,32 @@ class Function:
             tp = types.to_level(tp, lvl)
             self.writer.instr('load', self._type(tp))
 
-    # def _exit(self, stack: StackNode, target: StackNode) -> None:
-    #     while stack is not target:
-    #         assert stack is not None, 'cannot match stack'
+    def _exit(self, node: Node, tar: Node) -> None:
+        has_val = node.target_type != builtin.VOID
+        assert not has_val, 'TODO'
 
-    #         self.writer.instr('pop', self._type(stack.type))
-    #         stack = stack.next
+        while node is not tar:
+            assert node.parent is not None, 'cannot match stack'
 
-    # def _reduce(self, stack: StackNode, target: StackNode) -> None:
-    #     # FIXME: this looks weird
-    #     assert types.Resolution().match_type(target.type, stack.type, False)
+            if node.parent.type in ('IF', 'WHILE', 'MATCH'):
+                node = node.parent
+                continue
 
-    #     self.writer.instr('shift', self._type(stack.type))
-    #     self._exit(stack.next, target.next)
-    #     self.writer.instr('unshift', self._type(stack.type))
+            before = False
+            for child in reversed(node.parent.children):
+                if before:
+                    if child.target_type is not None \
+                            and child.target_type != builtin.VOID:
+                        self.writer.instr('pop', self._type(child.target_type))
+
+                    continue
+
+                if child is node:
+                    before = True
+
+            # TODO: RAII cleanup for local variables
+
+            node = node.parent
 
     def _call(self, match: types.Match) -> None:
         fn = match.source
@@ -467,35 +499,10 @@ class Function:
             self.writer.instr(f'cast_{frm}_{tar}')
             return
 
-        if fn.name == 'pos':
-            raise NotImplementedError('unary + not implemented')
-        elif fn.name == 'neg':
-            op = 'neg'
-        elif fn.name == 'less':
-            op = 'lt'
-        elif fn.name == 'greater':
-            op = 'gt'
-        elif fn.name == 'lessEqual':
-            op = 'le'
-        elif fn.name == 'greaterEqual':
-            op = 'ge'
-        elif fn.name == 'equal':
-            op = 'eq'
-        elif fn.name == 'notEqual':
-            op = 'ne'
-        elif fn.name == 'plus':
-            op = 'add'
-        elif fn.name == 'minus':
-            op = 'sub'
-        elif fn.name == 'multiplies':
-            op = 'mult'
-        elif fn.name == 'divides':
-            op = 'div'
-        elif fn.name == 'modulus':
-            op = 'mod'
-        else:
+        if fn.name not in OP_TABLE:
             assert False, f'unknown operator {fn.name}'
 
+        op = OP_TABLE[fn.name]
         name = fn.params[0].type.fullname()[0].lower()
         self.writer.instr(f'{op}_{name}')
 
@@ -629,7 +636,7 @@ class Function:
         self.writer.label(end)
 
     def _MATCH(self, node: Node) -> None:
-        end = self._label('END_MATCH')
+        end = self.gen.label('END_MATCH')
 
         node.context = {
             'end': end
@@ -647,7 +654,7 @@ class Function:
     def _ARM(self, node: Node) -> None:
         match = node.ancestor('MATCH')
 
-        nxt = self._label('ARM')
+        nxt = self.gen.label('ARM')
 
         pat = node.children[0].pattern
         tp = match.children[0].target_type
@@ -693,35 +700,31 @@ class Function:
         tar = node.ancestor('WHILE')
 
         self._gen(node.children[0])
-
-        if node.children[0].target_type == builtin.VOID:
-            self._exit(node.stack_end, tar.stack_start)
-        else:
-            self._reduce(node.stack_end, tar.stack_end)
+        self._exit(node.children[0], tar)
 
         self.writer.instr('br', tar.context['break'])
 
     def _CONTINUE(self, node: Node) -> None:
         tar = node.ancestor('WHILE')
-        self._exit(node.stack_end, tar.stack_start)
+        self._exit(node, tar)
         self.writer.instr('br', tar.context['continue'])
 
     def _REDO(self, node: Node) -> None:
         tar = node.ancestor('WHILE')
-        self._exit(node.stack_end, tar.stack_start)
+        self._exit(node, tar)
         self.writer.instr('br', tar.context['redo'])
 
     def _RETURN(self, node: Node) -> None:
         tar = node.ancestor('DEF')
 
         self._gen(node.children[0])
+        # TODO: popping not necessary when no RAII needed
+        self._exit(node.children[0], tar)
 
         if node.children[0].target_type == builtin.VOID:
-            self._exit(node.stack_end, tar.stack_end)
+            self.writer.instr('end')
         else:
-            self._reduce(node.stack_end, tar.stack_end)
-
-        self.writer.instr('return')
+            self.writer.instr('ret')
 
     def _TEST(self, node: Node) -> None:
         if node.value == 'NOT':
@@ -868,7 +871,7 @@ def type_name(tp: types.Type) -> str:
 
         return name
 
-    assert False
+    assert False, tp
 
 
 def match_name(match: types.Match) -> str:

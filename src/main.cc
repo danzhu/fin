@@ -28,7 +28,7 @@ void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
     st.push(ptr);
 }
 
-void realloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+void _realloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     auto type = ctr.sizes.at(0);
 
@@ -92,7 +92,7 @@ int main(int argc, const char *argv[])
     fin.addFunction(Fin::Function{"input()Float", input<Fin::Float>});
     fin.addFunction(Fin::Function{"input()Bool", input<Fin::Bool>});
     fin.addFunction(Fin::Function{"alloc(Int)&[0]", alloc, 1});
-    fin.addFunction(Fin::Function{"realloc(&[0],Int)&[0]", dealloc, 1});
+    fin.addFunction(Fin::Function{"realloc(&[0],Int)&[0]", _realloc, 1});
     fin.addFunction(Fin::Function{"dealloc(&0)", dealloc, 1});
     fin.addFunction(Fin::Function{"write(Int)", write});
     fin.addFunction(Fin::Function{"read()Int", read});
