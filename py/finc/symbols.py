@@ -244,11 +244,10 @@ class Module(Scope):
 
 
 class Struct(Scope):
-    def __init__(self, name: str, size: int = 0) -> None:
+    def __init__(self, name: str) -> None:
         super().__init__()
 
         self.name = name
-        self.size = size
         self.generics: List[Generic] = []
         self.fields: List[Variable] = []
 

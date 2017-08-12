@@ -90,9 +90,9 @@ def load_builtins() -> symbols.Module:
 
 
 # structs
-BOOL_SYM = symbols.Struct('Bool', 1)
-INT_SYM = symbols.Struct('Int', 4)
-FLOAT_SYM = symbols.Struct('Float', 4)
+BOOL_SYM = symbols.Struct('Bool')
+INT_SYM = symbols.Struct('Int')
+FLOAT_SYM = symbols.Struct('Float')
 
 # types
 BOOL = types.StructType(BOOL_SYM)
