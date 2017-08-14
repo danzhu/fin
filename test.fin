@@ -13,9 +13,11 @@ def new{T}(cap Int) Vec{T}
     v
 
 def append{T}(self &Vec{T}, item T)
-    if self.size == self.capacity
+    if self.size == self.capacity then
         self.capacity *= 2
         self.content := rt::realloc(self.content, self.capacity)
+    else if self.size == self.capacity + 1 then
+        self.capacity = 0
 
     self.content[self.size] = item
     self.size += 1
@@ -33,15 +35,14 @@ def drop{T}(self Vec{T})
 def main()
     let v Vec{Int} = new(4)
     let i = 1
-    while TRUE
-        v.append(if i > 1000
-            break
-        else
-            i *= 2
-            i
-        )
+    while TRUE do
+        v.append(if i > 1000 then break else i)
+        i *= 2
 
-    while v.size > 0
+    while
+        v.size
+        v.size > 0
+    do
         v.pop().rt::print()
 
     v.drop()

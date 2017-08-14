@@ -49,13 +49,15 @@ class Lexer:
     def _state(self, name: str) -> State:
         if name not in self.states:
             self.states[name] = State(name)
+
         return self.states[name]
 
     def read(self, src: Iterable[str]) -> Iterable[Token]:
         self.ind_amount = None
         indent = 0
         ln = 0
-        prevEmpty = False
+        prev_empty = False
+        eol_token = None
 
         # TODO: line continuation
         line = ''
@@ -65,7 +67,7 @@ class Lexer:
             stripped = line.lstrip()
 
             if len(stripped) == 0:
-                prevEmpty = True
+                prev_empty = True
                 continue
 
             if stripped[0] == '#':
@@ -85,6 +87,9 @@ class Lexer:
                     yield Token('INDENT', line, ln)
 
             elif new_indent < indent:
+                assert eol_token is not None
+                yield eol_token
+
                 if (indent - new_indent) % self.ind_amount != 0:
                     raise LexerError('wrong dedent',
                                      Token('DEDENT', line, ln, new_indent))
@@ -96,11 +101,15 @@ class Lexer:
 
                 # also end the last block if followed by an empty line
                 yield Token('DEDENT', line, ln)
-                if prevEmpty:
+                if prev_empty:
                     yield Token('EOL', line, ln)
 
+            else:
+                if eol_token is not None:
+                    yield eol_token
+
             indent = new_indent
-            prevEmpty = False
+            prev_empty = False
 
             start = 0
             end = 0
@@ -147,7 +156,10 @@ class Lexer:
                 state = self.start
 
             # since \n is part of line, len(line) is exactly the column of EOL
-            yield Token('EOL', line, ln, len(line), '\n')
+            eol_token = Token('EOL', line, ln, len(line), '\n')
+
+        if eol_token is not None:
+            yield eol_token
 
         if self.ind_amount > 0:
             for _ in range(indent // self.ind_amount):

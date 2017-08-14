@@ -66,11 +66,12 @@ keyword enum ENUM
 keyword def DEF
 keyword let LET
 keyword if IF
-keyword elif ELIF
+keyword then THEN
 keyword else ELSE
 keyword match MATCH
 keyword begin BEGIN
 keyword while WHILE
+keyword do DO
 keyword break BREAK
 keyword continue CONTINUE
 keyword redo REDO

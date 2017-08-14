@@ -53,7 +53,6 @@ class Parser:
         return children
 
     def _children(self, tp: str, fn: Callable[[], node.Node]) -> node.Node:
-        self._expect('EOL')
         self._expect('INDENT')
 
         children = []
@@ -79,8 +78,8 @@ class Parser:
             elif self._lookahead.type == 'ENUM':
                 children.append(self._enum())
             else:
-                children.append(self._test())
-                self._expect('EOL')
+                self._expect()
+
         return node.Node('FILE', None, children)
 
     def _import(self) -> node.Node:
@@ -190,7 +189,7 @@ class Parser:
 
         params = node.Node('PARAMS', None, self._params(self._param))
 
-        if self._lookahead.type != 'EOL':
+        if self._lookahead.type != 'INDENT':
             ret = self._type()
         else:
             ret = self._empty()
@@ -228,25 +227,16 @@ class Parser:
     def _if(self) -> node.Node:
         token = self._lookahead
         self._expect('IF')
-        cond = self._test()
+        cond = self._block()
+        self._expect('THEN')
         succ = self._block()
-        fail = self._else()
-        return node.Node('IF', token, (cond, succ, fail))
-
-    def _else(self) -> node.Node:
-        if self._lookahead.type == 'ELIF':
-            token = self._lookahead
-            self._next()
-            cond = self._test()
-            succ = self._block()
-            fail = self._else()
-            return node.Node('IF', token, (cond, succ, fail))
-
         if self._lookahead.type == 'ELSE':
-            self._next()
-            return self._block()
+            self._next()  # ELSE
+            fail = self._block()
+        else:
+            fail = self._empty()
 
-        return self._empty()
+        return node.Node('IF', token, (cond, succ, fail))
 
     def _match(self) -> node.Node:
         token = self._lookahead
@@ -275,30 +265,17 @@ class Parser:
     def _while(self) -> node.Node:
         token = self._lookahead
         self._expect('WHILE')
-        cond = self._test()
+        cond = self._block()
+        self._expect('DO')
         cont = self._block()
 
         if self._lookahead.type == 'ELSE':
-            self._next()
+            self._next()  # ELSE
             fail = self._block()
         else:
             fail = self._empty()
 
         return node.Node('WHILE', token, (cond, cont, fail))
-
-    def _begin(self) -> node.Node:
-        self._expect('BEGIN')
-        return self._block()
-
-    def _return(self) -> node.Node:
-        token = self._lookahead
-        self._expect('RETURN')
-        if self._lookahead.type != 'EOL':
-            val = self._test()
-        else:
-            val = self._empty()
-
-        return node.Node('RETURN', token, (val,))
 
     def _param(self) -> node.Node:
         token = self._lookahead
@@ -370,20 +347,24 @@ class Parser:
         assert False
 
     def _block(self) -> node.Node:
-        self._expect('EOL')
-        token = self._lookahead
         stmts = []
-        self._expect('INDENT')
-        while self._lookahead.type != 'DEDENT':
-            if self._lookahead.type == 'LET':
-                stmt = self._let()
-            else:
-                stmt = self._test()
-            self._expect('EOL')
-            stmts.append(stmt)
 
-        self._next()
-        return node.Node('BLOCK', token, stmts)
+        if self._lookahead.type == 'INDENT':
+            self._next()  # INDENT
+            while self._lookahead.type != 'DEDENT':
+                if self._lookahead.type == 'LET':
+                    stmt = self._let()
+                else:
+                    stmt = self._test()
+
+                self._expect('EOL')
+                stmts.append(stmt)
+
+            self._next()
+        else:
+            stmts.append(self._test())
+
+        return node.Node('BLOCK', None, stmts)
 
     def _test(self) -> node.Node:
         n = self._or_test()
@@ -560,15 +541,25 @@ class Parser:
             return self._while()
 
         if self._lookahead.type == 'BEGIN':
-            return self._begin()
+            self._expect('BEGIN')
+            return self._block()
 
         if self._lookahead.type == 'RETURN':
-            return self._return()
+            token = self._lookahead
+            self._next()  # RETURN
+            # FIXME: hacks
+            if self._lookahead.type not in ('EOL', 'THEN', 'DO', 'ELSE'):
+                val = self._test()
+            else:
+                val = self._empty()
+
+            return node.Node('RETURN', token, (val,))
 
         if self._lookahead.type == 'BREAK':
             token = self._lookahead
-            self._next()
-            if self._lookahead.type != 'EOL':
+            self._next()  # BREAK
+            # FIXME: hacks
+            if self._lookahead.type not in ('EOL', 'THEN', 'DO', 'ELSE'):
                 val = self._test()
             else:
                 val = self._empty()

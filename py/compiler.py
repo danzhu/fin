@@ -46,6 +46,7 @@ class Compiler:
         tokens = self.lexer.read(src)
 
         if stage == 'lex':
+            tokens = list(tokens)
             for t in tokens:
                 print(t)
 
