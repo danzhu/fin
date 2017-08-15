@@ -8,6 +8,9 @@ import struct
 import instr
 
 
+BRANCH_SIZE = 4
+
+
 class RefTable:
     def __init__(self) -> None:
         self.refs: Dict[str, int] = {}
@@ -20,81 +23,79 @@ class RefTable:
 
 
 class Token:
-    size: int
-
-    def resolve(self, loc: int, syms: Dict[str, int]) -> None:
+    def resolve(self,
+                loc: int,
+                syms: Dict[str, int],
+                refs: Dict[str, RefTable]) -> int:
         raise NotImplementedError()
 
-    def write(self,
-              out: io.BytesIO,
-              syms: Dict[str, int],
-              refs: Dict[str, RefTable]) -> None:
+    def write(self, out: io.BytesIO, syms: Dict[str, int]) -> None:
         raise NotImplementedError()
 
 
 class Bytes(Token):
     def __init__(self, val: bytes) -> None:
         self.value = val
-        self.size = len(val)
 
-    def resolve(self, loc: int, syms: Dict[str, int]) -> None:
-        pass
+    def resolve(self,
+                loc: int,
+                syms: Dict[str, int],
+                refs: Dict[str, RefTable]) -> int:
+        return len(self.value)
 
-    def write(self,
-              out: io.BytesIO,
-              syms: Dict[str, int],
-              refs: Dict[str, RefTable]) -> None:
+    def write(self, out: io.BytesIO, syms: Dict[str, int]) -> None:
         out.write(self.value)
 
 
 class Label(Token):
     def __init__(self, label: str) -> None:
         self.label = label
-        self.size = 0
 
-    def resolve(self, loc: int, syms: Dict[str, int]) -> None:
+    def resolve(self,
+                loc: int,
+                syms: Dict[str, int],
+                refs: Dict[str, RefTable]) -> int:
         syms[self.label] = loc
+        return 0
 
-    def write(self,
-              out: io.BytesIO,
-              syms: Dict[str, int],
-              refs: Dict[str, RefTable]) -> None:
+    def write(self, out: io.BytesIO, syms: Dict[str, int]) -> None:
         pass
 
 
 class Branch(Token):
     def __init__(self, label: str) -> None:
         self.label = label
+
         self.location: int = None
 
-        self.size = 4
-
-    def resolve(self, loc: int, syms: Dict[str, int]) -> None:
+    def resolve(self,
+                loc: int,
+                syms: Dict[str, int],
+                refs: Dict[str, RefTable]) -> int:
         self.location = loc
+        return BRANCH_SIZE
 
-    def write(self,
-              out: io.BytesIO,
-              syms: Dict[str, int],
-              refs: Dict[str, RefTable]) -> None:
-        value = syms[self.label] - (self.location + self.size)
-        out.write(encode(value, self.size))
+    def write(self, out: io.BytesIO, syms: Dict[str, int]) -> None:
+        value = syms[self.label] - (self.location + BRANCH_SIZE)
+        out.write(encode(value, BRANCH_SIZE))
 
 
 class Reference(Token):
-    def __init__(self, tp: str, val: str) -> None:
+    def __init__(self, tp: str, ref: str) -> None:
         self.type = tp
-        self.value = val
+        self.ref = ref
 
-        self.size = 4
+        self.value: bytes = None
 
-    def resolve(self, loc: int, syms: Dict[str, int]) -> None:
-        pass
+    def resolve(self,
+                loc: int,
+                syms: Dict[str, int],
+                refs: Dict[str, RefTable]) -> int:
+        self.value = encode(refs[self.type][self.ref])
+        return len(self.value)
 
-    def write(self,
-              out: io.BytesIO,
-              syms: Dict[str, int],
-              refs: Dict[str, RefTable]) -> None:
-        out.write(encode(refs[self.type][self.value], self.size))
+    def write(self, out: io.BytesIO, syms: Dict[str, int]) -> None:
+        out.write(self.value)
 
 
 class Assembler:
@@ -145,13 +146,13 @@ class Assembler:
         self.references['type'] = self.types
         self.references['member'] = self.members
 
-        # two-pass approach since labels need to be calculated first
+        # two-pass to resolve labels and references
         for token in self.tokens:
-            token.resolve(location, syms)
-            location += token.size
+            size = token.resolve(location, syms, self.references)
+            location += size
 
         for token in self.tokens:
-            token.write(out, syms, self.references)
+            token.write(out, syms)
 
     def instr(self, opname: str, *args: str) -> None:
         # pseudo-label resolution
