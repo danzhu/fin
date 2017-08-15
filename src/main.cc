@@ -105,10 +105,15 @@ int main(int argc, const char *argv[])
     }
     catch (const std::exception &ex)
     {
-        std::cerr << "Error: " << ex.what() << std::endl;
+        std::cerr << std::endl << "Error: " << ex.what() << std::endl;
         runtime.backtrace(std::cerr);
+        runtime.allocator().summary(std::cerr);
         return 1;
     }
+
+#if DEBUG > 0
+    runtime.allocator().summary(std::cerr);
+#endif
 
     return 0;
 }

@@ -32,7 +32,9 @@ namespace Fin
         std::unique_ptr<Contract> mainContract;
 
         std::string readStr();
+        Pc readTarget();
         Function &readFunction();
+        Type &readType();
         Contract &readContract();
         TypeInfo readSize();
         Offset readOffset();
@@ -44,23 +46,32 @@ namespace Fin
         void checkContract();
         void execute();
 
-        template<typename T> T readConst()
+        template<typename T> T readInt()
         {
-            T val = *reinterpret_cast<T*>(&instrs.at(frame.pc));
+            T val = 0;
+
+            char byte;
+            while ((byte = instrs.at(frame.pc++)) & 0b10000000)
+                val = static_cast<T>(val << 7) | (byte & 0b01111111);
+
+            val = static_cast<T>(val << 6) | (byte & 0b00111111);
+
+            if (byte & 0b01000000)
+                val = ~val;
 
             LOG(1) << ' ' << val;
-
-            jump(frame.pc + sizeof(T));
             return val;
         }
-        template<typename T> void readConst(T &val)
-        {
-            val = readConst<T>();
-        }
 
-        template<typename T> void loadConst()
+        template<typename T> T readConst()
         {
-            opStack.push(readConst<T>());
+            // FIXME: unaligned access
+            auto addr = &instrs.at(frame.pc);
+            jump(frame.pc + sizeof(T));
+
+            T val = *reinterpret_cast<T*>(addr);
+            LOG(1) << ' ' << val;
+            return val;
         }
 
         template<typename Op> void binaryOp()

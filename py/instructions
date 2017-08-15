@@ -9,10 +9,10 @@ cookie=35
 lib name:str
     Declare new module, and set declaring module to this module.
 
-fn name:str gens:H ctrs:H begin:I end:I
+fn name:str gens:int ctrs:int begin:tar end:tar
     Declare function `name` of declaring module.
 
-type name:str gens:H end:I
+type name:str gens:int end:tar
 
 member name:str
 
@@ -35,7 +35,7 @@ size_p
 
 size_dup type:sz
 
-size_arr length:i
+size_arr length:int
 
 type_call type:tp
 
@@ -84,24 +84,24 @@ addr_var slot:off
 
 addr_mem slot:off
 
-br offset:h
+br offset:tar
     Unconditionally branch to `pc + offset`, where pc is at the end of the
     instruction.
 
-br_false offset:h
+br_false offset:tar
     Pop boolean from stack and branch if false.
 
-br_true offset:h
+br_true offset:tar
     Pop boolean from stack and branch if true.
-
-not
-    Invert the boolean value on top of stack.
 
 const_false
     Load constant false onto stack.
 
 const_true
     Load constant true onto stack.
+
+not
+    Invert the boolean value on top of stack.
 
 const_i value:i
     Load constant `value` onto stack.

@@ -63,11 +63,11 @@ class Label(Token):
 
 
 class Branch(Token):
-    def __init__(self, enc: str, label: str) -> None:
-        self.enc = enc
+    def __init__(self, label: str) -> None:
         self.label = label
-        self.size = struct.calcsize(enc)
         self.location: int = None
+
+        self.size = 4
 
     def resolve(self, loc: int, syms: Dict[str, int]) -> None:
         self.location = loc
@@ -77,15 +77,15 @@ class Branch(Token):
               syms: Dict[str, int],
               refs: Dict[str, RefTable]) -> None:
         value = syms[self.label] - (self.location + self.size)
-        out.write(encode(self.enc, value))
+        out.write(encode(value, self.size))
 
 
 class Reference(Token):
     def __init__(self, tp: str, val: str) -> None:
-        self.enc = 'I'
         self.type = tp
         self.value = val
-        self.size = struct.calcsize(self.enc)
+
+        self.size = 4
 
     def resolve(self, loc: int, syms: Dict[str, int]) -> None:
         pass
@@ -94,7 +94,7 @@ class Reference(Token):
               out: io.BytesIO,
               syms: Dict[str, int],
               refs: Dict[str, RefTable]) -> None:
-        out.write(encode(self.enc, refs[self.type][self.value]))
+        out.write(encode(refs[self.type][self.value], self.size))
 
 
 class Assembler:
@@ -164,7 +164,7 @@ class Assembler:
             raise LookupError(f"no instruction '{opname}' defined")
 
         ins = self.instrs[opname]
-        self.tokens.append(Bytes(encode('B', ins.opcode)))
+        self.tokens.append(Bytes(pack('B', ins.opcode)))
 
         if len(args) != len(ins.params):
             raise ValueError('incorrect number of arguments for\n' +
@@ -200,12 +200,15 @@ class Assembler:
 
         for param, arg in zip(ins.params, args):
             token: Token
-            if param.type == 'str':
+            if param.type == 'int':
+                token = Bytes(encode(int(arg, 0)))
+
+            elif param.type == 'str':
                 if arg[0] != "'" or arg[-1] != "'":
                     raise ValueError('expected quotes around string')
 
                 arg = arg[1:-1]
-                token = Bytes(encode('H', len(arg)) + arg.encode())
+                token = Bytes(encode(len(arg)) + arg.encode())
 
             elif param.type == 'fn':
                 token = Reference('function', arg)
@@ -217,22 +220,51 @@ class Assembler:
                 token = Reference('member', arg)
 
             elif param.type in ['sz', 'ctr', 'off']:
-                token = Bytes(encode('H', self.references[param.type][arg]))
+                token = Bytes(encode(self.references[param.type][arg]))
+
+            elif param.type == 'i':
+                token = Bytes(pack('i', int(arg, 0)))
 
             elif param.type == 'f':
-                token = Bytes(encode(param.type, float(arg)))
+                token = Bytes(pack('f', float(arg)))
 
-            elif arg[0].isalpha():
-                token = Branch(param.type, arg)
+            elif param.type == 'tar':
+                if not arg[0].isalpha():
+                    raise ValueError('branch target not a label')
 
-            else:
-                token = Bytes(encode(param.type, int(arg, 0)))
+                token = Branch(arg)
 
             self.tokens.append(token)
 
 
-def encode(fmt: str, val: Any) -> bytes:
+def pack(fmt: str, val: Any) -> bytes:
     return struct.pack('<' + fmt, val)
+
+
+def encode(val: int, size: int = None) -> bytes:
+    enc: List[int] = []
+
+    if val < 0:
+        val = ~val
+        sign = 0b01000000
+    else:
+        sign = 0b00000000
+
+    enc.append(val & 0b00111111 | sign)
+    val >>= 6
+
+    while val:
+        enc.append(val & 0b01111111 | 0b10000000)
+        val >>= 7
+
+    if size is not None:
+        if len(enc) > size:
+            raise ValueError('value out of range')
+
+        while len(enc) < size:
+            enc.append(0b10000000)
+
+    return bytes(reversed(enc))
 
 
 def get_name(val: str) -> str:

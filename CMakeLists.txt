@@ -17,6 +17,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     -Weverything \
     -Wno-c++98-compat \
     -Wno-c++98-compat-pedantic \
+    -Wno-covered-switch-default \
     -Wno-missing-prototypes \
     -Wno-padded \
     -Wno-shadow-field-in-constructor \
