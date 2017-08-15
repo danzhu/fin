@@ -28,7 +28,7 @@
 - [ ] tuples
 - [x] assignment
   - [x] level-based assignment
-  - [ ] deconstruct assignment
+  - [ ] destructure assignment
 - [ ] error handling
 - [ ] ownership
   - [ ] copy / move assignment
@@ -42,7 +42,7 @@
   - [ ] export
 - [x] generics
   - [x] struct / enum
-  - [ ] function
+  - [x] function
 - [x] pattern matching
   - [x] matching
   - [x] destructuring
@@ -120,9 +120,11 @@
 
 ## Runtime
 
-- [ ] recycle unused ptrs
+- [ ] option to recycle unused ptrs
 - [x] rename method to function
 - [x] use `std::function` instead of native function ptr
 - [ ] globals
-- [ ] remove module index
+- [x] remove module index
 - [ ] template for automatic C++ binding
+- [ ] bytecode memory map for each library, managed pc
+- [ ] unaligned free warning

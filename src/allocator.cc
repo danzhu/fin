@@ -1,84 +1,91 @@
 #include "allocator.h"
 
+#include <cassert>
+
 Fin::Allocator::Allocator() {}
 
 Fin::Allocator::~Allocator() noexcept
 {
     // cleanup any blocks still in-use
-    for (const auto &val : heap)
+    for (const auto &block : heap)
     {
-        if (val.state == State::Allocated)
-            std::free(val.value);
+        if (block.state == State::Managed)
+            std::free(block.value);
     }
 }
 
-Fin::Ptr Fin::Allocator::alloc(std::uint32_t size)
+Fin::Ptr Fin::Allocator::alloc(std::uint32_t size, State state)
 {
     // TODO: reuse deallocated ptrs
-    Ptr ptr{static_cast<std::uint32_t>(heap.size()), 0};
     auto addr = static_cast<char *>(std::malloc(size));
-
     if (!addr)
         throw std::runtime_error{"failed to allocate"};
 
-    heap.emplace_back(Block{State::Allocated, addr, size});
-    return ptr;
+    return add(addr, size, state);
 }
 
-Fin::Ptr Fin::Allocator::add(char *addr, std::uint32_t size)
+Fin::Ptr Fin::Allocator::add(char *addr, std::uint32_t size, State state)
 {
+    assert(state != State::Freed);
+
     Ptr ptr{static_cast<std::uint32_t>(heap.size()), 0};
-    heap.emplace_back(Block{State::Native, addr, size});
-    return ptr;
-}
-
-void Fin::Allocator::dealloc(Ptr ptr)
-{
-    auto &val = heap.at(ptr.block);
-
-    if (val.state != State::Allocated)
-        throw std::runtime_error{"invalid deallocation"};
-
-    std::free(val.value);
-    val.state = State::Freed;
-}
-
-Fin::Ptr Fin::Allocator::realloc(Ptr ptr, uint32_t size)
-{
-    auto &val = heap.at(ptr.block);
-
-    if (val.state != State::Allocated)
-        throw std::runtime_error{"invalid reallocation"};
-
-    val.value = static_cast<char *>(std::realloc(val.value, size));
-
-    if (!val.value)
-        throw std::runtime_error{"failed to reallocate"};
-
-    val.size = size;
-
+    heap.emplace_back(Block{state, addr, size});
     return ptr;
 }
 
 void Fin::Allocator::remove(Ptr ptr)
 {
-    auto &val = heap.at(ptr.block);
+    auto &block = heap.at(ptr.block);
 
-    val.state = State::Freed;
+    block.state = State::Freed;
 }
 
-char *Fin::Allocator::read(Ptr ptr, std::uint32_t size) const
+void Fin::Allocator::dealloc(Ptr ptr)
+{
+    auto &block = heap.at(ptr.block);
+
+    if (block.state != State::Managed)
+        throw std::runtime_error{"invalid deallocation"};
+
+    std::free(block.value);
+    block.state = State::Freed;
+}
+
+Fin::Ptr Fin::Allocator::realloc(Ptr ptr, std::uint32_t size)
+{
+    auto &block = heap.at(ptr.block);
+
+    if (block.state != State::Managed)
+        throw std::runtime_error{"invalid reallocation"};
+
+    block.value = static_cast<char *>(std::realloc(block.value, size));
+
+    if (!block.value)
+        throw std::runtime_error{"failed to reallocate"};
+
+    block.size = size;
+
+    return ptr;
+}
+
+char *Fin::Allocator::read(Ptr ptr, std::uint32_t size)
 {
     LOG(2) << std::endl << "  & " << ptr;
 
-    return deref(ptr.block, ptr.offset, size);
+    const auto &block = heap.at(ptr.block);
+    return deref(block, ptr.offset, size);
 }
 
 char *Fin::Allocator::write(Ptr ptr, std::uint32_t size)
 {
     LOG(2) << std::endl << "  * " << ptr;
 
-    return deref(ptr.block, ptr.offset, size);
+    const auto &block = heap.at(ptr.block);
+
+    if (block.state == State::ReadOnly)
+        throw std::runtime_error{"invalid write to read-only memory"};
+
+    return deref(block, ptr.offset, size);
 }
 
 void Fin::Allocator::summary(std::ostream &out) const noexcept
@@ -90,23 +97,27 @@ void Fin::Allocator::summary(std::ostream &out) const noexcept
     int native = 0;
     std::size_t nativeMem = 0;
 
-    for (const auto &val : heap)
+    for (const auto &block : heap)
     {
-        switch (val.state)
+        switch (block.state)
         {
-            case State::Allocated:
-                ++inUse;
-                inUseMem += val.size;
-                break;
-
-            case State::Freed:
-                ++freed;
-                freedMem += val.size;
+            case State::ReadOnly:
+                // ignore
                 break;
 
             case State::Native:
                 ++native;
-                nativeMem += val.size;
+                nativeMem += block.size;
+                break;
+
+            case State::Managed:
+                ++inUse;
+                inUseMem += block.size;
+                break;
+
+            case State::Freed:
+                ++freed;
+                freedMem += block.size;
                 break;
         }
     }
@@ -118,13 +129,16 @@ void Fin::Allocator::summary(std::ostream &out) const noexcept
         ;
 }
 
-char *Fin::Allocator::deref(std::uint32_t blk, std::uint32_t offset,
+char *Fin::Allocator::deref(const Block &block, std::uint32_t offset,
         std::uint32_t size) const
 {
-    auto block = heap.at(blk);
-    if (block.state == State::Freed || offset + size > block.size)
-        throw std::runtime_error{"invalid memory access at "
+    if (block.state == State::Freed)
+        throw std::runtime_error{"invalid access to freed memory"};
+
+    if (offset + size > block.size)
+        throw std::runtime_error{"out-of-bound memory access at "
             + std::to_string(offset + size) + " out of "
             + std::to_string(block.size)};
-    return block.value + offset;
+
+    return &block.value[offset];
 }
