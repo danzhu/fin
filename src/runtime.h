@@ -73,8 +73,8 @@ namespace Fin
         Runtime(Size stackSize);
         void load(std::istream &src);
         void run();
-        Library &createLibrary(const std::string &name);
-        Library &getLibrary(const std::string &name);
+        Library &createLibrary(const LibraryID &id);
+        Library &getLibrary(const LibraryID &id);
         void backtrace(std::ostream &out) const noexcept;
         Allocator &allocator() noexcept { return alloc; }
         Stack &stack() noexcept { return opStack; }

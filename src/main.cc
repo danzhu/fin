@@ -84,7 +84,7 @@ int main(int argc, const char *argv[])
 
     Fin::Runtime runtime{2048};
 
-    auto &fin = runtime.createLibrary("rt");
+    auto &fin = runtime.createLibrary(Fin::LibraryID{"rt"});
     fin.addFunction(Fin::Function{"print(Int)", print<Fin::Int>});
     fin.addFunction(Fin::Function{"print(Float)", print<Fin::Float>});
     fin.addFunction(Fin::Function{"print(Bool)", print<Fin::Bool>});

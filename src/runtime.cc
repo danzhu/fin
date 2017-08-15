@@ -168,7 +168,7 @@ void Fin::Runtime::execute()
                 {
                     auto name = readStr();
 
-                    auto &lib = createLibrary(name);
+                    auto &lib = createLibrary(LibraryID{name});
                     frame.library = &lib;
                 }
                 continue;
@@ -220,7 +220,7 @@ void Fin::Runtime::execute()
                 {
                     auto name = readStr();
 
-                    refLibrary = &getLibrary(name);
+                    refLibrary = &getLibrary(LibraryID{name});
                 }
                 continue;
 
@@ -736,9 +736,8 @@ void Fin::Runtime::run()
     LOG(1) << std::endl;
 }
 
-Fin::Library &Fin::Runtime::createLibrary(const std::string &name)
+Fin::Library &Fin::Runtime::createLibrary(const LibraryID &id)
 {
-    LibraryID id{name};
     auto lib = std::make_unique<Library>(id);
 
     auto p = lib.get();
@@ -746,11 +745,8 @@ Fin::Library &Fin::Runtime::createLibrary(const std::string &name)
     return *p;
 }
 
-Fin::Library &Fin::Runtime::getLibrary(const std::string &name)
+Fin::Library &Fin::Runtime::getLibrary(const LibraryID &id)
 {
-    LibraryID id;
-    id.name = name;
-
     // TODO: load library if not available
     return *libraries.at(id);
 }
