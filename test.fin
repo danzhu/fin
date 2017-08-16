@@ -6,11 +6,7 @@ struct Vec{T}
     capacity Int
 
 def new{T}(cap Int) Vec{T}
-    let v Vec{T}
-    v.content := rt::alloc(cap)
-    v.size = 0
-    v.capacity = cap
-    v
+    Vec(rt::alloc(cap), 0, cap)
 
 def append{T}(self &Vec{T}, item T)
     if self.size == self.capacity then

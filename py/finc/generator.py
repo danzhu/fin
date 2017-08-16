@@ -1,5 +1,6 @@
 from typing import Any, Dict, Set, List, Sequence, Iterable, Iterator, Union, \
     Tuple, Sized, TypeVar, Generic, cast
+from collections import OrderedDict
 from io import TextIOBase
 from . import builtin
 from . import symbols
@@ -295,9 +296,10 @@ class Function:
                  writer: Writer) -> None:
         self.gen = gen
 
+        self._temps = 0
         self.types: Dict[str, TypeRef] = {}
         self.contracts: Dict[str, types.Match] = {}
-        self.locals: KeyList[symbols.Variable] = KeyList()
+        self.locals: OrderedDict[str, types.Type] = OrderedDict()
 
         for param in node.function.params:
             self._type(param.type)
@@ -368,9 +370,9 @@ class Function:
 
         writer.space()
         writer.comment('locals')
-        for local in self.locals:
-            writer.instr('!off', local.name)
-            writer.instr('local', type_name(local.type))
+        for name, local_tp in self.locals.items():
+            writer.instr('!off', name)
+            writer.instr('local', type_name(local_tp))
             writer.space()
 
         writer.dedent()
@@ -381,6 +383,11 @@ class Function:
 
         writer.label(end)
         writer.space()
+
+    def _temp(self) -> str:
+        temp = f'{self._temps}_'
+        self._temps += 1
+        return temp
 
     def _gen(self, node: Node) -> None:
         self.writer.comment(node)
@@ -416,11 +423,13 @@ class Function:
         self.gen.ref_member(tp, mem)
         return name
 
-    def _push_local(self, var: symbols.Variable) -> None:
-        self._type(var.type)
-        self.locals.add(var.name, var)
+    def _push_local(self, name: str, tp: types.Type) -> None:
+        assert name not in self.locals
 
-    def _pop_local(self, var: symbols.Variable) -> None:
+        self._type(tp)
+        self.locals[name] = tp
+
+    def _pop_local(self, name: str) -> None:
         pass
 
     def _cast(self, tp: types.Type, tar: types.Type) -> None:
@@ -454,6 +463,8 @@ class Function:
             self.writer.instr('load', self._type(tp))
 
     def _exit(self, node: Node, tar: Node) -> None:
+        # FIXME: broken in inline struct construction
+
         has_val = node.target_type != builtin.VOID
         assert not has_val, 'TODO'
 
@@ -605,7 +616,7 @@ class Function:
             self.writer.space()
 
         for var in node.block.locals:
-            self._pop_local(var)
+            self._pop_local(var.name)
 
     def _EMPTY(self, node: Node) -> None:
         pass
@@ -613,7 +624,7 @@ class Function:
     def _LET(self, node: Node) -> None:
         assert isinstance(node.variable, symbols.Variable)
 
-        self._push_local(node.variable)
+        self._push_local(node.variable.name, node.variable.type)
         if node.children[1].type != 'EMPTY':
             self.writer.instr('addr_var', node.variable.name)
             self._gen(node.children[1])
@@ -761,17 +772,30 @@ class Function:
         self.writer.instr('store', self._type(tp))
 
     def _CALL(self, node: Node) -> None:
-        if isinstance(node.match.source, symbols.Variant):
-            self.writer.instr('const_i', node.match.source.value)
-
-        for c in node.children[1].children:
-            self._gen(c)
-
         if isinstance(node.match.source, symbols.Function):
+            for c in node.children[1].children:
+                self._gen(c)
+
             self._call(node.match)
 
         elif isinstance(node.match.source, symbols.Struct):
-            assert False, 'TODO'
+            tmp = self._temp()
+
+            tp = node.match.ret
+            self._push_local(tmp, tp)
+
+            for i in range(len(node.children[1].children)):
+                child = node.children[1].children[i]
+                mem = self._member(tp, node.match.source.fields[i].name)
+
+                self.writer.instr('addr_var', tmp)
+                self.writer.instr('addr_mem', mem)
+                self._gen(child)
+                self.writer.instr('store', self._type(child.target_type))
+
+            self.writer.instr('addr_var', tmp)
+            self.writer.instr('load', self._type(tp))
+            self._pop_local(tmp)
 
         elif isinstance(node.match.source, symbols.Variant):
             # FIXME: fill variant
