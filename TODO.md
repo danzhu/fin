@@ -80,7 +80,7 @@
   - [x] `else`
   - [x] `redo`
   - [x] `break ...`
-  - [ ] disallow jumps inside condition and else
+  - [ ] disallow loop control inside condition and else
   - [ ] loop labels
 - [ ] levelled equality comparison
 - [x] unify module / struct / function to symbol table
@@ -93,7 +93,7 @@
   - [ ] partial replacement construction
 - member function
   - [x] member call syntax
-  - [ ] member call scope limit
+  - [x] ~~member call scope limit~~
 - [x] symbol full path
   - [x] fix standard library hierarchy (import)
 - [x] `let` type inference
@@ -103,7 +103,7 @@
   - [x] array allocation
   - [x] struct (single instance) allocation
 - [x] fix incremental assignment stack inaccuracy
-- [ ] fix level ambiguity in generics
+- [ ] remove levelled assignment
 - [x] change postfix to prefix for reference
 - [ ] show token of unsized type error
   - [ ] first bring back recursive definition check
@@ -120,11 +120,12 @@
 
 ## Runtime
 
-- [ ] option to recycle unused ptrs
+- [x] option to disable recycling freed ptrs
 - [x] rename method to function
 - [x] use `std::function` instead of native function ptr
 - [ ] globals
 - [x] remove module index
 - [ ] template for automatic C++ binding
-- [ ] bytecode memory map for each library, managed pc
-- [ ] unaligned free warning
+- [ ] separate bytecode memory space for each library
+- [ ] managed pc
+- [x] internal free error

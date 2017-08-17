@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <stack>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -25,28 +26,33 @@ namespace Fin
             Allocator();
             ~Allocator() noexcept;
 
-            Ptr alloc(std::uint32_t size, State state = State::Managed);
-            Ptr add(char *addr, std::uint32_t size,
-                    State state = State::Native);
+            Ptr add(char *addr, Offset size, State state = State::Native);
+            void update(Ptr ptr, char *addr, Offset size);
             void remove(Ptr ptr);
+            Ptr alloc(Offset size);
+            Ptr realloc(Ptr ptr, Offset size);
             void dealloc(Ptr ptr);
-            Ptr realloc(Ptr ptr, std::uint32_t size);
-            char *read(Ptr ptr, std::uint32_t size);
-            char *write(Ptr ptr, std::uint32_t size);
+            char *read(Ptr ptr, Offset size);
+            char *write(Ptr ptr, Offset size);
             void summary(std::ostream &out) const noexcept;
 
         private:
             struct Block
             {
-                State state;
                 char *value;
-                std::uint32_t size;
+                Offset size;
+                State state;
             };
 
             std::vector<Block> heap;
 
-            char *deref(const Block &block, std::uint32_t offset,
-                    std::uint32_t size) const;
+#ifndef FIN_PEDANTIC
+            std::stack<std::uint32_t> freeStore;
+#endif
+
+            Ptr add(Block block);
+            void remove(std::uint32_t idx, Block &block);
+            char *deref(const Block &block, Offset offset, Offset size) const;
     };
 }
 

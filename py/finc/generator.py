@@ -505,16 +505,15 @@ class Function:
             return
 
         if fn.name == 'cast':
-            frm = fn.params[0].type.fullname()[0].lower()
-            tar = fn.ret.fullname()[0].lower()
+            frm = native_type_name(fn.params[0].type)
+            tar = native_type_name(fn.ret)
             self.writer.instr(f'cast_{frm}_{tar}')
             return
 
-        if fn.name not in OP_TABLE:
-            assert False, f'unknown operator {fn.name}'
+        assert fn.name in OP_TABLE, f'unknown operator {fn.name}'
 
         op = OP_TABLE[fn.name]
-        name = fn.params[0].type.fullname()[0].lower()
+        name = native_type_name(fn.params[0].type)
         self.writer.instr(f'{op}_{name}')
 
     def _match(self, pat: pattern.Pattern, tp: types.Type, nxt: str) -> None:
@@ -913,3 +912,7 @@ def match_name(match: types.Match) -> str:
 
 def quote(s: str) -> str:
     return f"'{s}'"
+
+
+def native_type_name(tp: types.Type) -> str:
+    return tp.fullname()[0].lower()

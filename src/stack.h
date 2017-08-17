@@ -15,8 +15,8 @@ namespace Fin
     class Stack
     {
         public:
-            explicit Stack(Size cap):
-                _content{new char[cap]}, _cap{cap} {}
+            explicit Stack(Offset cap):
+                _content{new char[cap.value]}, _cap{cap.value} {}
 
             Stack(const Stack &other) = delete;
             Stack(Stack &&other) = delete;
@@ -29,26 +29,26 @@ namespace Fin
             Stack &operator=(const Stack &other) = delete;
             Stack &operator=(Stack &&other) = delete;
 
-            std::uint32_t size() const noexcept { return _size; }
-            std::uint32_t capacity() const noexcept { return _cap; }
-            void resize(std::uint32_t size) noexcept { _size = size; }
+            Offset size() const noexcept { return _size; }
+            Offset capacity() const noexcept { return _cap; }
+            void resize(Offset size) noexcept { _size = size; }
             char *content() const noexcept { return _content; }
 
-            char *at(Offset idx, Size size)
+            char *at(Offset off, Offset size)
             {
-                if (idx + size > _size)
+                if (off + size > _size)
                     throw std::out_of_range{"invalid stack access at "
-                        + std::to_string(idx)};
+                        + std::to_string(off.value)};
 
-                return _content + idx;
+                return &_content[off.value];
             }
 
-            char *pushSize(Size size)
+            char *pushSize(Offset size)
             {
                 if (_size > _cap - size)
                     throw std::overflow_error{"stack overflow"};
 
-                auto val = &_content[_size];
+                auto val = &_content[_size.value];
 
                 LOG(2) << std::endl << "  < [" << _size << ", " << size << "]";
 
@@ -56,7 +56,7 @@ namespace Fin
                 return val;
             }
 
-            char *popSize(Size size)
+            char *popSize(Offset size)
             {
                 if (_size < size)
                     throw std::overflow_error{"negative stack size"};
@@ -64,29 +64,29 @@ namespace Fin
                 LOG(2) << std::endl << "  > [" << _size << ", " << size << "]";
 
                 _size -= size;
-                return &_content[_size];
+                return &_content[_size.value];
             }
 
-            char *topSize(Size size)
+            char *topSize(Offset size)
             {
                 if (_size < size)
                     throw std::overflow_error{"accessing at negative index"};
 
                 LOG(2) << std::endl << "  ^ [" << _size << ", " << size << "]";
 
-                return &_content[_size - size];
+                return &_content[(_size - size).value];
             }
 
             template<typename T> T &at(Offset idx)
             {
-                constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
+                constexpr auto size = Offset{sizeof(T)}.align(MAX_ALIGN);
 
                 return *reinterpret_cast<T*>(at(idx, size));
             }
 
             template<typename T> void push(T val)
             {
-                constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
+                constexpr auto size = Offset{sizeof(T)}.align(MAX_ALIGN);
 
                 if (_size > _cap - size)
                     throw std::overflow_error{"stack overflow"};
@@ -101,7 +101,7 @@ namespace Fin
 
             template<typename T> void pop(T &val)
             {
-                constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
+                constexpr auto size = Offset{sizeof(T)}.align(MAX_ALIGN);
 
                 if (_size < size)
                     throw std::overflow_error{"negative stack size"};
@@ -123,7 +123,7 @@ namespace Fin
 
             template<typename T> T &top()
             {
-                constexpr auto size = alignTo(sizeof(T), MAX_ALIGN);
+                constexpr auto size = Offset{sizeof(T)}.align(MAX_ALIGN);
 
                 if (_size < size)
                     throw std::runtime_error{"accessing at negative index"};
@@ -138,8 +138,8 @@ namespace Fin
 
         private:
             char *_content = nullptr;
-            std::uint32_t _cap;
-            std::uint32_t _size = 0;
+            Offset _cap;
+            Offset _size{0};
     };
 }
 

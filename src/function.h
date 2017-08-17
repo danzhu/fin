@@ -21,19 +21,19 @@ namespace Fin
     {
         Library *library = nullptr;
         std::string name;
-        Count generics;
-        Count contracts;
+        Index generics;
+        Index contracts;
         NativeFunction native = nullptr;
         Pc init;
         Pc location;
 
-        Function(std::string name, NativeFunction fn, Count gens = 0,
-                Count ctrs = 0):
+        Function(std::string name, NativeFunction fn, Index gens = 0,
+                Index ctrs = 0):
             name{std::move(name)}, generics{gens}, contracts{ctrs},
             native{std::move(fn)} {}
 
-        Function(std::string name, Pc init, Pc loc, Count gens = 0,
-                Count ctrs = 0):
+        Function(std::string name, Pc init, Pc loc, Index gens = 0,
+                Index ctrs = 0):
             name{std::move(name)}, generics{gens}, contracts{ctrs}, init{init},
             location{loc} {}
 

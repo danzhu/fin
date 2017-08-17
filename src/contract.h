@@ -19,13 +19,13 @@ namespace Fin
         std::vector<Contract> contracts;
         std::vector<Offset> offsets;
         std::unique_ptr<Contract> refType;
-        bool initialized = false;
-        Pc init = 0;
-        Pc location = 0;
+        bool initialized{false};
+        Pc init{0};
+        Pc location{0};
         NativeFunction native;
-        Offset argOffset = 0;
-        Offset localOffset = 0;
-        std::size_t localAlign = 0;
+        Offset argOffset{0};
+        Offset localOffset{0};
+        std::size_t localAlign{0};
 
         Contract(Function &fn);
         Contract(Type &tp);

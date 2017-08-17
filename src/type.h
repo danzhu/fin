@@ -41,17 +41,17 @@ namespace Fin
 
     struct TypeInfo
     {
-        Size size;
+        Offset size;
         std::size_t alignment;
-        Size aligned;
+        Offset aligned;
 
-        TypeInfo(Size size, std::size_t alignment):
+        TypeInfo(Offset size, std::size_t alignment):
             size{size}, alignment{alignment},
-            aligned{alignTo(size, MAX_ALIGN)} {}
+            aligned{size.align(MAX_ALIGN)} {}
 
         template<typename T> static TypeInfo native()
         {
-            return TypeInfo{sizeof(T), alignof(T)};
+            return TypeInfo{Offset{sizeof(T)}, alignof(T)};
         }
     };
 }

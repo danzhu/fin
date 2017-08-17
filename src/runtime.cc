@@ -12,12 +12,12 @@
 #include "type.h"
 #include "util.h"
 
-void move(const char *src, char *dest, Fin::Size size)
+void move(const char *src, char *dest, Fin::Offset size)
 {
     LOG(2) << std::endl << "  = ";
-    LOG_HEX(2, src, size);
+    LOG_HEX(2, src, size.value);
 
-    for (Fin::Size i = 0; i < size; ++i)
+    for (decltype(Fin::Offset::value) i = 0; i < size.value; ++i)
         dest[i] = src[i];
 }
 
@@ -329,7 +329,7 @@ void Fin::Runtime::execute()
 
                     auto size = pop(frame.contract->sizes);
 
-                    size.size = alignTo(size.size, size.alignment) * len;
+                    size.size = size.size.align(size.alignment) * len;
                     frame.contract->sizes.emplace_back(size);
                 }
                 break;
@@ -391,7 +391,7 @@ void Fin::Runtime::execute()
 
                     auto size = readSize();
 
-                    auto offset = alignTo(frame.contract->localOffset,
+                    auto offset = frame.contract->localOffset.align(
                             size.alignment);
                     frame.contract->addOffset(offset);
                     frame.contract->localOffset = offset + size.size;
@@ -404,7 +404,7 @@ void Fin::Runtime::execute()
 
                     auto size = readSize();
 
-                    auto offset = alignTo(frame.contract->localOffset,
+                    auto offset = frame.contract->localOffset.align(
                             size.alignment);
                     frame.contract->addOffset(offset);
                     frame.contract->localOffset = offset + size.size;
@@ -517,7 +517,7 @@ void Fin::Runtime::execute()
                     auto idx = opStack.pop<Int>();
                     auto addr = opStack.pop<Ptr>();
 
-                    opStack.push<Ptr>(addr + idx * size.aligned);
+                    opStack.push<Ptr>(addr + size.aligned * idx);
                 }
                 break;
 
@@ -706,7 +706,7 @@ void Fin::Runtime::execute()
     }
 }
 
-Fin::Runtime::Runtime(Size stackSize): opStack{stackSize}
+Fin::Runtime::Runtime(Offset stackSize): opStack{stackSize}
 {
     stackPtr = alloc.add(opStack.content(), opStack.capacity());
     instrs.emplace_back(static_cast<char>(Opcode::Term));

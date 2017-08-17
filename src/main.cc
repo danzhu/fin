@@ -22,7 +22,7 @@ void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 
     auto len = st.pop<Fin::Int>();
 
-    auto size = Fin::alignTo(type.size, type.alignment) * len;
+    auto size = type.size.align(type.alignment) * len;
     auto ptr = rt.allocator().alloc(size);
 
     st.push(ptr);
@@ -35,7 +35,7 @@ void _realloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
     auto len = st.pop<Fin::Int>();
     auto ptr = st.pop<Fin::Ptr>();
 
-    auto size = Fin::alignTo(type.size, type.alignment) * len;
+    auto size = type.size.align(type.alignment) * len;
     ptr = rt.allocator().realloc(ptr, size);
 
     st.push(ptr);
@@ -82,7 +82,7 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    Fin::Runtime runtime{2048};
+    Fin::Runtime runtime{Fin::Offset{2048}};
 
     auto &fin = runtime.createLibrary(Fin::LibraryID{"rt"});
     fin.addFunction(Fin::Function{"print(Int)", print<Fin::Int>});
@@ -111,7 +111,7 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-#if DEBUG > 0
+#if FIN_DEBUG > 0
     runtime.allocator().summary(std::cerr);
 #endif
 

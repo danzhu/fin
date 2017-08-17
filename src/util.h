@@ -30,12 +30,6 @@ namespace Fin
         vec.erase(begin, end);
         return ret;
     }
-
-    constexpr Size alignTo(Size size, std::size_t align)
-    {
-        return static_cast<Size>((size & ~(align - 1))
-                + (size % align ? align : 0));
-    }
 }
 
 #endif

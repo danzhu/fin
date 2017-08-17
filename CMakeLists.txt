@@ -113,8 +113,11 @@ test_compile("no_symbol" "cannot find symbol 'i'")
 test_compile("unsized_array" "array is unsized")
 
 # options
-option(DEBUG "Enable debug messages" 0)
+option(DEBUG "Enable debug messages logging" 0)
+option(PEDANTIC "Disable auto-handling of execution errors" off)
 
-if(DEBUG)
-    target_compile_definitions(fin PRIVATE DEBUG=${DEBUG})
+target_compile_definitions(fin PRIVATE FIN_DEBUG=${DEBUG})
+
+if(PEDANTIC)
+    target_compile_definitions(fin PRIVATE FIN_PEDANTIC=1)
 endif()

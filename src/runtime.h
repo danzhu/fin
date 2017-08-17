@@ -81,7 +81,7 @@ namespace Fin
             opStack.push(Op{}(op1, op2));
         }
     public:
-        Runtime(Size stackSize);
+        Runtime(Offset stackSize);
         void load(std::istream &src);
         void run();
         Library &createLibrary(const LibraryID &id);
