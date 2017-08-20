@@ -10,15 +10,70 @@
 #include "library.h"
 #include "opcode.h"
 #include "type.h"
+#include "typeinfo.h"
 #include "util.h"
 
-void move(const char *src, char *dest, Fin::Offset size)
+Fin::Runtime::Runtime(): eval{alloc}
 {
-    LOG(2) << std::endl << "  = ";
-    LOG_HEX(2, src, size.value);
+    instrs.emplace_back(static_cast<std::uint8_t>(Opcode::Term));
+}
 
-    for (decltype(Fin::Offset::value) i = 0; i < size.value; ++i)
-        dest[i] = src[i];
+void Fin::Runtime::load(std::istream &src)
+{
+    LOG(1) << "Loading...";
+
+    frame = Frame{};
+    frame.local = frame.param = eval.size();
+    frame.pc = static_cast<Pc>(instrs.size());
+
+    instrs.insert(instrs.end(),
+            std::istreambuf_iterator<char>{src},
+            std::istreambuf_iterator<char>{});
+    instrs.emplace_back(static_cast<std::uint8_t>(Opcode::Term));
+
+    execute();
+
+    LOG(1) << std::endl;
+}
+
+void Fin::Runtime::run()
+{
+    LOG(1) << "Running...";
+
+    checkLibrary();
+    mainContract = std::make_unique<Contract>(
+            frame.library->functions.at("main()"));
+
+    frame.pc = 0;
+    call(*mainContract);
+    execute();
+
+    LOG(1) << std::endl;
+}
+
+Fin::Library &Fin::Runtime::createLibrary(const LibraryID &id)
+{
+    auto lib = std::make_unique<Library>(id);
+
+    auto p = lib.get();
+    libraries.emplace(std::move(id), std::move(lib));
+    return *p;
+}
+
+Fin::Library &Fin::Runtime::getLibrary(const LibraryID &id)
+{
+    // TODO: load library if not available
+    return *libraries.at(id);
+}
+
+void Fin::Runtime::backtrace(std::ostream &out) const noexcept
+{
+    out << "Backtrace:" << std::endl;
+
+    for (const auto &fr : rtStack)
+        out << fr << std::endl;
+
+    out << frame << std::endl;
 }
 
 void Fin::Runtime::jump(Pc target)
@@ -32,7 +87,7 @@ void Fin::Runtime::jump(Pc target)
 std::string Fin::Runtime::readStr()
 {
     auto len = readInt<std::uint16_t>();
-    auto val = std::string{&instrs.at(frame.pc), len};
+    auto val = std::string{reinterpret_cast<char *>(&instrs.at(frame.pc)), len};
 
     LOG(1) << " '" << val << "'";
 
@@ -81,7 +136,7 @@ Fin::TypeInfo Fin::Runtime::readSize()
     auto idx = readInt<Index>();
     auto size = frame.contract->sizes.at(idx);
 
-    LOG(1) << " [" << size.size << " | " << size.alignment << "]";
+    LOG(1) << " [" << size.size() << " | " << size.alignment() << "]";
 
     return size;
 }
@@ -98,8 +153,7 @@ Fin::Offset Fin::Runtime::readOffset()
 
 void Fin::Runtime::ret()
 {
-    // TODO: looks a bit hacky
-    opStack.resize(frame.param.offset);
+    eval.resize(frame.param);
 
     frame = pop(rtStack);
 }
@@ -111,13 +165,13 @@ void Fin::Runtime::call(Contract &ctr)
 
     // update frame
     frame.contract = &ctr;
-    frame.local = frame.param = stackPtr + opStack.size();
+    frame.local = frame.param = eval.size();
 
     frame.library = ctr.library;
 
     if (ctr.native)
     {
-        ctr.native(*this, ctr, opStack);
+        ctr.native(*this, ctr, eval);
 
         // emplace and pop even for native functions so that we can get full
         // backtrace
@@ -141,7 +195,7 @@ void Fin::Runtime::call(Contract &ctr)
 void Fin::Runtime::sign()
 {
     frame.param = frame.local - frame.contract->argOffset;
-    opStack.resize(opStack.size() + frame.contract->localOffset);
+    eval.resize(eval.size() + frame.contract->localOffset);
 
     // cleanup unneeded data
     frame.contract->refType = nullptr;
@@ -314,7 +368,7 @@ void Fin::Runtime::execute()
                 {
                     checkContract();
 
-                    auto idx = readInt<std::uint16_t>();
+                    auto idx = readInt<Index>();
 
                     auto size = frame.contract->sizes.at(idx);
                     frame.contract->sizes.emplace_back(size);
@@ -329,7 +383,7 @@ void Fin::Runtime::execute()
 
                     auto size = pop(frame.contract->sizes);
 
-                    size.size = size.size.align(size.alignment) * len;
+                    size = TypeInfo{size.alignedSize() * len, size.alignment()};
                     frame.contract->sizes.emplace_back(size);
                 }
                 break;
@@ -365,7 +419,7 @@ void Fin::Runtime::execute()
                     checkLibrary();
                     checkContract();
 
-                    auto idx = readInt<std::uint32_t>();
+                    auto idx = readInt<Index>();
 
                     auto mem = frame.library->refMembers.at(idx);
                     auto off = frame.contract->refType->offsets.at(mem->index);
@@ -381,7 +435,7 @@ void Fin::Runtime::execute()
 
                     auto offset = frame.contract->argOffset;
                     frame.contract->addOffset(offset);
-                    frame.contract->argOffset += size.aligned;
+                    frame.contract->argOffset += size.alignedSize();
                 }
                 break;
 
@@ -392,9 +446,9 @@ void Fin::Runtime::execute()
                     auto size = readSize();
 
                     auto offset = frame.contract->localOffset.align(
-                            size.alignment);
+                            size.alignment());
                     frame.contract->addOffset(offset);
-                    frame.contract->localOffset = offset + size.size;
+                    frame.contract->localOffset = offset + size.size();
                 }
                 break;
 
@@ -405,11 +459,11 @@ void Fin::Runtime::execute()
                     auto size = readSize();
 
                     auto offset = frame.contract->localOffset.align(
-                            size.alignment);
+                            size.alignment());
                     frame.contract->addOffset(offset);
-                    frame.contract->localOffset = offset + size.size;
+                    frame.contract->localOffset = offset + size.size();
                     frame.contract->localAlign = std::max(
-                            frame.contract->localAlign, size.alignment);
+                            frame.contract->localAlign, size.alignment());
                 }
                 break;
 
@@ -453,12 +507,12 @@ void Fin::Runtime::execute()
                 {
                     auto size = readSize();
 
-                    auto src = opStack.topSize(size.aligned);
+                    auto src = eval.topSize(size);
 
                     ret();
 
-                    auto dest = opStack.pushSize(size.aligned);
-                    move(src, dest, size.size);
+                    auto dest = eval.pushSize(size);
+                    src.move(dest, size);
                 }
                 break;
 
@@ -466,7 +520,7 @@ void Fin::Runtime::execute()
                 {
                     auto size = readSize();
 
-                    opStack.pushSize(size.aligned);
+                    eval.pushSize(size);
                 }
                 break;
 
@@ -474,7 +528,7 @@ void Fin::Runtime::execute()
                 {
                     auto size = readSize();
 
-                    opStack.popSize(size.aligned);
+                    eval.popSize(size);
                 }
                 break;
 
@@ -482,9 +536,10 @@ void Fin::Runtime::execute()
                 {
                     auto size = readSize();
 
-                    auto src = opStack.topSize(size.aligned);
-                    auto dest = opStack.pushSize(size.aligned);
-                    move(src, dest, size.size);
+                    auto src = eval.topSize(size);
+                    auto dest = eval.pushSize(size);
+
+                    src.move(dest, size);
                 }
                 break;
 
@@ -492,10 +547,11 @@ void Fin::Runtime::execute()
                 {
                     auto size = readSize();
 
-                    auto ptr = opStack.pop<Ptr>();
-                    auto src = alloc.read(ptr, size.size);
-                    auto dest = opStack.pushSize(size.aligned);
-                    move(src, dest, size.size);
+                    auto ptr = eval.pop<Ptr>();
+                    auto src = alloc.readSize(ptr, size);
+                    auto dest = eval.pushSize(size);
+
+                    src.move(dest, size);
                 }
                 break;
 
@@ -503,10 +559,11 @@ void Fin::Runtime::execute()
                 {
                     auto size = readSize();
 
-                    auto src = opStack.popSize(size.aligned);
-                    auto ptr = opStack.pop<Ptr>();
-                    auto dest = alloc.write(ptr, size.size);
-                    move(src, dest, size.size);
+                    auto src = eval.popSize(size);
+                    auto ptr = eval.pop<Ptr>();
+                    auto dest = alloc.writeSize(ptr, size);
+
+                    src.move(dest, size);
                 }
                 break;
 
@@ -514,10 +571,10 @@ void Fin::Runtime::execute()
                 {
                     auto size = readSize();
 
-                    auto idx = opStack.pop<Int>();
-                    auto addr = opStack.pop<Ptr>();
+                    auto idx = eval.pop<Int>();
+                    auto addr = eval.pop<Ptr>();
 
-                    opStack.push<Ptr>(addr + size.aligned * idx);
+                    eval.push<Ptr>(addr + size.alignedSize() * idx);
                 }
                 break;
 
@@ -525,7 +582,7 @@ void Fin::Runtime::execute()
                 {
                     auto offset = readOffset();
 
-                    opStack.push<Ptr>(frame.param + offset);
+                    eval.push<Ptr>(eval.ptr() + frame.param + offset);
                 }
                 break;
 
@@ -533,7 +590,7 @@ void Fin::Runtime::execute()
                 {
                     auto offset = readOffset();
 
-                    opStack.push<Ptr>(frame.local + offset);
+                    eval.push<Ptr>(eval.ptr() + frame.local + offset);
                 }
                 break;
 
@@ -541,7 +598,7 @@ void Fin::Runtime::execute()
                 {
                     auto offset = readOffset();
 
-                    opStack.top<Ptr>() += offset;
+                    eval.top<Ptr>() += offset;
                 }
                 break;
 
@@ -557,7 +614,7 @@ void Fin::Runtime::execute()
                 {
                     auto target = readTarget();
 
-                    if (!opStack.pop<bool>())
+                    if (!eval.pop<bool>())
                         jump(target);
                 }
                 break;
@@ -566,25 +623,25 @@ void Fin::Runtime::execute()
                 {
                     auto target = readTarget();
 
-                    if (opStack.pop<bool>())
+                    if (eval.pop<bool>())
                         jump(target);
                 }
                 break;
 
             case Opcode::ConstFalse:
-                opStack.push(false);
+                eval.push(false);
                 break;
 
             case Opcode::ConstTrue:
-                opStack.push(true);
+                eval.push(true);
                 break;
 
             case Opcode::Not:
-                opStack.push(!opStack.pop<bool>());
+                eval.push(!eval.pop<bool>());
                 break;
 
             case Opcode::ConstI:
-                opStack.push(readConst<Int>());
+                eval.push(readConst<Int>());
                 break;
 
             case Opcode::AddI:
@@ -608,7 +665,7 @@ void Fin::Runtime::execute()
                 break;
 
             case Opcode::NegI:
-                opStack.push(-opStack.pop<Int>());
+                eval.push(-eval.pop<Int>());
                 break;
 
             case Opcode::EqI:
@@ -636,7 +693,7 @@ void Fin::Runtime::execute()
                 break;
 
             case Opcode::ConstF:
-                opStack.push(readConst<Float>());
+                eval.push(readConst<Float>());
                 break;
 
             case Opcode::AddF:
@@ -657,14 +714,14 @@ void Fin::Runtime::execute()
 
             case Opcode::ModF:
                 {
-                    auto op2 = opStack.pop<Float>();
-                    auto op1 = opStack.pop<Float>();
-                    opStack.push(std::fmod(op1, op2));
+                    auto op2 = eval.pop<Float>();
+                    auto op1 = eval.pop<Float>();
+                    eval.push(std::fmod(op1, op2));
                 }
                 break;
 
             case Opcode::NegF:
-                opStack.push(-opStack.pop<int32_t>());
+                eval.push(-eval.pop<int32_t>());
                 break;
 
             case Opcode::EqF:
@@ -692,80 +749,16 @@ void Fin::Runtime::execute()
                 break;
 
             case Opcode::CastIF:
-                opStack.push(static_cast<Float>(opStack.pop<Int>()));
+                eval.push(static_cast<Float>(eval.pop<Int>()));
                 break;
 
             case Opcode::CastFI:
-                opStack.push(static_cast<Int>(opStack.pop<Float>()));
+                eval.push(static_cast<Int>(eval.pop<Float>()));
                 break;
 
             default:
                 throw std::runtime_error{"invalid opcode "
-                    + std::to_string(static_cast<char>(op))};
+                    + std::to_string(static_cast<std::uint8_t>(op))};
         }
     }
-}
-
-Fin::Runtime::Runtime(Offset stackSize): opStack{stackSize}
-{
-    stackPtr = alloc.add(opStack.content(), opStack.capacity());
-    instrs.emplace_back(static_cast<char>(Opcode::Term));
-}
-
-void Fin::Runtime::load(std::istream &src)
-{
-    LOG(1) << "Loading...";
-
-    frame = Frame{};
-    frame.local = frame.param = stackPtr;
-    frame.pc = static_cast<Pc>(instrs.size());
-
-    instrs.insert(instrs.end(),
-            std::istreambuf_iterator<char>(src),
-            std::istreambuf_iterator<char>());
-    instrs.emplace_back(static_cast<char>(Opcode::Term));
-
-    execute();
-
-    LOG(1) << std::endl;
-}
-
-void Fin::Runtime::run()
-{
-    LOG(1) << "Running...";
-
-    checkLibrary();
-    mainContract = std::make_unique<Contract>(
-            frame.library->functions.at("main()"));
-
-    frame.pc = 0;
-    call(*mainContract);
-    execute();
-
-    LOG(1) << std::endl;
-}
-
-Fin::Library &Fin::Runtime::createLibrary(const LibraryID &id)
-{
-    auto lib = std::make_unique<Library>(id);
-
-    auto p = lib.get();
-    libraries.emplace(std::move(id), std::move(lib));
-    return *p;
-}
-
-Fin::Library &Fin::Runtime::getLibrary(const LibraryID &id)
-{
-    // TODO: load library if not available
-    return *libraries.at(id);
-}
-
-void Fin::Runtime::backtrace(std::ostream &out) const noexcept
-{
-    out << "Backtrace:" << std::endl;
-
-    for (const auto &fr : rtStack)
-        out << fr << std::endl;
-
-    out << frame << std::endl;
 }

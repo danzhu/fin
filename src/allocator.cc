@@ -1,96 +1,58 @@
 #include "allocator.h"
 
 #include <cassert>
+#include "log.h"
 #include "util.h"
 
-Fin::Allocator::Allocator() {}
+Fin::Allocator::Allocator() noexcept {}
 
 Fin::Allocator::~Allocator() noexcept
 {
     // cleanup any blocks still in-use
     for (const auto &block : heap)
     {
-        if (block.state == State::Managed)
-            std::free(block.value);
+        std::free(block.memory._data);
     }
 }
 
-Fin::Ptr Fin::Allocator::add(char *addr, Offset size, State state)
+Fin::Ptr Fin::Allocator::alloc(Offset size, Access access)
 {
-    assert(state != State::Freed);
-
-#ifndef FIN_PEDANTIC
-    // recycle if possible
-    if (freeStore.size() > 0)
-    {
-        Ptr ptr{freeStore.top(), Offset{0}};
-        freeStore.pop();
-
-        assert(ptr.block < heap.size());
-        auto &block = heap[ptr.block];
-
-        assert(block.state == State::Freed);
-        block = Block{addr, size, state};
-
-        return ptr;
-    }
-#endif
-
-    // no more freed blocks / pedantic, add new
-    Ptr ptr{static_cast<std::uint32_t>(heap.size()), Offset{0}};
-    heap.emplace_back(Block{addr, size, state});
-
-    return ptr;
-}
-
-void Fin::Allocator::update(Ptr ptr, char *addr, Offset size)
-{
-    auto &block = heap.at(ptr.block);
-
-    assert(block.state != State::Freed);
-    block.value = addr;
-    block.size = size;
-}
-
-void Fin::Allocator::remove(Ptr ptr)
-{
-    auto &block = heap.at(ptr.block);
-
-    assert(block.state != State::Freed);
-    remove(ptr.block, block);
-}
-
-Fin::Ptr Fin::Allocator::alloc(Offset size)
-{
-    auto addr = static_cast<char *>(std::malloc(size.value));
+    auto addr = static_cast<std::uint8_t *>(std::malloc(size._value));
     if (!addr)
         throw std::runtime_error{"failed to allocate"};
 
-    return add(addr, size, State::Managed);
+    auto ptr = add(Memory{addr}, size, access);
+
+    LOG(1) << std::endl << "  A " << ptr << " [" << size << "]";
+
+    return ptr;
 }
 
 Fin::Ptr Fin::Allocator::realloc(Ptr ptr, Offset size)
 {
 #ifdef FIN_PEDANTIC
-    if (ptr.offset.value != 0)
+    if (ptr._offset._value != 0)
         throw std::runtime_error{"internal reallocation"};
 #endif
 
-    auto &block = heap.at(ptr.block);
+    auto &block = getBlock(ptr);
 
-    if (block.state != State::Managed)
-        throw std::runtime_error{"invalid reallocation"};
+    checkAccess(block, Access::Free);
 
-    auto addr = static_cast<char *>(std::realloc(block.value, size.value));
+    auto addr = static_cast<std::uint8_t *>(
+            std::realloc(block.memory._data, size._value));
     if (!addr)
         throw std::runtime_error{"failed to reallocate"};
 
+    LOG(1) << std::endl << "  R " << ptr << " [" << size << "]";
+
 #ifdef FIN_PEDANTIC
     // track every reallocation so that access to old memory can be tracked
-    remove(ptr.block, block);
-    return add(addr, size, State::Managed);
+    auto ret = add(Memory{addr}, size, block.access);
+    remove(ptr._block);
+    return ret;
 #else
-    block.value = addr;
+    block.memory = Memory{addr};
     block.size = size;
 
     return ptr;
@@ -100,101 +62,159 @@ Fin::Ptr Fin::Allocator::realloc(Ptr ptr, Offset size)
 void Fin::Allocator::dealloc(Ptr ptr)
 {
 #ifdef FIN_PEDANTIC
-    if (ptr.offset.value != 0)
+    if (ptr._offset._value != 0)
         throw std::runtime_error{"internal deallocation"};
 #endif
 
-    auto &block = heap.at(ptr.block);
+    auto &block = getBlock(ptr);
 
-    if (block.state != State::Managed)
-        throw std::runtime_error{"invalid deallocation"};
+    checkAccess(block, Access::Free);
 
-    std::free(block.value);
-    remove(ptr.block, block);
+    LOG(1) << std::endl << "  D " << ptr;
+
+    std::free(block.memory._data);
+    remove(ptr._block);
 }
 
-char *Fin::Allocator::read(Ptr ptr, Offset size)
+Fin::Memory Fin::Allocator::readSize(Ptr ptr, TypeInfo type)
 {
     LOG(2) << std::endl << "  & " << ptr;
 
-    const auto &block = heap.at(ptr.block);
-    return deref(block, ptr.offset, size);
+    const auto &block = getBlock(ptr);
+
+    checkOffset(block, ptr._offset, type.size());
+    checkAccess(block, Access::Read);
+
+    return block.memory + ptr._offset;
 }
 
-char *Fin::Allocator::write(Ptr ptr, Offset size)
+Fin::Memory Fin::Allocator::writeSize(Ptr ptr, TypeInfo type)
 {
     LOG(2) << std::endl << "  * " << ptr;
 
-    const auto &block = heap.at(ptr.block);
+    const auto &block = getBlock(ptr);
 
-    if (block.state == State::ReadOnly)
-        throw std::runtime_error{"invalid write to read-only memory"};
+    checkOffset(block, ptr._offset, type.size());
+    checkAccess(block, Access::Write);
 
-    return deref(block, ptr.offset, size);
+    return block.memory + ptr._offset;
+}
+
+Fin::Memory Fin::Allocator::get(Ptr ptr)
+{
+    return getBlock(ptr).memory;
+}
+
+void Fin::Allocator::setSize(Ptr ptr, Offset size)
+{
+    // FIXME: hacks
+    getBlock(ptr).size = size;
 }
 
 void Fin::Allocator::summary(std::ostream &out) const noexcept
 {
     int inUse = 0;
     std::size_t inUseMem = 0;
+    int stack = 0;
+    std::size_t stackMem = 0;
+    int instr = 0;
+    std::size_t instrMem = 0;
     int freed = 0;
     std::size_t freedMem = 0;
-    int native = 0;
-    std::size_t nativeMem = 0;
 
     for (const auto &block : heap)
     {
-        switch (block.state)
+        // TODO: this makes assumptions on what they are used for,
+        // maybe a better way to give summary?
+
+        if (hasFlag(block.access, Access::Free))
         {
-            case State::ReadOnly:
-                // ignore
-                break;
-
-            case State::Native:
-                ++native;
-                nativeMem += block.size.value;
-                break;
-
-            case State::Managed:
-                ++inUse;
-                inUseMem += block.size.value;
-                break;
-
-            case State::Freed:
-                ++freed;
-                freedMem += block.size.value;
-                break;
+            ++inUse;
+            inUseMem += block.size._value;
+        }
+        else if (hasFlag(block.access, Access::Write))
+        {
+            ++stack;
+            stackMem += block.size._value;
+        }
+        else if (hasFlag(block.access, Access::Read))
+        {
+            ++instr;
+            instrMem += block.size._value;
+        }
+        else
+        {
+            ++freed;
+            freedMem += block.size._value;
         }
     }
 
     out << "Allocator Summary:\n"
-        << "  In use: " << inUseMem << " bytes in " << inUse << " blocks\n"
-        << "   Freed: " << freedMem << " bytes in " << freed << " blocks\n"
-        << "  Native: " << nativeMem << " bytes in " << native << " blocks\n"
+        << "  In use: " << PLURAL(inUseMem, "byte")
+        << " in " << PLURAL(inUse, "block") << "\n"
+        << "   Stack: " << PLURAL(stackMem, "byte")
+        << " in " << PLURAL(stack, "block") << "\n"
+        << "   Instr: " << PLURAL(instrMem, "byte")
+        << " in " << PLURAL(instr, "block") << "\n"
+        << "  -------\n"
+        << "   Freed: " << PLURAL(freedMem, "byte")
+        << " in " << PLURAL(freed, "block") << "\n"
         ;
 }
 
-void Fin::Allocator::remove(std::uint32_t idx, Block &block)
+Fin::Allocator::Block &Fin::Allocator::getBlock(Ptr ptr)
 {
-    assert(block.state != State::Freed);
+    return heap.at(ptr._block);
+}
 
-    block.state = State::Freed;
+Fin::Ptr Fin::Allocator::add(Memory mem, Offset size, Access access)
+{
+#ifndef FIN_PEDANTIC
+    // recycle if possible
+    if (freeStore.size() > 0)
+    {
+        Ptr ptr{freeStore.top(), Offset{}};
+        freeStore.pop();
+
+        assert(ptr._block < heap.size());
+        auto &block = heap[ptr._block];
+
+        assert(block.access == Access::None);
+        assert(block.memory._data == nullptr);
+        block = Block{mem, size, access};
+
+        return ptr;
+    }
+#endif
+
+    // no more freed blocks / pedantic, add new
+    Ptr ptr{static_cast<std::uint32_t>(heap.size()), Offset{}};
+    heap.emplace_back(Block{mem, size, access});
+
+    return ptr;
+}
+
+void Fin::Allocator::remove(std::uint32_t idx)
+{
+    assert(idx < heap.size());
+    // preserve size so that statistics are correct
+    heap[idx].memory = Memory{};
+    heap[idx].access = Access::None;
 
 #ifndef FIN_PEDANTIC
     freeStore.emplace(idx);
 #endif
 }
 
-char *Fin::Allocator::deref(const Block &block, Offset offset,
-        Offset size) const
+void Fin::Allocator::checkOffset(const Block &block, Offset off, Offset size)
+    const
 {
-    if (block.state == State::Freed)
-        throw std::runtime_error{"invalid access to freed memory"};
+    if (off + size > block.size)
+        throw std::out_of_range{"access out of range"};
+}
 
-    if (offset + size > block.size)
-        throw std::runtime_error{"out-of-bound memory access at "
-            + std::to_string((offset + size).value) + " out of "
-            + std::to_string(block.size.value)};
-
-    return &block.value[offset.value];
+void Fin::Allocator::checkAccess(const Block &block, Access access) const
+{
+    if (!hasFlag(block.access, access))
+        throw std::runtime_error{"invalid permissions"};
 }

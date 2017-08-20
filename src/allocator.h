@@ -4,44 +4,74 @@
 #include <cstdint>
 #include <iostream>
 #include <stack>
-#include <stdexcept>
 #include <string>
 #include <vector>
-#include "log.h"
 #include "typedefs.h"
+#include "memory.h"
 
 namespace Fin
 {
+    class Memory;
+    class TypeInfo;
+
     class Allocator
     {
         public:
-            enum class State
+            enum class Access
             {
-                ReadOnly,
-                Native,
-                Managed,
-                Freed,
+                None  = 0,
+                Read  = 1 << 0,
+                Write = 1 << 1,
+                Free  = 1 << 2,
             };
 
-            Allocator();
+
+            Allocator() noexcept;
             ~Allocator() noexcept;
 
-            Ptr add(char *addr, Offset size, State state = State::Native);
-            void update(Ptr ptr, char *addr, Offset size);
-            void remove(Ptr ptr);
-            Ptr alloc(Offset size);
+            Ptr alloc(Offset size, Access access);
             Ptr realloc(Ptr ptr, Offset size);
             void dealloc(Ptr ptr);
-            char *read(Ptr ptr, Offset size);
-            char *write(Ptr ptr, Offset size);
+            Memory readSize(Ptr ptr, TypeInfo type);
+            Memory writeSize(Ptr ptr, TypeInfo type);
+            Memory get(Ptr ptr);
+            void setSize(Ptr ptr, Offset size);
             void summary(std::ostream &out) const noexcept;
+
+            template<typename T>
+            T read(Ptr ptr)
+            {
+                constexpr auto size = Offset{sizeof(T)};
+
+                LOG(2) << std::endl << "  & " << ptr;
+
+                const auto &block = getBlock(ptr);
+
+                checkOffset(block, ptr._offset, size);
+                checkAccess(block, Access::Read);
+                return Memory{block.memory + ptr._offset}.as<T>();
+            }
+
+            template<typename T>
+            void write(Ptr ptr, T val)
+            {
+                constexpr auto size = Offset{sizeof(T)};
+
+                LOG(2) << std::endl << "  * " << ptr;
+
+                const auto &block = getBlock(ptr);
+
+                checkOffset(block, ptr._offset, size);
+                checkAccess(block, Access::Write);
+                Memory{block.memory + ptr._offset}.as<T>() = val;
+            }
 
         private:
             struct Block
             {
-                char *value;
+                Memory memory;
                 Offset size;
-                State state;
+                Access access;
             };
 
             std::vector<Block> heap;
@@ -50,9 +80,11 @@ namespace Fin
             std::stack<std::uint32_t> freeStore;
 #endif
 
-            Ptr add(Block block);
-            void remove(std::uint32_t idx, Block &block);
-            char *deref(const Block &block, Offset offset, Offset size) const;
+            Block &getBlock(Ptr ptr);
+            Ptr add(Memory mem, Offset size, Access access);
+            void remove(std::uint32_t idx);
+            void checkOffset(const Block &block, Offset off, Offset size) const;
+            void checkAccess(const Block &block, Access access) const;
     };
 }
 

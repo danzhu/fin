@@ -866,6 +866,7 @@ class Function:
                 raise NotImplementedError()
 
         elif isinstance(node.variable, symbols.Variable):
+            # FIXME: variable names are not unique, this causes conflicts
             if node.variable.is_arg:
                 self.writer.instr('addr_arg', node.variable.name)
             else:

@@ -5,6 +5,7 @@
 #include <vector>
 #include "function.h"
 #include "type.h"
+#include "typeinfo.h"
 
 namespace Fin
 {
@@ -20,11 +21,11 @@ namespace Fin
         std::vector<Offset> offsets;
         std::unique_ptr<Contract> refType;
         bool initialized{false};
-        Pc init{0};
-        Pc location{0};
+        Pc init;
+        Pc location;
         NativeFunction native;
-        Offset argOffset{0};
-        Offset localOffset{0};
+        Offset argOffset;
+        Offset localOffset;
         std::size_t localAlign{0};
 
         Contract(Function &fn);

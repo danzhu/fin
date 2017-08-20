@@ -2,14 +2,14 @@
 #include <iostream>
 #include "runtime.h"
 
-template<typename T> void print(Fin::Runtime &rt, Fin::Contract &ctr,
-        Fin::Stack &st)
+template<typename T>
+void print(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     std::cout << st.pop<T>() << std::endl;
 }
 
-template<typename T> void input(Fin::Runtime &rt, Fin::Contract &ctr,
-        Fin::Stack &st)
+template<typename T>
+void input(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     T val;
     std::cin >> val;
@@ -22,8 +22,11 @@ void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 
     auto len = st.pop<Fin::Int>();
 
-    auto size = type.size.align(type.alignment) * len;
-    auto ptr = rt.allocator().alloc(size);
+    auto size = type.alignedSize() * len;
+    auto ptr = rt.allocator().alloc(size,
+            Fin::Allocator::Access::Read
+            | Fin::Allocator::Access::Write
+            | Fin::Allocator::Access::Free);
 
     st.push(ptr);
 }
@@ -35,7 +38,7 @@ void _realloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
     auto len = st.pop<Fin::Int>();
     auto ptr = st.pop<Fin::Ptr>();
 
-    auto size = type.size.align(type.alignment) * len;
+    auto size = type.size().align(type.alignment()) * len;
     ptr = rt.allocator().realloc(ptr, size);
 
     st.push(ptr);
@@ -82,7 +85,7 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-    Fin::Runtime runtime{Fin::Offset{2048}};
+    Fin::Runtime runtime{};
 
     auto &fin = runtime.createLibrary(Fin::LibraryID{"rt"});
     fin.addFunction(Fin::Function{"print(Int)", print<Fin::Int>});

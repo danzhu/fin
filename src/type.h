@@ -38,22 +38,6 @@ namespace Fin
             return mem;
         }
     };
-
-    struct TypeInfo
-    {
-        Offset size;
-        std::size_t alignment;
-        Offset aligned;
-
-        TypeInfo(Offset size, std::size_t alignment):
-            size{size}, alignment{alignment},
-            aligned{size.align(MAX_ALIGN)} {}
-
-        template<typename T> static TypeInfo native()
-        {
-            return TypeInfo{Offset{sizeof(T)}, alignof(T)};
-        }
-    };
 }
 
 #endif

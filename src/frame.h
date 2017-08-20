@@ -15,8 +15,8 @@ namespace Fin
         Library *library = nullptr;
         Contract *contract = nullptr;
         Pc pc;
-        Ptr local;
-        Ptr param;
+        Offset local;
+        Offset param;
     };
 
     std::ostream &operator<<(std::ostream &out, const Frame &fr);
