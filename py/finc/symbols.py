@@ -105,9 +105,11 @@ class Variable(Symbol):
     def __init__(self,
                  name: str,
                  tp: 'types.Type',
+                 idx: int,
                  is_arg: bool = False) -> None:
         self.name = name
         self.type = tp
+        self.index = idx
         self.is_arg = is_arg
 
     def __str__(self) -> str:
@@ -261,7 +263,7 @@ class Struct(Scope):
         return gen
 
     def add_field(self, name: str, tp: 'types.Type') -> Variable:
-        field = Variable(name, tp)
+        field = Variable(name, tp, len(self.fields))
         self.fields.append(field)
         self._add_symbol(field)
         return field
@@ -318,7 +320,7 @@ class Variant(Scope):
         return f'{self.enum.name}:{self.name}'
 
     def add_field(self, name: str, tp: 'types.Type') -> Variable:
-        field = Variable(name, tp)
+        field = Variable(name, tp, len(self.fields))
         self.fields.append(field)
         self._add_symbol(field)
         return field
@@ -336,6 +338,8 @@ class Function(Scope):
 
         self.ret: types.Type = None
         self.params: List[Variable] = []
+        # note: not in symbol table of function, they are in Block instead
+        self.locals: List[Variable] = []
         self.generics: List[Generic] = []
 
     def __lt__(self, other: 'Function') -> bool:
@@ -348,11 +352,17 @@ class Function(Scope):
         return f'{self.name}({params}){ret}'
 
     def add_param(self, name: str, tp: 'types.Type') -> Variable:
-        param = Variable(name, tp, is_arg=True)
+        param = Variable(name, tp, len(self.params), is_arg=True)
 
         self._add_symbol(param)
         self.params.append(param)
         return param
+
+    def add_local(self, name: str, tp: 'types.Type') -> Variable:
+        local = Variable(name, tp, len(self.locals))
+
+        self.locals.append(local)
+        return local
 
     def add_generic(self, name: str) -> 'Generic':
         gen = Generic(name, len(self.generics))
@@ -388,7 +398,7 @@ class Block(SymbolTable):
         self.locals: List[Variable] = []
 
     def add_local(self, name: str, tp: 'types.Type') -> Variable:
-        var = Variable(name, tp)
+        var = self.ancestor(Function).add_local(name, tp)
         self.locals.append(var)
         self._add_symbol(var)
         return var

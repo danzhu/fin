@@ -364,7 +364,7 @@ class Function:
         writer.space()
         writer.comment('params')
         for param in node.function.params:
-            writer.instr('!off', param.name)
+            writer.instr('!off', var_name(param))
             writer.instr('param', type_name(param.type))
             writer.space()
 
@@ -385,7 +385,7 @@ class Function:
         writer.space()
 
     def _temp(self) -> str:
-        temp = f'{self._temps}_'
+        temp = f't{self._temps}'
         self._temps += 1
         return temp
 
@@ -615,7 +615,7 @@ class Function:
             self.writer.space()
 
         for var in node.block.locals:
-            self._pop_local(var.name)
+            self._pop_local(var_name(var))
 
     def _EMPTY(self, node: Node) -> None:
         pass
@@ -623,9 +623,9 @@ class Function:
     def _LET(self, node: Node) -> None:
         assert isinstance(node.variable, symbols.Variable)
 
-        self._push_local(node.variable.name, node.variable.type)
+        self._push_local(var_name(node.variable), node.variable.type)
         if node.children[1].type != 'EMPTY':
-            self.writer.instr('addr_var', node.variable.name)
+            self.writer.instr('addr_var', var_name(node.variable))
             self._gen(node.children[1])
             self.writer.instr('store', self._type(node.variable.type))
 
@@ -866,11 +866,10 @@ class Function:
                 raise NotImplementedError()
 
         elif isinstance(node.variable, symbols.Variable):
-            # FIXME: variable names are not unique, this causes conflicts
             if node.variable.is_arg:
-                self.writer.instr('addr_arg', node.variable.name)
+                self.writer.instr('addr_arg', var_name(node.variable))
             else:
-                self.writer.instr('addr_var', node.variable.name)
+                self.writer.instr('addr_var', var_name(node.variable))
 
         else:
             assert False
@@ -909,6 +908,11 @@ def match_name(match: types.Match) -> str:
     # TODO: constraints
 
     return name
+
+
+def var_name(var: symbols.Variable) -> str:
+    tp = 'p' if var.is_arg else 'l'
+    return f'{var.name}_{tp}{var.index}'
 
 
 def quote(s: str) -> str:

@@ -34,6 +34,7 @@ def main()
     while TRUE do
         v.append(if i > 1000 then break else i)
         i *= 2
+        let i = i + 1
 
     while
         v.size

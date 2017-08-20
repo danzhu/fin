@@ -384,7 +384,10 @@ class Variables(Iterable['symbols.Variable']):
                 for p, a in zip(self.variables, args)]
 
     def resolve(self, res: Resolution) -> 'Variables':
-        return Variables([symbols.Variable(f.name, f.type.resolve(res))
+        return Variables([symbols.Variable(f.name,
+                                           f.type.resolve(res),
+                                           f.index,
+                                           f.is_arg)
                           for f in self.variables])
 
 
