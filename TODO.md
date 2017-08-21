@@ -127,5 +127,9 @@
 - [x] remove module index
 - [ ] template for automatic C++ binding
 - [ ] separate bytecode memory space for each library
-- [ ] managed pc
+- [x] ~~managed pc~~
 - [x] internal free error
+- [x] custom exception
+  - [ ] fix all `at` calls to std
+- [ ] rename `Allocator`
+- [ ] encapsulate `Library` and its items

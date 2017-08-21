@@ -14,16 +14,17 @@ namespace Fin
     struct Contract;
     struct Library;
 
-    typedef std::function<void(Runtime &rt, Contract &ctr, Stack &st)>
-        NativeFunction;
+    using NativeFunction = std::function<
+        void(Runtime &rt, Contract &ctr, Stack &st)
+        >;
 
     struct Function
     {
-        Library *library = nullptr;
+        Library *library{nullptr};
         std::string name;
         Index generics;
         Index contracts;
-        NativeFunction native = nullptr;
+        NativeFunction native;
         Pc init;
         Pc location;
 

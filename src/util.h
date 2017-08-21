@@ -38,8 +38,7 @@ namespace Fin
     constexpr std::enable_if_t<std::is_enum<T>::value, bool> hasFlag(
             T val, T flag)
     {
-        using U = std::underlying_type_t<T>;
-        return static_cast<U>(val & flag) != 0;
+        return (val & flag) != static_cast<T>(0);
     }
 
     template<typename T>

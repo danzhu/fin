@@ -3,23 +3,43 @@
 
 #include <cstdint>
 #include <iostream>
+#include "contract.h"
+#include "library.h"
+#include "offset.h"
 #include "typedefs.h"
 
 namespace Fin
 {
-    struct Contract;
-    struct Library;
-
     struct Frame
     {
-        Library *library = nullptr;
-        Contract *contract = nullptr;
+        Library *library{nullptr};
+        Contract *contract{nullptr};
         Pc pc;
         Offset local;
         Offset param;
     };
 
-    std::ostream &operator<<(std::ostream &out, const Frame &fr);
+    template<typename CharT, class Traits>
+    std::basic_ostream<CharT, Traits> &operator<<(
+            std::basic_ostream<CharT, Traits> &out, const Frame &fr)
+    {
+        out << "  in ";
+        if (fr.contract)
+        {
+            // TODO: show info on types in contract
+            out << fr.contract->name;
+        }
+        else if (fr.library)
+        {
+            out << '<' << fr.library->id << '>';
+        }
+        else
+        {
+            out << "<<anonymous>>";
+        }
+
+        return out;
+    }
 }
 
 #endif

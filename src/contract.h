@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include "function.h"
+#include "log.h"
 #include "type.h"
 #include "typeinfo.h"
 
@@ -28,8 +29,13 @@ namespace Fin
         Offset localOffset;
         std::size_t localAlign{0};
 
-        Contract(Function &fn);
-        Contract(Type &tp);
+        explicit Contract(Function &fn) noexcept:
+            library{fn.library}, name{fn.name}, init{fn.init},
+            location{fn.location}, native{fn.native}
+        {}
+        explicit Contract(Type &tp) noexcept:
+            library{tp.library}, name{tp.name}, init{tp.location}
+        {}
 
         Contract(const Contract &other) = delete;
         Contract(Contract &&other) = default;
@@ -37,8 +43,16 @@ namespace Fin
         Contract &operator=(const Contract &other) = delete;
         Contract &operator=(Contract &&other) = default;
 
-        void addContract(Contract ctr);
-        void addOffset(Offset off);
+        void addContract(Contract ctr) noexcept
+        {
+            contracts.emplace_back(std::move(ctr));
+        }
+
+        void addOffset(Offset off) noexcept
+        {
+            LOG(2) << std::endl << "  + " << off << " [" << offsets.size() << "]";
+            offsets.emplace_back(off);
+        }
     };
 }
 

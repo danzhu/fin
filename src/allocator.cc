@@ -1,6 +1,7 @@
 #include "allocator.h"
 
 #include <cassert>
+#include "exception.h"
 #include "log.h"
 #include "util.h"
 
@@ -19,7 +20,7 @@ Fin::Ptr Fin::Allocator::alloc(Offset size, Access access)
 {
     auto addr = static_cast<std::uint8_t *>(std::malloc(size._value));
     if (!addr)
-        throw std::runtime_error{"failed to allocate"};
+        throw AllocationError{};
 
     auto ptr = add(Memory{addr}, size, access);
 
@@ -32,7 +33,7 @@ Fin::Ptr Fin::Allocator::realloc(Ptr ptr, Offset size)
 {
 #ifdef FIN_PEDANTIC
     if (ptr._offset._value != 0)
-        throw std::runtime_error{"internal reallocation"};
+        throw RuntimeError{"internal reallocation"};
 #endif
 
     auto &block = getBlock(ptr);
@@ -42,7 +43,7 @@ Fin::Ptr Fin::Allocator::realloc(Ptr ptr, Offset size)
     auto addr = static_cast<std::uint8_t *>(
             std::realloc(block.memory._data, size._value));
     if (!addr)
-        throw std::runtime_error{"failed to reallocate"};
+        throw AllocationError{};
 
     LOG(1) << std::endl << "  R " << ptr << " [" << size << "]";
 
@@ -63,7 +64,7 @@ void Fin::Allocator::dealloc(Ptr ptr)
 {
 #ifdef FIN_PEDANTIC
     if (ptr._offset._value != 0)
-        throw std::runtime_error{"internal deallocation"};
+        throw RuntimeError{"internal deallocation"};
 #endif
 
     auto &block = getBlock(ptr);
@@ -164,7 +165,9 @@ void Fin::Allocator::summary(std::ostream &out) const noexcept
 
 Fin::Allocator::Block &Fin::Allocator::getBlock(Ptr ptr)
 {
-    return heap.at(ptr._block);
+    if (ptr._block >= heap.size())
+        throw RuntimeError{"invalid ptr block"};
+    return heap[ptr._block];
 }
 
 Fin::Ptr Fin::Allocator::add(Memory mem, Offset size, Access access)
@@ -210,11 +213,11 @@ void Fin::Allocator::checkOffset(const Block &block, Offset off, Offset size)
     const
 {
     if (off + size > block.size)
-        throw std::out_of_range{"access out of range"};
+        throw RuntimeError{"access out of range"};
 }
 
 void Fin::Allocator::checkAccess(const Block &block, Access access) const
 {
     if (!hasFlag(block.access, access))
-        throw std::runtime_error{"invalid permissions"};
+        throw RuntimeError{"invalid permissions"};
 }

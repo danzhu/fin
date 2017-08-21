@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include "contract.h"
+#include "exception.h"
 #include "function.h"
 #include "library.h"
 #include "opcode.h"
@@ -79,7 +80,7 @@ void Fin::Runtime::backtrace(std::ostream &out) const noexcept
 void Fin::Runtime::jump(Pc target)
 {
     if (target > instrs.size())
-        throw std::out_of_range{"jump target " + std::to_string(target)
+        throw RuntimeError{"jump target " + std::to_string(target)
             + " out of range " + std::to_string(instrs.size())};
     frame.pc = target;
 }
@@ -204,13 +205,13 @@ void Fin::Runtime::sign()
 void Fin::Runtime::checkLibrary()
 {
     if (!frame.library)
-        throw std::runtime_error{"no library active"};
+        throw RuntimeError{"no library active"};
 }
 
 void Fin::Runtime::checkContract()
 {
     if (!frame.contract)
-        throw std::runtime_error{"no contract active"};
+        throw RuntimeError{"no contract active"};
 }
 
 void Fin::Runtime::execute()
@@ -228,7 +229,7 @@ void Fin::Runtime::execute()
         switch (op)
         {
             case Opcode::Error:
-                throw std::runtime_error{"error instruction reached"};
+                throw RuntimeError{"error instruction reached"};
 
             case Opcode::Cookie:
                 // skip shebang
@@ -275,7 +276,7 @@ void Fin::Runtime::execute()
             case Opcode::Member:
                 {
                     if (!refType)
-                        throw std::runtime_error{"no referencing type"};
+                        throw RuntimeError{"no referencing type"};
 
                     auto name = readStr();
 
@@ -297,13 +298,13 @@ void Fin::Runtime::execute()
                     checkLibrary();
 
                     if (!refLibrary)
-                        throw std::runtime_error{"no referencing library"};
+                        throw RuntimeError{"no referencing library"};
 
                     auto name = readStr();
 
                     auto it = refLibrary->functions.find(name);
                     if (it == refLibrary->functions.end())
-                        throw std::runtime_error{"unable to find function '"
+                        throw RuntimeError{"unable to find function '"
                             + name + "'"};
 
                     frame.library->refFunctions.emplace_back(&it->second);
@@ -315,13 +316,13 @@ void Fin::Runtime::execute()
                     checkLibrary();
 
                     if (!refLibrary)
-                        throw std::runtime_error{"no referencing library"};
+                        throw RuntimeError{"no referencing library"};
 
                     auto name = readStr();
 
                     auto it = refLibrary->types.find(name);
                     if (it == refLibrary->types.end())
-                        throw std::runtime_error{"unable to find type "
+                        throw RuntimeError{"unable to find type "
                             + name + "'"};
 
                     frame.library->refTypes.emplace_back(&it->second);
@@ -757,7 +758,7 @@ void Fin::Runtime::execute()
                 break;
 
             default:
-                throw std::runtime_error{"invalid opcode "
+                throw RuntimeError{"invalid opcode "
                     + std::to_string(static_cast<std::uint8_t>(op))};
         }
     }

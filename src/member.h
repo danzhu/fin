@@ -11,7 +11,9 @@ namespace Fin
         std::string name;
         Index index;
 
-        Member(std::string name, Index index): name{name}, index{index} {}
+        Member(std::string name, Index index) noexcept:
+            name{std::move(name)}, index{index}
+        {}
     };
 }
 

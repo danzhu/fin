@@ -5,7 +5,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "array.h"
 #include "contract.h"
 #include "function.h"
 #include "type.h"
@@ -15,6 +14,8 @@ namespace Fin
     struct LibraryID
     {
         std::string name;
+
+        explicit LibraryID(std::string name): name{std::move(name)} {}
 
         bool operator<(const LibraryID &other) const
         {
@@ -39,7 +40,7 @@ namespace Fin
         Library &operator=(const Library &other) = delete;
         Library &operator=(Library &&other) = default;
 
-        Function &addFunction(Function fn)
+        Function &addFunction(Function fn) noexcept
         {
             fn.library = this;
             auto name = fn.name;
@@ -49,7 +50,7 @@ namespace Fin
             return res;
         }
 
-        Type &addType(Type tp)
+        Type &addType(Type tp) noexcept
         {
             tp.library = this;
             auto name = tp.name;
@@ -59,6 +60,13 @@ namespace Fin
             return res;
         }
     };
+
+    template<typename CharT, class Traits>
+    std::basic_ostream<CharT, Traits> &operator<<(
+            std::basic_ostream<CharT, Traits> &out, const LibraryID &id)
+    {
+        return out << id.name;
+    }
 }
 
 #endif

@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include "allocator.h"
+#include "exception.h"
 #include "log.h"
 #include "type.h"
 #include "typedefs.h"
@@ -41,7 +42,7 @@ namespace Fin
             Memory at(Offset off, TypeInfo type)
             {
                 if (off + type.maxAlignedSize() > _size)
-                    throw std::out_of_range{"invalid stack access"};
+                    throw RuntimeError{"invalid stack access"};
 
                 return Memory{_data + off};
             }
@@ -49,7 +50,7 @@ namespace Fin
             Memory pushSize(TypeInfo type)
             {
                 if (_size + type.maxAlignedSize() > _capacity)
-                    throw std::overflow_error{"stack overflow"};
+                    throw RuntimeError{"stack overflow"};
 
                 LOG(2) << std::endl << "  < [" << _size << ", "
                     << type.maxAlignedSize() << "]";
@@ -62,7 +63,7 @@ namespace Fin
             Memory popSize(TypeInfo type)
             {
                 if (_size < type.maxAlignedSize())
-                    throw std::overflow_error{"negative stack size"};
+                    throw RuntimeError{"negative stack size"};
 
                 LOG(2) << std::endl << "  > [" << _size << ", "
                     << type.maxAlignedSize() << "]";
@@ -74,7 +75,7 @@ namespace Fin
             Memory topSize(TypeInfo type)
             {
                 if (_size < type.maxAlignedSize())
-                    throw std::overflow_error{"accessing at negative index"};
+                    throw RuntimeError{"accessing at negative index"};
 
                 LOG(2) << std::endl << "  ^ [" << _size << ", "
                     << type.maxAlignedSize() << "]";
@@ -86,6 +87,9 @@ namespace Fin
             void push(T val)
             {
                 constexpr auto size = TypeInfo::maxAlignedSize<T>();
+
+                if (_size + size > _capacity)
+                    throw RuntimeError{"stack overflow"};
 
                 LOG(2) << std::endl << "  < " << val;
                 LOG(2) << " [" << _size << ", " << size << "]";
@@ -100,7 +104,7 @@ namespace Fin
                 constexpr auto size = TypeInfo::maxAlignedSize<T>();
 
                 if (_size < size)
-                    throw std::overflow_error{"negative stack size"};
+                    throw RuntimeError{"negative stack size"};
 
                 auto val = Memory{_data + _size - size}.as<T>();
 
@@ -123,7 +127,7 @@ namespace Fin
                 constexpr auto size = TypeInfo::maxAlignedSize<T>();
 
                 if (_size < size)
-                    throw std::runtime_error{"accessing at negative index"};
+                    throw RuntimeError{"accessing at negative index"};
 
                 auto &val = Memory{_data + _size - size}.as<T>();
 

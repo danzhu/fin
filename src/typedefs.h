@@ -9,15 +9,15 @@
 namespace Fin
 {
     // index of an item in a consecutively-indexed table
-    typedef std::uint16_t Index;
+    using Index = std::uint16_t;
 
     // program counter location
-    typedef std::size_t Pc;
+    using Pc = std::size_t;
 
     // primitive types
-    typedef std::int32_t Int;
-    typedef float Float;
-    typedef bool Bool;
+    using Int = std::int32_t;
+    using Float = float;
+    using Bool = bool;
 
     class Ptr
     {
@@ -40,7 +40,7 @@ namespace Fin
             std::uint32_t _block = 0;
             Offset _offset;
 
-            constexpr explicit Ptr(std::uint32_t block, Offset off):
+            constexpr Ptr(std::uint32_t block, Offset off):
                 _block{block}, _offset{off} {}
 
             friend class Allocator;

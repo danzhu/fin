@@ -29,7 +29,7 @@ namespace Fin
         Type &operator=(const Type &other) = delete;
         Type &operator=(Type &&other) = default;
 
-        Member &addMember(std::string fieldName)
+        Member &addMember(std::string fieldName) noexcept
         {
             auto ptr = std::make_unique<Member>(std::move(fieldName),
                     static_cast<Index>(members.size()));
