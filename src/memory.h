@@ -2,6 +2,7 @@
 #define FIN_MEMORY_H
 
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include "log.h"
 #include "offset.h"
@@ -9,8 +10,11 @@
 
 namespace Fin
 {
-    constexpr char HexMap[] {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        'A', 'B', 'C', 'D', 'E', 'F'};
+    constexpr std::array<char, 16> HexMap
+    {{
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+    }};
 
     class Memory
     {
@@ -27,8 +31,7 @@ namespace Fin
                         << HexMap[_data[i] & 0xF];
                 }
 
-                for (std::uint32_t i = 0; i < type.size()._value; ++i)
-                    target._data[i] = _data[i];
+                std::memmove(target._data, _data, type.size()._value);
             }
 
             template<typename T>
