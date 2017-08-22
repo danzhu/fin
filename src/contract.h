@@ -52,7 +52,7 @@ struct Contract
 
     void addOffset(Offset off) noexcept
     {
-        LOG(2) << std::endl << "  + " << off << " [" << offsets.size() << "]";
+        LOG(2) << "\n  + " << off << " [" << offsets.size() << "]";
         offsets.emplace_back(off);
     }
 };

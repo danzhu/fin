@@ -20,7 +20,7 @@ public:
 
     void move(Memory target, TypeInfo type) const noexcept
     {
-        LOG(2) << std::endl << "  = 0x";
+        LOG(2) << "\n  = 0x";
         for (int i = type.size()._value - 1; i >= 0; --i)
         {
             LOG(2) << ' ' << HexMap[_data[i] >> 4 & 0xF]

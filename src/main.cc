@@ -5,7 +5,7 @@
 template <typename T>
 void print(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
-    std::cout << st.pop<T>() << std::endl;
+    std::cout << st.pop<T>() << '\n';
 }
 
 template <typename T>
@@ -73,7 +73,7 @@ int main(int argc, const char *argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "no input file" << std::endl;
+        std::cerr << "no input file\n";
         return 1;
     }
 
@@ -81,7 +81,7 @@ int main(int argc, const char *argv[])
 
     if (!src)
     {
-        std::cerr << "cannot open file" << std::endl;
+        std::cerr << "cannot open file\n";
         return 1;
     }
 
@@ -108,7 +108,7 @@ int main(int argc, const char *argv[])
     }
     catch (const std::exception &ex)
     {
-        std::cerr << std::endl << "Error: " << ex.what() << std::endl;
+        std::cerr << "\nError: " << ex.what() << '\n';
         runtime.backtrace(std::cerr);
         runtime.allocator().summary(std::cerr);
         return 1;

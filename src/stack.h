@@ -50,8 +50,7 @@ public:
         if (_size + type.maxAlignedSize() > _capacity)
             throw RuntimeError{"stack overflow"};
 
-        LOG(2) << std::endl
-               << "  < [" << _size << ", " << type.maxAlignedSize() << "]";
+        LOG(2) << "\n  < [" << _size << ", " << type.maxAlignedSize() << "]";
 
         Memory mem{_data + _size};
         resize(_size + type.maxAlignedSize());
@@ -63,8 +62,7 @@ public:
         if (_size < type.maxAlignedSize())
             throw RuntimeError{"negative stack size"};
 
-        LOG(2) << std::endl
-               << "  > [" << _size << ", " << type.maxAlignedSize() << "]";
+        LOG(2) << "\n  > [" << _size << ", " << type.maxAlignedSize() << "]";
 
         resize(_size - type.maxAlignedSize());
         return Memory{_data + _size};
@@ -75,8 +73,7 @@ public:
         if (_size < type.maxAlignedSize())
             throw RuntimeError{"accessing at negative index"};
 
-        LOG(2) << std::endl
-               << "  ^ [" << _size << ", " << type.maxAlignedSize() << "]";
+        LOG(2) << "\n  ^ [" << _size << ", " << type.maxAlignedSize() << "]";
 
         return Memory{_data + _size - type.maxAlignedSize()};
     }
@@ -89,8 +86,7 @@ public:
         if (_size + size > _capacity)
             throw RuntimeError{"stack overflow"};
 
-        LOG(2) << std::endl << "  < " << val;
-        LOG(2) << " [" << _size << ", " << size << "]";
+        LOG(2) << "\n  < " << val << " [" << _size << ", " << size << "]";
 
         Memory{_data + _size}.as<T>() = val;
         resize(_size + size);
@@ -106,8 +102,7 @@ public:
 
         auto val = Memory{_data + _size - size}.as<T>();
 
-        LOG(2) << std::endl << "  > " << val;
-        LOG(2) << " [" << _size << ", " << size << "]";
+        LOG(2) << "\n  > " << val << " [" << _size << ", " << size << "]";
 
         resize(_size - size);
         return val;
@@ -129,8 +124,7 @@ public:
 
         auto &val = Memory{_data + _size - size}.as<T>();
 
-        LOG(2) << std::endl << "  ^ " << val;
-        LOG(2) << " [" << _size << ", " << size << "]";
+        LOG(2) << "\n  ^ " << val << " [" << _size << ", " << size << "]";
 
         return val;
     }

@@ -24,7 +24,7 @@ Fin::Ptr Fin::Allocator::alloc(Offset size, Access access)
 
     auto ptr = add(Memory{addr}, size, access);
 
-    LOG(1) << std::endl << "  A " << ptr << " [" << size << "]";
+    LOG(1) << "\n  A " << ptr << " [" << size << "]";
 
     return ptr;
 }
@@ -45,7 +45,7 @@ Fin::Ptr Fin::Allocator::realloc(Ptr ptr, Offset size)
     if (!addr)
         throw AllocationError{};
 
-    LOG(1) << std::endl << "  R " << ptr << " [" << size << "]";
+    LOG(1) << "\n  R " << ptr << " [" << size << "]";
 
 #ifdef FIN_PEDANTIC
     // track every reallocation so that access to old memory can be tracked
@@ -71,7 +71,7 @@ void Fin::Allocator::dealloc(Ptr ptr)
 
     checkAccess(block, Access::Free);
 
-    LOG(1) << std::endl << "  D " << ptr;
+    LOG(1) << "\n  D " << ptr;
 
     std::free(block.memory._data);
     remove(ptr._block);
@@ -79,7 +79,7 @@ void Fin::Allocator::dealloc(Ptr ptr)
 
 Fin::Memory Fin::Allocator::readSize(Ptr ptr, TypeInfo type)
 {
-    LOG(2) << std::endl << "  & " << ptr;
+    LOG(2) << "\n  & " << ptr;
 
     const auto &block = getBlock(ptr);
 
@@ -91,7 +91,7 @@ Fin::Memory Fin::Allocator::readSize(Ptr ptr, TypeInfo type)
 
 Fin::Memory Fin::Allocator::writeSize(Ptr ptr, TypeInfo type)
 {
-    LOG(2) << std::endl << "  * " << ptr;
+    LOG(2) << "\n  * " << ptr;
 
     const auto &block = getBlock(ptr);
 

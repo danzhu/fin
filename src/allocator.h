@@ -42,7 +42,7 @@ public:
     {
         constexpr auto size = Offset{sizeof(T)};
 
-        LOG(2) << std::endl << "  & " << ptr;
+        LOG(2) << "\n  & " << ptr;
 
         const auto &block = getBlock(ptr);
 
@@ -56,7 +56,7 @@ public:
     {
         constexpr auto size = Offset{sizeof(T)};
 
-        LOG(2) << std::endl << "  * " << ptr;
+        LOG(2) << "\n  * " << ptr;
 
         const auto &block = getBlock(ptr);
 

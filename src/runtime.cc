@@ -33,7 +33,7 @@ void Fin::Runtime::load(std::istream &src)
 
     execute();
 
-    LOG(1) << std::endl;
+    LOG(1) << '\n';
 }
 
 void Fin::Runtime::run()
@@ -48,7 +48,7 @@ void Fin::Runtime::run()
     call(*mainContract);
     execute();
 
-    LOG(1) << std::endl;
+    LOG(1) << '\n';
 }
 
 Fin::Library &Fin::Runtime::createLibrary(const LibraryID &id)
@@ -68,12 +68,12 @@ Fin::Library &Fin::Runtime::getLibrary(const LibraryID &id)
 
 void Fin::Runtime::backtrace(std::ostream &out) const noexcept
 {
-    out << "Backtrace:" << std::endl;
+    out << "Backtrace:\n";
 
     for (const auto &fr : rtStack)
-        out << fr << std::endl;
+        out << fr << '\n';
 
-    out << frame << std::endl;
+    out << frame << '\n';
 }
 
 void Fin::Runtime::jump(Pc target)
@@ -220,10 +220,10 @@ void Fin::Runtime::execute()
 
     while (true)
     {
-        LOG(2) << std::endl;
+        LOG(2) << '\n';
 
         auto op = static_cast<Opcode>(instrs.at(frame.pc++));
-        LOG(1) << std::endl << "- " << op;
+        LOG(1) << "\n- " << op;
 
         switch (op)
         {
