@@ -1,14 +1,14 @@
+#include "runtime.h"
 #include <fstream>
 #include <iostream>
-#include "runtime.h"
 
-template<typename T>
+template <typename T>
 void print(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     std::cout << st.pop<T>() << std::endl;
 }
 
-template<typename T>
+template <typename T>
 void input(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 {
     T val;
@@ -24,9 +24,9 @@ void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
 
     auto size = type.alignedSize() * len;
     auto ptr = rt.allocator().alloc(size,
-            Fin::Allocator::Access::Read
-            | Fin::Allocator::Access::Write
-            | Fin::Allocator::Access::Free);
+                                    Fin::Allocator::Access::Read |
+                                            Fin::Allocator::Access::Write |
+                                            Fin::Allocator::Access::Free);
 
     st.push(ptr);
 }

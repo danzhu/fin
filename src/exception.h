@@ -5,15 +5,15 @@
 
 namespace Fin
 {
-    class RuntimeError : public std::runtime_error
-    {
-        using std::runtime_error::runtime_error;
-    };
+class RuntimeError : public std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+};
 
-    class AllocationError : public std::bad_alloc
-    {
-        using std::bad_alloc::bad_alloc;
-    };
+class AllocationError : public std::bad_alloc
+{
+    using std::bad_alloc::bad_alloc;
+};
 }
 
 #endif

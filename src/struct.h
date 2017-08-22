@@ -5,14 +5,14 @@
 
 namespace Fin
 {
-    struct Library;
+struct Library;
 
-    struct Struct
-    {
-        std::string name;
-        Library *library;
-        std::size_t location;
-    };
+struct Struct
+{
+    std::string name;
+    Library *library;
+    std::size_t location;
+};
 }
 
 #endif

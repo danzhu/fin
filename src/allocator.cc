@@ -1,9 +1,9 @@
 #include "allocator.h"
 
-#include <cassert>
 #include "exception.h"
 #include "log.h"
 #include "util.h"
+#include <cassert>
 
 Fin::Allocator::Allocator() noexcept {}
 
@@ -101,10 +101,7 @@ Fin::Memory Fin::Allocator::writeSize(Ptr ptr, TypeInfo type)
     return block.memory + ptr._offset;
 }
 
-Fin::Memory Fin::Allocator::get(Ptr ptr)
-{
-    return getBlock(ptr).memory;
-}
+Fin::Memory Fin::Allocator::get(Ptr ptr) { return getBlock(ptr).memory; }
 
 void Fin::Allocator::setSize(Ptr ptr, Offset size)
 {
@@ -151,16 +148,15 @@ void Fin::Allocator::summary(std::ostream &out) const noexcept
     }
 
     out << "Allocator Summary:\n"
-        << "  In use: " << PLURAL(inUseMem, "byte")
-        << " in " << PLURAL(inUse, "block") << "\n"
-        << "   Stack: " << PLURAL(stackMem, "byte")
-        << " in " << PLURAL(stack, "block") << "\n"
-        << "   Instr: " << PLURAL(instrMem, "byte")
-        << " in " << PLURAL(instr, "block") << "\n"
+        << "  In use: " << PLURAL(inUseMem, "byte") << " in "
+        << PLURAL(inUse, "block") << "\n"
+        << "   Stack: " << PLURAL(stackMem, "byte") << " in "
+        << PLURAL(stack, "block") << "\n"
+        << "   Instr: " << PLURAL(instrMem, "byte") << " in "
+        << PLURAL(instr, "block") << "\n"
         << "  -------\n"
-        << "   Freed: " << PLURAL(freedMem, "byte")
-        << " in " << PLURAL(freed, "block") << "\n"
-        ;
+        << "   Freed: " << PLURAL(freedMem, "byte") << " in "
+        << PLURAL(freed, "block") << "\n";
 }
 
 Fin::Allocator::Block &Fin::Allocator::getBlock(Ptr ptr)
@@ -209,8 +205,8 @@ void Fin::Allocator::remove(std::uint32_t idx)
 #endif
 }
 
-void Fin::Allocator::checkOffset(const Block &block, Offset off, Offset size)
-    const
+void Fin::Allocator::checkOffset(const Block &block, Offset off,
+                                 Offset size) const
 {
     if (off + size > block.size)
         throw RuntimeError{"access out of range"};
