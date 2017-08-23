@@ -7,9 +7,12 @@ namespace Fin
 {
 class RuntimeError : public std::runtime_error
 {
-    using std::runtime_error::runtime_error;
-
 public:
+    explicit RuntimeError(const std::string &msg) noexcept
+            : std::runtime_error{msg}
+    {
+    }
+
     RuntimeError(const RuntimeError &other) = default;
     RuntimeError(RuntimeError &&other) = default;
     ~RuntimeError() noexcept;
@@ -20,9 +23,9 @@ public:
 
 class AllocationError : public std::bad_alloc
 {
-    using std::bad_alloc::bad_alloc;
-
 public:
+    AllocationError() noexcept {}
+
     AllocationError(const AllocationError &other) = default;
     AllocationError(AllocationError &&other) = default;
     ~AllocationError() noexcept;
