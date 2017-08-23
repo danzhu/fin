@@ -116,7 +116,9 @@ test_compile("unsized_array" "array is unsized")
 option(DEBUG "Enable debug messages logging" 0)
 option(PEDANTIC "Disable auto-handling of execution errors" off)
 
-target_compile_definitions(fin PRIVATE FIN_DEBUG=${DEBUG})
+if(DEBUG)
+    target_compile_definitions(fin PRIVATE FIN_DEBUG=${DEBUG})
+endif()
 
 if(PEDANTIC)
     target_compile_definitions(fin PRIVATE FIN_PEDANTIC=1)

@@ -125,7 +125,9 @@
 - [x] use `std::function` instead of native function ptr
 - [ ] globals
 - [x] remove module index
-- [ ] template for automatic C++ binding
+- [x] template for automatic C++ binding
+  - [ ] auto generics and contracts calculation
+  - [ ] compile-time generics and contracts index generation
 - [ ] separate bytecode memory space for each library
 - [x] ~~managed pc~~
 - [x] internal free error

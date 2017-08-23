@@ -28,6 +28,12 @@ public:
     Allocator() noexcept;
     ~Allocator() noexcept;
 
+    Allocator(const Allocator &other) = delete;
+    Allocator(Allocator &&other) = delete;
+
+    Allocator &operator=(const Allocator &other) = delete;
+    Allocator &operator=(Allocator &&other) = delete;
+
     Ptr alloc(Offset size, Access access);
     Ptr realloc(Ptr ptr, Offset size);
     void dealloc(Ptr ptr);

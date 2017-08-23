@@ -14,8 +14,8 @@ class Stack;
 struct Contract;
 struct Library;
 
-using NativeFunction =
-        std::function<void(Runtime &rt, Contract &ctr, Stack &st)>;
+using NativeSignature = void(Runtime &rt, Contract &ctr);
+using NativeFunction = std::function<NativeSignature>;
 
 struct Function
 {
@@ -28,13 +28,14 @@ struct Function
     Pc location;
 
     Function(std::string name, NativeFunction fn, Index gens = 0,
-             Index ctrs = 0)
+             Index ctrs = 0) noexcept
             : name{std::move(name)}, generics{gens}, contracts{ctrs},
               native{std::move(fn)}
     {
     }
 
-    Function(std::string name, Pc init, Pc loc, Index gens = 0, Index ctrs = 0)
+    Function(std::string name, Pc init, Pc loc, Index gens = 0,
+             Index ctrs = 0) noexcept
             : name{std::move(name)}, generics{gens}, contracts{ctrs},
               init{init}, location{loc}
     {

@@ -2,6 +2,7 @@
 #define FIN_TYPEDEFS_H
 
 #include "offset.h"
+#include "traits.h"
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
@@ -53,6 +54,30 @@ private:
     template <typename CharT, class Traits>
     friend std::basic_ostream<CharT, Traits> &
     operator<<(std::basic_ostream<CharT, Traits> &out, const Ptr &ptr);
+};
+
+template <>
+struct TypeTraits<Int>
+{
+    using IsPrimitive = std::true_type;
+};
+
+template <>
+struct TypeTraits<Float>
+{
+    using IsPrimitive = std::true_type;
+};
+
+template <>
+struct TypeTraits<Bool>
+{
+    using IsPrimitive = std::true_type;
+};
+
+template <>
+struct TypeTraits<Ptr>
+{
+    using IsPrimitive = std::true_type;
 };
 
 inline constexpr Ptr operator+(Ptr self, Offset off) noexcept

@@ -1,72 +1,47 @@
 #include "runtime.h"
+#include "wrapper.h"
 #include <fstream>
 #include <iostream>
 
-template <typename T>
-void print(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+namespace
 {
-    std::cout << st.pop<T>() << '\n';
+template <typename T>
+void print(T val)
+{
+    std::cout << val << '\n';
 }
 
 template <typename T>
-void input(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+T input()
 {
     T val;
     std::cin >> val;
-    st.push(val);
+    return val;
 }
 
-void alloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+Fin::Ptr alloc(Fin::Allocator *alloc, Fin::TypeInfo type, Fin::Int len)
 {
-    auto type = ctr.sizes.at(0);
-
-    auto len = st.pop<Fin::Int>();
-
     auto size = type.alignedSize() * len;
-    auto ptr = rt.allocator().alloc(size,
-                                    Fin::Allocator::Access::Read |
-                                            Fin::Allocator::Access::Write |
-                                            Fin::Allocator::Access::Free);
-
-    st.push(ptr);
+    return alloc->alloc(size,
+                        Fin::Allocator::Access::Read |
+                                Fin::Allocator::Access::Write |
+                                Fin::Allocator::Access::Free);
 }
 
-void _realloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
+Fin::Ptr _realloc(Fin::Allocator *alloc, Fin::TypeInfo type, Fin::Ptr ptr,
+                  Fin::Int len)
 {
-    auto type = ctr.sizes.at(0);
-
-    auto len = st.pop<Fin::Int>();
-    auto ptr = st.pop<Fin::Ptr>();
-
     auto size = type.size().align(type.alignment()) * len;
-    ptr = rt.allocator().realloc(ptr, size);
-
-    st.push(ptr);
+    return alloc->realloc(ptr, size);
 }
 
-void dealloc(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
-{
-    auto ptr = st.pop<Fin::Ptr>();
+void dealloc(Fin::Allocator *alloc, Fin::Ptr ptr) { alloc->dealloc(ptr); }
 
-    rt.allocator().dealloc(ptr);
-}
+void write(Fin::Int val) { std::cout.put(static_cast<char>(val)); }
 
-void write(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
-{
-    auto c = static_cast<char>(st.pop<Fin::Int>());
-    std::cout.put(c);
-}
+Fin::Int read() { return static_cast<Fin::Int>(std::cin.get()); }
 
-void read(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
-{
-    char c;
-    std::cin.get(c);
-    st.push(static_cast<Fin::Int>(c));
-}
-
-void backtrace(Fin::Runtime &rt, Fin::Contract &ctr, Fin::Stack &st)
-{
-    rt.backtrace(std::cout);
+void backtrace(Fin::Runtime *rt) { rt->backtrace(std::cout); }
 }
 
 int main(int argc, const char *argv[])
@@ -88,18 +63,18 @@ int main(int argc, const char *argv[])
     Fin::Runtime runtime{};
 
     auto &fin = runtime.createLibrary(Fin::LibraryID{"rt"});
-    fin.addFunction(Fin::Function{"print(Int)", print<Fin::Int>});
-    fin.addFunction(Fin::Function{"print(Float)", print<Fin::Float>});
-    fin.addFunction(Fin::Function{"print(Bool)", print<Fin::Bool>});
-    fin.addFunction(Fin::Function{"input()Int", input<Fin::Int>});
-    fin.addFunction(Fin::Function{"input()Float", input<Fin::Float>});
-    fin.addFunction(Fin::Function{"input()Bool", input<Fin::Bool>});
-    fin.addFunction(Fin::Function{"alloc(Int)&[0]", alloc, 1});
-    fin.addFunction(Fin::Function{"realloc(&[0],Int)&[0]", _realloc, 1});
-    fin.addFunction(Fin::Function{"dealloc(&0)", dealloc, 1});
-    fin.addFunction(Fin::Function{"write(Int)", write});
-    fin.addFunction(Fin::Function{"read()Int", read});
-    fin.addFunction(Fin::Function{"backtrace()", backtrace});
+    fin.addFunction(Fin::wrap("print(Int)", &print<Fin::Int>));
+    fin.addFunction(Fin::wrap("print(Float)", &print<Fin::Float>));
+    fin.addFunction(Fin::wrap("print(Bool)", &print<Fin::Bool>));
+    fin.addFunction(Fin::wrap("input()Int", &input<Fin::Int>));
+    fin.addFunction(Fin::wrap("input()Float", &input<Fin::Float>));
+    fin.addFunction(Fin::wrap("input()Bool", &input<Fin::Bool>));
+    fin.addFunction(Fin::wrap("alloc(Int)&[0]", &alloc, 1));
+    fin.addFunction(Fin::wrap("realloc(&[0],Int)&[0]", &_realloc, 1));
+    fin.addFunction(Fin::wrap("dealloc(&0)", &dealloc, 1));
+    fin.addFunction(Fin::wrap("write(Int)", &write));
+    fin.addFunction(Fin::wrap("read()Int", &read));
+    fin.addFunction(Fin::wrap("backtrace()", &backtrace));
 
     try
     {

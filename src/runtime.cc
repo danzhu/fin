@@ -171,7 +171,7 @@ void Fin::Runtime::call(Contract &ctr)
 
     if (ctr.native)
     {
-        ctr.native(*this, ctr, eval);
+        ctr.native(*this, ctr);
 
         // emplace and pop even for native functions so that we can get full
         // backtrace
