@@ -47,6 +47,6 @@ private:
     std::size_t _alignment;
     Offset _maxAligned;
 };
-}
+} // namespace Fin
 
 #endif

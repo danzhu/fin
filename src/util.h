@@ -1,7 +1,7 @@
 #ifndef FIN_UTIL_H
 #define FIN_UTIL_H
 
-#define PLURAL(num, str) num << ' ' << str << (num == 1 ? "" : "s")
+#define PLURAL(num, str) (num) << ' ' << (str) << ((num) == 1 ? "" : "s")
 
 #include "typedefs.h"
 #include <stdexcept>
@@ -55,6 +55,6 @@ operator|(T self, T other) noexcept
     using U = std::underlying_type_t<T>;
     return static_cast<T>(static_cast<U>(self) | static_cast<U>(other));
 }
-}
+} // namespace Fin
 
 #endif

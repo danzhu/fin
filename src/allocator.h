@@ -25,7 +25,7 @@ public:
         Free = 1 << 2,
     };
 
-    Allocator() noexcept;
+    Allocator() noexcept = default;
     ~Allocator() noexcept;
 
     Allocator(const Allocator &other) = delete;
@@ -76,7 +76,7 @@ private:
     {
         Memory memory;
         Offset size;
-        Access access;
+        Access access{Access::None};
     };
 
     std::vector<Block> heap;
@@ -91,6 +91,6 @@ private:
     void checkOffset(const Block &block, Offset off, Offset size) const;
     void checkAccess(const Block &block, Access access) const;
 };
-}
+} // namespace Fin
 
 #endif

@@ -53,7 +53,7 @@ struct Read<TypeInfo>
 {
     static TypeInfo read(Runtime &rt, Contract &ctr, State &state)
     {
-        return ctr.sizes.at(--state.typeInfo);
+        return ctr.size(--state.typeInfo);
     }
 };
 
@@ -106,15 +106,15 @@ struct ArgCreator<T, Args...>
 template <typename... Args>
 std::tuple<Args...> createArgs(Runtime &rt, Contract &ctr)
 {
-    State state{static_cast<Index>(ctr.sizes.size()),
-                static_cast<Index>(ctr.contracts.size())};
+    State state{static_cast<Index>(ctr.sizes()),
+                static_cast<Index>(ctr.contracts())};
 
     return ArgCreator<Args...>::createArgs(rt, ctr, state);
 
     // TODO: static assert that state is either ignored or all used,
     // this will require state to be template / constexpr
 }
-}
+} // namespace detail
 
 template <typename Ret, typename... Args>
 class Wrapper
@@ -150,13 +150,11 @@ private:
 };
 
 template <typename Ret, typename... Args>
-Function wrap(std::string name, Ret (*fn)(Args...), Index gens = 0,
-              Index ctrs = 0) noexcept
+NativeFunction wrap(Ret (*fn)(Args...)) noexcept
 {
     // TODO: acquire gens and ctrs from function signature
-    NativeFunction wrapped = Wrapper<Ret, Args...>{fn};
-    return Function{name, wrapped, gens, ctrs};
+    return Wrapper<Ret, Args...>{fn};
 }
-}
+} // namespace Fin
 
 #endif

@@ -23,7 +23,7 @@ using Bool = bool;
 class Ptr
 {
 public:
-    constexpr Ptr() {}
+    constexpr Ptr() noexcept = default;
 
     Ptr &operator+=(Offset off) noexcept
     {
@@ -97,8 +97,8 @@ operator<<(std::basic_ostream<CharT, Traits> &out, const Ptr &ptr)
     return out << ptr._block << ':' << ptr._offset;
 }
 
-constexpr std::size_t MaxAlignment =
-        std::max({alignof(Int), alignof(Float), alignof(Bool), alignof(Ptr)});
-}
+constexpr std::size_t MaxAlignment{
+        std::max({alignof(Int), alignof(Float), alignof(Bool), alignof(Ptr)})};
+} // namespace Fin
 
 #endif

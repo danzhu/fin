@@ -12,7 +12,7 @@ class Memory;
 class Offset
 {
 public:
-    constexpr Offset() {}
+    constexpr Offset() noexcept = default;
 
     Offset operator+=(Offset other) noexcept
     {
@@ -28,8 +28,8 @@ public:
 
     constexpr Offset align(std::size_t aln) const noexcept
     {
-        return Offset{static_cast<std::uint32_t>((_value & ~(aln - 1)) +
-                                                 (_value % aln ? aln : 0))};
+        return Offset{static_cast<std::uint32_t>(
+                (_value & ~(aln - 1)) + ((_value % aln) != 0u ? aln : 0))};
     }
 
 private:
@@ -99,6 +99,6 @@ operator<<(std::basic_ostream<CharT, Traits> &out, Offset off)
 {
     return out << off._value;
 }
-}
+} // namespace Fin
 
 #endif

@@ -9,35 +9,28 @@
 
 namespace Fin
 {
+class Contract;
+class Library;
 class Runtime;
 class Stack;
-struct Contract;
-struct Library;
 
 using NativeSignature = void(Runtime &rt, Contract &ctr);
 using NativeFunction = std::function<NativeSignature>;
 
-struct Function
+class Function
 {
-    Library *library{nullptr};
-    std::string name;
-    Index generics;
-    Index contracts;
-    NativeFunction native;
-    Pc init;
-    Pc location;
-
-    Function(std::string name, NativeFunction fn, Index gens = 0,
+public:
+    Function(Library &lib, std::string name, NativeFunction fn, Index gens = 0,
              Index ctrs = 0) noexcept
-            : name{std::move(name)}, generics{gens}, contracts{ctrs},
-              native{std::move(fn)}
+            : _library{&lib}, _name{std::move(name)}, _generics{gens},
+              _contracts{ctrs}, _native{std::move(fn)}
     {
     }
 
-    Function(std::string name, Pc init, Pc loc, Index gens = 0,
+    Function(Library &lib, std::string name, Pc init, Pc loc, Index gens = 0,
              Index ctrs = 0) noexcept
-            : name{std::move(name)}, generics{gens}, contracts{ctrs},
-              init{init}, location{loc}
+            : _library{&lib}, _name{std::move(name)}, _generics{gens},
+              _contracts{ctrs}, _init{init}, _location{loc}
     {
     }
 
@@ -46,7 +39,24 @@ struct Function
 
     Function &operator=(const Function &other) = delete;
     Function &operator=(Function &&other) = default;
+
+    Library &library() const noexcept { return *_library; }
+    std::string name() const noexcept { return _name; }
+    Index generics() const noexcept { return _generics; }
+    Index contracts() const noexcept { return _contracts; }
+    NativeFunction native() const noexcept { return _native; }
+    Pc init() const noexcept { return _init; }
+    Pc location() const noexcept { return _location; }
+
+private:
+    Library *_library;
+    std::string _name;
+    Index _generics;
+    Index _contracts;
+    NativeFunction _native;
+    Pc _init;
+    Pc _location;
 };
-}
+} // namespace Fin
 
 #endif

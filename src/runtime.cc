@@ -14,6 +14,10 @@
 #include <iomanip>
 #include <iostream>
 
+namespace
+{
+} // end of anonymous namespace
+
 Fin::Runtime::Runtime() : eval{alloc}
 {
     instrs.emplace_back(static_cast<std::uint8_t>(Opcode::Term));
@@ -42,7 +46,7 @@ void Fin::Runtime::run()
 
     checkLibrary();
     mainContract =
-            std::make_unique<Contract>(frame.library->functions.at("main()"));
+            std::make_unique<Contract>(frame.library->function("main()"));
 
     frame.pc = 0;
     call(*mainContract);
@@ -51,7 +55,7 @@ void Fin::Runtime::run()
     LOG(1) << '\n';
 }
 
-Fin::Library &Fin::Runtime::createLibrary(const LibraryID &id)
+Fin::Library &Fin::Runtime::createLibrary(LibraryID id)
 {
     auto lib = std::make_unique<Library>(id);
 
@@ -71,11 +75,30 @@ void Fin::Runtime::backtrace(std::ostream &out) const noexcept
     out << "Backtrace:\n";
 
     for (const auto &fr : rtStack)
-        out << fr << '\n';
+        printFrame(out, fr);
 
-    out << frame << '\n';
+    printFrame(out, frame);
 }
 
+void Fin::Runtime::printFrame(std::ostream &out, const Frame &fr) const
+{
+    out << "  in ";
+    if (fr.contract != nullptr)
+    {
+        // TODO: show info on types in contract
+        out << fr.contract->name();
+    }
+    else if (fr.library != nullptr)
+    {
+        out << '<' << fr.library->id() << '>';
+    }
+    else
+    {
+        out << "<<anonymous>>";
+    }
+
+    out << '\n';
+}
 void Fin::Runtime::jump(Pc target)
 {
     if (target > instrs.size())
@@ -101,22 +124,22 @@ Fin::Pc Fin::Runtime::readTarget()
     return frame.pc + offset;
 }
 
-Fin::Function &Fin::Runtime::readFunction()
+const Fin::Function &Fin::Runtime::readFunction()
 {
     auto idx = readInt<std::uint32_t>();
-    auto &fn = *frame.library->refFunctions.at(idx);
+    auto &fn = frame.library->refFunction(idx);
 
-    LOG(1) << " [" << fn.name << "]";
+    LOG(1) << " [" << fn.name() << "]";
 
     return fn;
 }
 
-Fin::Type &Fin::Runtime::readType()
+const Fin::Type &Fin::Runtime::readType()
 {
     auto idx = readInt<std::uint32_t>();
-    auto &type = *frame.library->refTypes.at(idx);
+    auto &type = frame.library->refType(idx);
 
-    LOG(1) << " [" << type.name << "]";
+    LOG(1) << " [" << type.name() << "]";
 
     return type;
 }
@@ -124,9 +147,9 @@ Fin::Type &Fin::Runtime::readType()
 Fin::Contract &Fin::Runtime::readContract()
 {
     auto idx = readInt<Index>();
-    auto &ctr = frame.contract->contracts.at(idx);
+    auto &ctr = frame.contract->contract(idx);
 
-    LOG(1) << " [" << ctr.name << "]";
+    LOG(1) << " [" << ctr.name() << "]";
 
     return ctr;
 }
@@ -134,7 +157,7 @@ Fin::Contract &Fin::Runtime::readContract()
 Fin::TypeInfo Fin::Runtime::readSize()
 {
     auto idx = readInt<Index>();
-    auto size = frame.contract->sizes.at(idx);
+    auto size = frame.contract->size(idx);
 
     LOG(1) << " [" << size.size() << " | " << size.alignment() << "]";
 
@@ -144,7 +167,7 @@ Fin::TypeInfo Fin::Runtime::readSize()
 Fin::Offset Fin::Runtime::readOffset()
 {
     auto idx = readInt<Index>();
-    auto offset = frame.contract->offsets.at(idx);
+    auto offset = frame.contract->offset(idx);
 
     LOG(1) << " [" << offset << "]";
 
@@ -167,11 +190,11 @@ void Fin::Runtime::call(Contract &ctr)
     frame.contract = &ctr;
     frame.local = frame.param = eval.size();
 
-    frame.library = ctr.library;
+    frame.library = &ctr.library();
 
-    if (ctr.native)
+    if (ctr.native())
     {
-        ctr.native(*this, ctr);
+        ctr.native()(*this, ctr);
 
         // emplace and pop even for native functions so that we can get full
         // backtrace
@@ -179,37 +202,34 @@ void Fin::Runtime::call(Contract &ctr)
     }
     else
     {
-        if (ctr.initialized)
-        {
-            jump(ctr.location);
-            sign();
-        }
-        else
-        {
-            jump(ctr.init);
-            ctr.initialized = true;
-        }
+        Pc target;
+
+        // if initialized then we don't need to wait for the Sign instruction
+        if (!ctr.initialize(target))
+            finalizeCall();
+
+        jump(target);
     }
 }
 
-void Fin::Runtime::sign()
+void Fin::Runtime::finalizeCall()
 {
-    frame.param = frame.local - frame.contract->argOffset;
-    eval.resize(eval.size() + frame.contract->localOffset);
+    // update param and local ptr
+    frame.param = frame.local - frame.contract->argOffset();
 
-    // cleanup unneeded data
-    frame.contract->refType = nullptr;
+    // reserve space for local
+    eval.resize(eval.size() + frame.contract->localOffset());
 }
 
 void Fin::Runtime::checkLibrary()
 {
-    if (!frame.library)
+    if (frame.library == nullptr)
         throw RuntimeError{"no library active"};
 }
 
 void Fin::Runtime::checkContract()
 {
-    if (!frame.contract)
+    if (frame.contract == nullptr)
         throw RuntimeError{"no contract active"};
 }
 
@@ -242,8 +262,8 @@ void Fin::Runtime::execute()
 
             auto &lib = createLibrary(LibraryID{name});
             frame.library = &lib;
+            break;
         }
-        break;
 
         case Opcode::Fn:
         {
@@ -255,11 +275,10 @@ void Fin::Runtime::execute()
             auto loc = readTarget();
             auto end = readTarget();
 
-            frame.library->addFunction(
-                    Function{name, frame.pc, loc, gens, ctrs});
+            frame.library->addFunction(name, frame.pc, loc, gens, ctrs);
             jump(end);
+            break;
         }
-        break;
 
         case Opcode::Type:
         {
@@ -267,100 +286,94 @@ void Fin::Runtime::execute()
             auto gens = readInt<std::uint16_t>();
             auto end = readTarget();
 
-            refType = &frame.library->addType(Type{name, gens, frame.pc});
+            refType = &frame.library->addType(name, gens, frame.pc);
             jump(end);
+            break;
         }
-        break;
 
         case Opcode::Member:
         {
-            if (!refType)
+            if (refType == nullptr)
                 throw RuntimeError{"no referencing type"};
 
             auto name = readStr();
 
             auto &mem = refType->addMember(name);
-            frame.library->refMembers.emplace_back(&mem);
+            frame.library->addRefMember(mem);
+            break;
         }
-        break;
 
         case Opcode::RefLib:
         {
             auto name = readStr();
 
             refLibrary = &getLibrary(LibraryID{name});
+            break;
         }
-        break;
 
         case Opcode::RefFn:
         {
             checkLibrary();
 
-            if (!refLibrary)
+            if (refLibrary == nullptr)
                 throw RuntimeError{"no referencing library"};
 
             auto name = readStr();
 
-            auto it = refLibrary->functions.find(name);
-            if (it == refLibrary->functions.end())
-                throw RuntimeError{"unable to find function '" + name + "'"};
-
-            frame.library->refFunctions.emplace_back(&it->second);
+            auto &fn = refLibrary->function(name);
+            frame.library->addRefFunction(fn);
+            break;
         }
-        break;
 
         case Opcode::RefType:
         {
             checkLibrary();
 
-            if (!refLibrary)
+            if (refLibrary == nullptr)
                 throw RuntimeError{"no referencing library"};
 
             auto name = readStr();
 
-            auto it = refLibrary->types.find(name);
-            if (it == refLibrary->types.end())
-                throw RuntimeError{"unable to find type " + name + "'"};
-
-            frame.library->refTypes.emplace_back(&it->second);
+            auto &tp = refLibrary->type(name);
+            frame.library->addRefType(tp);
+            break;
         }
-        break;
 
         case Opcode::SizeI:
         {
             checkContract();
 
             auto size = TypeInfo::native<Int>();
-            frame.contract->sizes.emplace_back(size);
+            frame.contract->addSize(size);
+            break;
         }
-        break;
 
         case Opcode::SizeF:
         {
             checkContract();
 
             auto size = TypeInfo::native<Float>();
-            frame.contract->sizes.emplace_back(size);
+            frame.contract->addSize(size);
+            break;
         }
-        break;
 
         case Opcode::SizeB:
         {
             checkContract();
 
             auto size = TypeInfo::native<Bool>();
-            frame.contract->sizes.emplace_back(size);
+            frame.contract->addSize(size);
+            break;
         }
-        break;
 
         case Opcode::SizeP:
         {
             checkContract();
 
             auto size = TypeInfo::native<Ptr>();
-            frame.contract->sizes.emplace_back(size);
+            frame.contract->addSize(size);
+            break;
         }
-        break;
 
         case Opcode::SizeDup:
         {
@@ -368,10 +381,10 @@ void Fin::Runtime::execute()
 
             auto idx = readInt<Index>();
 
-            auto size = frame.contract->sizes.at(idx);
-            frame.contract->sizes.emplace_back(size);
+            auto size = frame.contract->size(idx);
+            frame.contract->addSize(size);
+            break;
         }
-        break;
 
         case Opcode::SizeArr:
         {
@@ -379,12 +392,12 @@ void Fin::Runtime::execute()
 
             auto len = readInt<Int>();
 
-            auto size = pop(frame.contract->sizes);
+            auto size = frame.contract->popSize();
 
             size = TypeInfo{size.alignedSize() * len, size.alignment()};
-            frame.contract->sizes.emplace_back(size);
+            frame.contract->addSize(size);
+            break;
         }
-        break;
 
         case Opcode::TypeCall:
         {
@@ -393,24 +406,22 @@ void Fin::Runtime::execute()
 
             auto &type = readType();
 
-            frame.contract->refType = std::make_unique<Contract>(type);
-            frame.contract->refType->sizes =
-                    popRange(frame.contract->sizes, type.generics);
-            call(*frame.contract->refType);
+            auto &ctr = frame.contract->callType(type);
+            call(ctr);
+            break;
         }
-        break;
 
         case Opcode::TypeRet:
         {
             checkLibrary();
             checkContract();
 
-            TypeInfo size{frame.contract->localOffset,
-                          frame.contract->localAlign};
+            TypeInfo size{frame.contract->localOffset(),
+                          frame.contract->localAlignment()};
             ret();
-            frame.contract->sizes.emplace_back(size);
+            frame.contract->addSize(size);
+            break;
         }
-        break;
 
         case Opcode::TypeMem:
         {
@@ -419,11 +430,11 @@ void Fin::Runtime::execute()
 
             auto idx = readInt<Index>();
 
-            auto mem = frame.library->refMembers.at(idx);
-            auto off = frame.contract->refType->offsets.at(mem->index);
+            auto mem = frame.library->refMember(idx);
+            auto off = frame.contract->typeContract().offset(mem.index());
             frame.contract->addOffset(off);
+            break;
         }
-        break;
 
         case Opcode::Param:
         {
@@ -431,37 +442,20 @@ void Fin::Runtime::execute()
 
             auto size = readSize();
 
-            auto offset = frame.contract->argOffset;
-            frame.contract->addOffset(offset);
-            frame.contract->argOffset += size.alignedSize();
+            frame.contract->addArgOffset(size);
+            break;
         }
-        break;
 
         case Opcode::Local:
-        {
-            checkContract();
-
-            auto size = readSize();
-
-            auto offset = frame.contract->localOffset.align(size.alignment());
-            frame.contract->addOffset(offset);
-            frame.contract->localOffset = offset + size.size();
-        }
-        break;
-
         case Opcode::Field:
         {
             checkContract();
 
             auto size = readSize();
 
-            auto offset = frame.contract->localOffset.align(size.alignment());
-            frame.contract->addOffset(offset);
-            frame.contract->localOffset = offset + size.size();
-            frame.contract->localAlign =
-                    std::max(frame.contract->localAlign, size.alignment());
+            frame.contract->addLocalOffset(size);
+            break;
         }
-        break;
 
         case Opcode::Contract:
         {
@@ -470,16 +464,15 @@ void Fin::Runtime::execute()
 
             auto &fn = readFunction();
 
-            Contract ctr{fn};
-            ctr.sizes = popRange(frame.contract->sizes, fn.generics);
-            ctr.contracts = popRange(frame.contract->contracts, fn.contracts);
-
-            frame.contract->addContract(std::move(ctr));
+            frame.contract->addContract(fn);
+            break;
         }
-        break;
 
         case Opcode::Sign:
-            sign();
+            finalizeCall();
+
+            // cleanup unneeded data
+            frame.contract->sign();
             break;
 
         case Opcode::Call:
@@ -488,8 +481,8 @@ void Fin::Runtime::execute()
 
             auto &ctr = readContract();
             call(ctr);
+            break;
         }
-        break;
 
         case Opcode::Term:
             return;
@@ -508,24 +501,24 @@ void Fin::Runtime::execute()
 
             auto dest = eval.pushSize(size);
             src.move(dest, size);
+            break;
         }
-        break;
 
         case Opcode::Push:
         {
             auto size = readSize();
 
             eval.pushSize(size);
+            break;
         }
-        break;
 
         case Opcode::Pop:
         {
             auto size = readSize();
 
             eval.popSize(size);
+            break;
         }
-        break;
 
         case Opcode::Dup:
         {
@@ -535,8 +528,8 @@ void Fin::Runtime::execute()
             auto dest = eval.pushSize(size);
 
             src.move(dest, size);
+            break;
         }
-        break;
 
         case Opcode::Load:
         {
@@ -547,8 +540,8 @@ void Fin::Runtime::execute()
             auto dest = eval.pushSize(size);
 
             src.move(dest, size);
+            break;
         }
-        break;
 
         case Opcode::Store:
         {
@@ -559,8 +552,8 @@ void Fin::Runtime::execute()
             auto dest = alloc.writeSize(ptr, size);
 
             src.move(dest, size);
+            break;
         }
-        break;
 
         case Opcode::AddrOff:
         {
@@ -570,40 +563,40 @@ void Fin::Runtime::execute()
             auto addr = eval.pop<Ptr>();
 
             eval.push<Ptr>(addr + size.alignedSize() * idx);
+            break;
         }
-        break;
 
         case Opcode::AddrArg:
         {
             auto offset = readOffset();
 
             eval.push<Ptr>(eval.ptr() + frame.param + offset);
+            break;
         }
-        break;
 
         case Opcode::AddrVar:
         {
             auto offset = readOffset();
 
             eval.push<Ptr>(eval.ptr() + frame.local + offset);
+            break;
         }
-        break;
 
         case Opcode::AddrMem:
         {
             auto offset = readOffset();
 
             eval.top<Ptr>() += offset;
+            break;
         }
-        break;
 
         case Opcode::Br:
         {
             auto target = readTarget();
 
             jump(target);
+            break;
         }
-        break;
 
         case Opcode::BrFalse:
         {
@@ -611,8 +604,8 @@ void Fin::Runtime::execute()
 
             if (!eval.pop<bool>())
                 jump(target);
+            break;
         }
-        break;
 
         case Opcode::BrTrue:
         {
@@ -620,8 +613,8 @@ void Fin::Runtime::execute()
 
             if (eval.pop<bool>())
                 jump(target);
+            break;
         }
-        break;
 
         case Opcode::ConstFalse:
             eval.push(false);
@@ -712,8 +705,8 @@ void Fin::Runtime::execute()
             auto op2 = eval.pop<Float>();
             auto op1 = eval.pop<Float>();
             eval.push(std::fmod(op1, op2));
+            break;
         }
-        break;
 
         case Opcode::NegF:
             eval.push(-eval.pop<int32_t>());

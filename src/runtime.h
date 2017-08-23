@@ -2,7 +2,6 @@
 #define FIN_RUNTIME_H
 
 #include "allocator.h"
-#include "frame.h"
 #include "library.h"
 #include "log.h"
 #include "stack.h"
@@ -15,10 +14,10 @@
 
 namespace Fin
 {
-struct Contract;
-struct Function;
-struct Library;
-struct Type;
+class Contract;
+class Function;
+class Library;
+class Type;
 
 class Runtime
 {
@@ -26,13 +25,22 @@ public:
     Runtime();
     void load(std::istream &src);
     void run();
-    Library &createLibrary(const LibraryID &id);
+    Library &createLibrary(LibraryID id);
     Library &getLibrary(const LibraryID &id);
     void backtrace(std::ostream &out) const noexcept;
     Allocator &allocator() noexcept { return alloc; }
     Stack &stack() noexcept { return eval; }
 
 private:
+    struct Frame
+    {
+        Library *library{nullptr};
+        Contract *contract{nullptr};
+        Pc pc{0};
+        Offset local;
+        Offset param;
+    };
+
     Allocator alloc;
     Stack eval;
     Frame frame;
@@ -42,17 +50,18 @@ private:
     std::vector<std::uint8_t> instrs;
     std::unique_ptr<Contract> mainContract;
 
+    void printFrame(std::ostream &out, const Frame &fr) const;
     std::string readStr();
     Pc readTarget();
-    Function &readFunction();
-    Type &readType();
+    const Function &readFunction();
+    const Type &readType();
     Contract &readContract();
     TypeInfo readSize();
     Offset readOffset();
     void jump(std::size_t target);
     void ret();
     void call(Contract &ctr);
-    void sign();
+    void finalizeCall();
     void checkLibrary();
     void checkContract();
     void execute();
@@ -95,6 +104,6 @@ private:
         eval.push(Op{}(op1, op2));
     }
 };
-}
+} // namespace Fin
 
 #endif

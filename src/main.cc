@@ -42,7 +42,7 @@ void write(Fin::Int val) { std::cout.put(static_cast<char>(val)); }
 Fin::Int read() { return static_cast<Fin::Int>(std::cin.get()); }
 
 void backtrace(Fin::Runtime *rt) { rt->backtrace(std::cout); }
-}
+} // end of anonymous namespace
 
 int main(int argc, const char *argv[])
 {
@@ -63,18 +63,19 @@ int main(int argc, const char *argv[])
     Fin::Runtime runtime{};
 
     auto &fin = runtime.createLibrary(Fin::LibraryID{"rt"});
-    fin.addFunction(Fin::wrap("print(Int)", &print<Fin::Int>));
-    fin.addFunction(Fin::wrap("print(Float)", &print<Fin::Float>));
-    fin.addFunction(Fin::wrap("print(Bool)", &print<Fin::Bool>));
-    fin.addFunction(Fin::wrap("input()Int", &input<Fin::Int>));
-    fin.addFunction(Fin::wrap("input()Float", &input<Fin::Float>));
-    fin.addFunction(Fin::wrap("input()Bool", &input<Fin::Bool>));
-    fin.addFunction(Fin::wrap("alloc(Int)&[0]", &alloc, 1));
-    fin.addFunction(Fin::wrap("realloc(&[0],Int)&[0]", &_realloc, 1));
-    fin.addFunction(Fin::wrap("dealloc(&0)", &dealloc, 1));
-    fin.addFunction(Fin::wrap("write(Int)", &write));
-    fin.addFunction(Fin::wrap("read()Int", &read));
-    fin.addFunction(Fin::wrap("backtrace()", &backtrace));
+    fin.addFunction("print(Int)", Fin::wrap(&print<Fin::Int>));
+    fin.addFunction("print(Float)", Fin::wrap(&print<Fin::Float>));
+    fin.addFunction("print(Bool)", Fin::wrap(&print<Fin::Bool>));
+    fin.addFunction("input()Int", Fin::wrap(&input<Fin::Int>));
+    fin.addFunction("input()Float", Fin::wrap(&input<Fin::Float>));
+    fin.addFunction("input()Bool", Fin::wrap(&input<Fin::Bool>));
+    fin.addFunction("alloc(Int)&[0]", Fin::wrap(&alloc), Fin::Index{1});
+    fin.addFunction("realloc(&[0],Int)&[0]", Fin::wrap(&_realloc),
+                    Fin::Index{1});
+    fin.addFunction("dealloc(&0)", Fin::wrap(&dealloc), Fin::Index{1});
+    fin.addFunction("write(Int)", Fin::wrap(&write));
+    fin.addFunction("read()Int", Fin::wrap(&read));
+    fin.addFunction("backtrace()", Fin::wrap(&backtrace));
 
     try
     {

@@ -5,8 +5,6 @@
 #include "util.h"
 #include <cassert>
 
-Fin::Allocator::Allocator() noexcept {}
-
 Fin::Allocator::~Allocator() noexcept
 {
     // cleanup any blocks still in-use
@@ -19,7 +17,7 @@ Fin::Allocator::~Allocator() noexcept
 Fin::Ptr Fin::Allocator::alloc(Offset size, Access access)
 {
     auto addr = static_cast<std::uint8_t *>(std::malloc(size._value));
-    if (!addr)
+    if (addr == nullptr)
         throw AllocationError{};
 
     auto ptr = add(Memory{addr}, size, access);
@@ -42,7 +40,7 @@ Fin::Ptr Fin::Allocator::realloc(Ptr ptr, Offset size)
 
     auto addr = static_cast<std::uint8_t *>(
             std::realloc(block.memory._data, size._value));
-    if (!addr)
+    if (addr == nullptr)
         throw AllocationError{};
 
     LOG(1) << "\n  R " << ptr << " [" << size << "]";
@@ -170,7 +168,7 @@ Fin::Ptr Fin::Allocator::add(Memory mem, Offset size, Access access)
 {
 #ifndef FIN_PEDANTIC
     // recycle if possible
-    if (freeStore.size() > 0)
+    if (!freeStore.empty())
     {
         Ptr ptr{freeStore.top(), Offset{}};
         freeStore.pop();

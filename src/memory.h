@@ -17,7 +17,7 @@ constexpr std::array<char, 16> HexMap{{'0', '1', '2', '3', '4', '5', '6', '7',
 class Memory
 {
 public:
-    constexpr Memory() {}
+    constexpr Memory() noexcept = default;
 
     void move(Memory target, TypeInfo type) const noexcept
     {
@@ -40,7 +40,7 @@ public:
 private:
     std::uint8_t *_data{nullptr};
 
-    constexpr explicit Memory(std::uint8_t *data) : _data{data} {}
+    constexpr explicit Memory(std::uint8_t *data) noexcept : _data{data} {}
 
     friend class Allocator;
 
@@ -57,6 +57,6 @@ inline constexpr Memory operator-(Memory self, Offset off) noexcept
 {
     return Memory{self._data - off._value};
 }
-}
+} // namespace Fin
 
 #endif

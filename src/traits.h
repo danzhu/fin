@@ -5,6 +5,6 @@ namespace Fin
 {
 template <typename T>
 struct TypeTraits;
-}
+} // namespace Fin
 
 #endif

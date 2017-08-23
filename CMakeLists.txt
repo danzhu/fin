@@ -20,7 +20,6 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     -Wno-covered-switch-default \
     -Wno-missing-prototypes \
     -Wno-padded \
-    -Wno-shadow-field-in-constructor \
     -Wno-sign-conversion \
     -Wno-unused-exception-parameter \
     -Wno-unused-parameter \

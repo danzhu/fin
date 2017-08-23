@@ -12,27 +12,27 @@ public:
             : std::runtime_error{msg}
     {
     }
+    ~RuntimeError() noexcept override;
 
-    RuntimeError(const RuntimeError &other) = default;
-    RuntimeError(RuntimeError &&other) = default;
-    ~RuntimeError() noexcept;
+    RuntimeError(const RuntimeError &other) noexcept = default;
+    RuntimeError(RuntimeError &&other) noexcept = default;
 
-    RuntimeError &operator=(const RuntimeError &other) = default;
-    RuntimeError &operator=(RuntimeError &&other) = default;
+    RuntimeError &operator=(const RuntimeError &other) noexcept = default;
+    RuntimeError &operator=(RuntimeError &&other) noexcept = default;
 };
 
 class AllocationError : public std::bad_alloc
 {
 public:
-    AllocationError() noexcept {}
+    AllocationError() noexcept = default;
+    ~AllocationError() noexcept override;
 
-    AllocationError(const AllocationError &other) = default;
-    AllocationError(AllocationError &&other) = default;
-    ~AllocationError() noexcept;
+    AllocationError(const AllocationError &other) noexcept = default;
+    AllocationError(AllocationError &&other) noexcept = default;
 
-    AllocationError &operator=(const AllocationError &other) = default;
-    AllocationError &operator=(AllocationError &&other) = default;
+    AllocationError &operator=(const AllocationError &other) noexcept = default;
+    AllocationError &operator=(AllocationError &&other) noexcept = default;
 };
-}
+} // namespace Fin
 
 #endif

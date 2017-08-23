@@ -18,7 +18,7 @@ namespace Fin
 class Stack
 {
 public:
-    Stack(Allocator &alloc, Offset cap = Offset{4096}) : _alloc{alloc}
+    explicit Stack(Allocator &alloc, Offset cap = Offset{4096}) : _alloc{alloc}
     {
         _ptr = alloc.alloc(cap,
                            Allocator::Access::Read | Allocator::Access::Write);
@@ -136,6 +136,6 @@ private:
     Offset _size;
     Offset _capacity;
 };
-}
+} // namespace Fin
 
 #endif

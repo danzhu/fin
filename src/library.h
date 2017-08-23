@@ -11,59 +11,107 @@
 
 namespace Fin
 {
-struct LibraryID
+class LibraryID
 {
-    std::string name;
+public:
+    explicit LibraryID(std::string name) noexcept : _name{std::move(name)} {}
 
-    explicit LibraryID(std::string name) : name{std::move(name)} {}
+    bool operator<(const LibraryID &other) const noexcept
+    {
+        return _name < other._name;
+    }
 
-    bool operator<(const LibraryID &other) const { return name < other.name; }
+private:
+    std::string _name;
+
+    template <typename CharT, class Traits>
+    friend std::basic_ostream<CharT, Traits> &
+    operator<<(std::basic_ostream<CharT, Traits> &out, const LibraryID &id);
 };
 
-struct Library
+class Library
 {
-    LibraryID id;
-    std::unordered_map<std::string, Function> functions;
-    std::unordered_map<std::string, Type> types;
-    std::vector<Function *> refFunctions;
-    std::vector<Type *> refTypes;
-    std::vector<Member *> refMembers;
-
-    explicit Library(LibraryID id) : id{id} {}
+public:
+    explicit Library(LibraryID id) noexcept : _id{std::move(id)} {}
+    ~Library() noexcept = default;
 
     Library(const Library &other) = delete;
-    Library(Library &&other) = default;
+    Library(Library &&other) noexcept = default;
 
     Library &operator=(const Library &other) = delete;
-    Library &operator=(Library &&other) = default;
+    Library &operator=(Library &&other) noexcept = default;
 
-    Function &addFunction(Function fn) noexcept
+    template <typename... Args>
+    Function &addFunction(std::string name, Args &&... args) noexcept
     {
-        fn.library = this;
-        auto name = fn.name;
-        auto it = functions.emplace(std::move(name), std::move(fn)).first;
+        Function fn{*this, name, std::forward<Args>(args)...};
+        auto it = _functions.emplace(std::move(name), std::move(fn)).first;
         auto &res = it->second;
-        refFunctions.emplace_back(&res);
+        _refFunctions.emplace_back(&res);
         return res;
     }
 
-    Type &addType(Type tp) noexcept
+    template <typename... Args>
+    Type &addType(std::string name, Args &&... args) noexcept
     {
-        tp.library = this;
-        auto name = tp.name;
-        auto it = types.emplace(std::move(name), std::move(tp)).first;
+        Type tp{*this, name, std::forward<Args>(args)...};
+        auto it = _types.emplace(std::move(name), std::move(tp)).first;
         auto &res = it->second;
-        refTypes.emplace_back(&res);
+        addRefType(res);
         return res;
     }
+
+    void addRefFunction(const Function &fn) noexcept
+    {
+        _refFunctions.emplace_back(&fn);
+    }
+
+    void addRefType(const Type &type) noexcept
+    {
+        _refTypes.emplace_back(&type);
+    }
+
+    void addRefMember(const Member &mem) noexcept
+    {
+        _refMembers.emplace_back(&mem);
+    }
+
+    const Function &function(const std::string &name) const
+    {
+        return _functions.at(name);
+    }
+
+    const Type &type(const std::string &name) const { return _types.at(name); }
+
+    const Function &refFunction(std::uint32_t idx) const
+    {
+        return *_refFunctions.at(idx);
+    }
+
+    const Type &refType(std::uint32_t idx) const { return *_refTypes.at(idx); }
+
+    const Member &refMember(std::uint32_t idx) const
+    {
+        return *_refMembers.at(idx);
+    }
+
+    LibraryID id() const noexcept { return _id; }
+
+private:
+    LibraryID _id;
+    std::unordered_map<std::string, Function> _functions;
+    std::unordered_map<std::string, Type> _types;
+    std::vector<const Function *> _refFunctions;
+    std::vector<const Type *> _refTypes;
+    std::vector<const Member *> _refMembers;
 };
 
 template <typename CharT, class Traits>
 std::basic_ostream<CharT, Traits> &
 operator<<(std::basic_ostream<CharT, Traits> &out, const LibraryID &id)
 {
-    return out << id.name;
+    return out << id._name;
 }
-}
+} // namespace Fin
 
 #endif
