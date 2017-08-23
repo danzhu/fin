@@ -4,6 +4,7 @@
 #include "log.h"
 #include "offset.h"
 #include "typeinfo.h"
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
