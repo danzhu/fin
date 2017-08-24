@@ -34,13 +34,6 @@ class Library
 {
 public:
     explicit Library(LibraryID id) noexcept : _id{std::move(id)} {}
-    ~Library() noexcept = default;
-
-    Library(const Library &other) = delete;
-    Library(Library &&other) noexcept = default;
-
-    Library &operator=(const Library &other) = delete;
-    Library &operator=(Library &&other) noexcept = default;
 
     template <typename... Args>
     Function &addFunction(std::string name, Args &&... args) noexcept

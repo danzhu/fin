@@ -1,82 +1,31 @@
 #ifndef FIN_STACK_H
 #define FIN_STACK_H
 
-#include "allocator.h"
 #include "exception.h"
 #include "log.h"
-#include "type.h"
+#include "memory.h"
 #include "typedefs.h"
 #include "typeinfo.h"
-#include "util.h"
-#include <cstdint>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 
 namespace Fin
 {
+class Allocator;
+
 class Stack
 {
 public:
-    explicit Stack(Allocator &alloc, Offset cap = Offset{4096}) : _alloc{alloc}
-    {
-        _ptr = alloc.alloc(cap,
-                           Allocator::Access::Read | Allocator::Access::Write);
+    explicit Stack(Allocator &alloc, Offset cap = Offset{4096});
 
-        _data = alloc.get(_ptr);
-        _capacity = cap;
-    }
+    void resize(Offset size) noexcept;
+    Memory at(Offset off, TypeInfo type);
+    Memory pushSize(TypeInfo type);
+    Memory popSize(TypeInfo type);
+    Memory topSize(TypeInfo type);
 
     Ptr ptr() const noexcept { return _ptr; }
-
     Offset size() const noexcept { return _size; }
-
-    void resize(Offset size) noexcept
-    {
-        _size = size;
-        _alloc.setSize(_ptr, size);
-    }
-
-    Memory at(Offset off, TypeInfo type)
-    {
-        if (off + type.maxAlignedSize() > _size)
-            throw RuntimeError{"invalid stack access"};
-
-        return Memory{_data + off};
-    }
-
-    Memory pushSize(TypeInfo type)
-    {
-        if (_size + type.maxAlignedSize() > _capacity)
-            throw RuntimeError{"stack overflow"};
-
-        LOG(2) << "\n  < [" << _size << ", " << type.maxAlignedSize() << "]";
-
-        Memory mem{_data + _size};
-        resize(_size + type.maxAlignedSize());
-        return mem;
-    }
-
-    Memory popSize(TypeInfo type)
-    {
-        if (_size < type.maxAlignedSize())
-            throw RuntimeError{"negative stack size"};
-
-        LOG(2) << "\n  > [" << _size << ", " << type.maxAlignedSize() << "]";
-
-        resize(_size - type.maxAlignedSize());
-        return Memory{_data + _size};
-    }
-
-    Memory topSize(TypeInfo type)
-    {
-        if (_size < type.maxAlignedSize())
-            throw RuntimeError{"accessing at negative index"};
-
-        LOG(2) << "\n  ^ [" << _size << ", " << type.maxAlignedSize() << "]";
-
-        return Memory{_data + _size - type.maxAlignedSize()};
-    }
 
     template <typename T>
     void push(T val)

@@ -1,5 +1,5 @@
 #include "exception.h"
 
-Fin::RuntimeError::~RuntimeError() noexcept = default;
+void Fin::RuntimeError::dummy() {}
 
-Fin::AllocationError::~AllocationError() noexcept = default;
+void Fin::AllocationError::dummy() {}

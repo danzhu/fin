@@ -50,9 +50,6 @@ private:
     friend constexpr bool operator<=(Offset self, Offset other) noexcept;
     friend constexpr bool operator>=(Offset self, Offset other) noexcept;
 
-    friend constexpr Memory operator+(Memory self, Offset off) noexcept;
-    friend constexpr Memory operator-(Memory self, Offset off) noexcept;
-
     template <typename CharT, class Traits>
     friend std::basic_ostream<CharT, Traits> &
     operator<<(std::basic_ostream<CharT, Traits> &out, Offset off);

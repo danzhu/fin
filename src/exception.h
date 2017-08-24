@@ -12,26 +12,17 @@ public:
             : std::runtime_error{msg}
     {
     }
-    ~RuntimeError() noexcept override;
 
-    RuntimeError(const RuntimeError &other) noexcept = default;
-    RuntimeError(RuntimeError &&other) noexcept = default;
-
-    RuntimeError &operator=(const RuntimeError &other) noexcept = default;
-    RuntimeError &operator=(RuntimeError &&other) noexcept = default;
+private:
+    // avoid weak vtables
+    virtual void dummy();
 };
 
 class AllocationError : public std::bad_alloc
 {
-public:
-    AllocationError() noexcept = default;
-    ~AllocationError() noexcept override;
-
-    AllocationError(const AllocationError &other) noexcept = default;
-    AllocationError(AllocationError &&other) noexcept = default;
-
-    AllocationError &operator=(const AllocationError &other) noexcept = default;
-    AllocationError &operator=(AllocationError &&other) noexcept = default;
+private:
+    // avoid weak vtables
+    virtual void dummy();
 };
 } // namespace Fin
 

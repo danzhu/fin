@@ -34,22 +34,8 @@ public:
               _location{loc}
     {
     }
-    ~Type() noexcept = default;
 
-    Type(const Type &other) = delete;
-    Type(Type &&other) noexcept = default;
-
-    Type &operator=(const Type &other) = delete;
-    Type &operator=(Type &&other) noexcept = default;
-
-    Member &addMember(std::string fieldName) noexcept
-    {
-        auto ptr = std::make_unique<Member>(
-                std::move(fieldName), static_cast<Index>(_members.size()));
-        auto &mem = *ptr;
-        _members.emplace_back(std::move(ptr));
-        return mem;
-    }
+    Member &addMember(std::string fieldName) noexcept;
 
     Library &library() const noexcept { return *_library; }
     std::string name() const noexcept { return _name; }

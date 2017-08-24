@@ -1,6 +1,7 @@
 #ifndef FIN_ALLOCATOR_H
 #define FIN_ALLOCATOR_H
 
+#include "log.h"
 #include "memory.h"
 #include "typedefs.h"
 #include <cstdint>

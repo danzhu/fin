@@ -2,6 +2,7 @@
 
 #include "exception.h"
 #include "log.h"
+#include "typeinfo.h"
 #include "util.h"
 #include <cassert>
 #include <cstdlib>
