@@ -33,6 +33,7 @@ public:
               _contracts{ctrs}, _init{init}, _location{loc}
     {
     }
+    ~Function() noexcept;
 
     Function(const Function &other) = delete;
     Function(Function &&other) = default;
@@ -54,8 +55,8 @@ private:
     Index _generics;
     Index _contracts;
     NativeFunction _native;
-    Pc _init;
-    Pc _location;
+    Pc _init{0};
+    Pc _location{0};
 };
 } // namespace Fin
 

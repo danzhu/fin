@@ -25,7 +25,7 @@ public:
         Free = 1 << 2,
     };
 
-    Allocator() noexcept = default;
+    Allocator() noexcept {}
     ~Allocator() noexcept;
 
     Allocator(const Allocator &other) = delete;

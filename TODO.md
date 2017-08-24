@@ -135,3 +135,4 @@
   - [ ] fix all `at` calls to std
 - [ ] rename `Allocator`
 - [ ] encapsulate `Library` and its items
+- [ ] fix noexcept default move

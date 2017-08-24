@@ -1,7 +1,6 @@
 #ifndef FIN_TYPE_H
 #define FIN_TYPE_H
 
-#include "array.h"
 #include "typedefs.h"
 #include "util.h"
 #include <memory>
