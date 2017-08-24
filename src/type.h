@@ -2,7 +2,6 @@
 #define FIN_TYPE_H
 
 #include "typedefs.h"
-#include "util.h"
 #include <memory>
 #include <string>
 #include <vector>

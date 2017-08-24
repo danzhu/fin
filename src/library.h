@@ -4,6 +4,7 @@
 #include "contract.h"
 #include "function.h"
 #include "type.h"
+#include "wrapper.h"
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -49,6 +50,15 @@ public:
         auto &res = it->second;
         _refFunctions.emplace_back(&res);
         return res;
+    }
+
+    template <typename Ret, typename... Args>
+    Function &addNative(std::string name, Ret (*fn)(Args...))
+    {
+        constexpr Index sz = detail::count<TypeInfo, Args...>;
+        constexpr Index ct = detail::count<Contract, Args...>;
+
+        return addFunction(std::move(name), Wrapper<Ret, Args...>{fn}, sz, ct);
     }
 
     template <typename... Args>

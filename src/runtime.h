@@ -2,8 +2,6 @@
 #define FIN_RUNTIME_H
 
 #include "allocator.h"
-#include "library.h"
-#include "log.h"
 #include "stack.h"
 #include "typedefs.h"
 #include <iosfwd>
@@ -17,6 +15,7 @@ namespace Fin
 class Contract;
 class Function;
 class Library;
+class LibraryID;
 class Type;
 
 class Runtime

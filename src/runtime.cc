@@ -431,8 +431,7 @@ void Fin::Runtime::execute()
             auto idx = readInt<Index>();
 
             auto mem = frame.library->refMember(idx);
-            auto off = frame.contract->typeContract().offset(mem.index());
-            frame.contract->addOffset(off);
+            frame.contract->addMemberOffset(mem);
             break;
         }
 

@@ -4,9 +4,8 @@
 #include "memory.h"
 #include "typedefs.h"
 #include <cstdint>
-#include <iostream>
+#include <iosfwd>
 #include <stack>
-#include <string>
 #include <vector>
 
 namespace Fin

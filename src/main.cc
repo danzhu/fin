@@ -1,5 +1,5 @@
+#include "library.h"
 #include "runtime.h"
-#include "wrapper.h"
 #include <fstream>
 #include <iostream>
 
@@ -35,7 +35,10 @@ Fin::Ptr _realloc(Fin::Allocator *alloc, Fin::TypeInfo type, Fin::Ptr ptr,
     return alloc->realloc(ptr, size);
 }
 
-void dealloc(Fin::Allocator *alloc, Fin::Ptr ptr) { alloc->dealloc(ptr); }
+void dealloc(Fin::Allocator *alloc, Fin::TypeInfo type, Fin::Ptr ptr)
+{
+    alloc->dealloc(ptr);
+}
 
 void write(Fin::Int val) { std::cout.put(static_cast<char>(val)); }
 
@@ -63,19 +66,18 @@ int main(int argc, const char *argv[])
     Fin::Runtime runtime{};
 
     auto &fin = runtime.createLibrary(Fin::LibraryID{"rt"});
-    fin.addFunction("print(Int)", Fin::wrap(&print<Fin::Int>));
-    fin.addFunction("print(Float)", Fin::wrap(&print<Fin::Float>));
-    fin.addFunction("print(Bool)", Fin::wrap(&print<Fin::Bool>));
-    fin.addFunction("input()Int", Fin::wrap(&input<Fin::Int>));
-    fin.addFunction("input()Float", Fin::wrap(&input<Fin::Float>));
-    fin.addFunction("input()Bool", Fin::wrap(&input<Fin::Bool>));
-    fin.addFunction("alloc(Int)&[0]", Fin::wrap(&alloc), Fin::Index{1});
-    fin.addFunction("realloc(&[0],Int)&[0]", Fin::wrap(&_realloc),
-                    Fin::Index{1});
-    fin.addFunction("dealloc(&0)", Fin::wrap(&dealloc), Fin::Index{1});
-    fin.addFunction("write(Int)", Fin::wrap(&write));
-    fin.addFunction("read()Int", Fin::wrap(&read));
-    fin.addFunction("backtrace()", Fin::wrap(&backtrace));
+    fin.addNative("print(Int)", print<Fin::Int>);
+    fin.addNative("print(Float)", print<Fin::Float>);
+    fin.addNative("print(Bool)", print<Fin::Bool>);
+    fin.addNative("input()Int", input<Fin::Int>);
+    fin.addNative("input()Float", input<Fin::Float>);
+    fin.addNative("input()Bool", input<Fin::Bool>);
+    fin.addNative("alloc(Int)&[0]", alloc);
+    fin.addNative("realloc(&[0],Int)&[0]", _realloc);
+    fin.addNative("dealloc(&0)", dealloc);
+    fin.addNative("write(Int)", write);
+    fin.addNative("read()Int", read);
+    fin.addNative("backtrace()", backtrace);
 
     try
     {

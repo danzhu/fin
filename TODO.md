@@ -136,3 +136,4 @@
 - [ ] rename `Allocator`
 - [ ] encapsulate `Library` and its items
 - [ ] fix noexcept default move
+- [ ] use "allocated" and "freed" in allocator summary

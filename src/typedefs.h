@@ -15,6 +15,9 @@ using Index = std::uint16_t;
 // program counter location
 using Pc = std::size_t;
 
+// alignment requirement
+using Alignment = std::size_t;
+
 // primitive types
 using Int = std::int32_t;
 using Float = float;
@@ -97,7 +100,7 @@ operator<<(std::basic_ostream<CharT, Traits> &out, const Ptr &ptr)
     return out << ptr._block << ':' << ptr._offset;
 }
 
-constexpr std::size_t MaxAlignment{
+constexpr Alignment MaxAlignment{
         std::max({alignof(Int), alignof(Float), alignof(Bool), alignof(Ptr)})};
 } // namespace Fin
 

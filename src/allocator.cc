@@ -4,6 +4,8 @@
 #include "log.h"
 #include "util.h"
 #include <cassert>
+#include <cstdlib>
+#include <iostream>
 
 Fin::Allocator::~Allocator() noexcept
 {

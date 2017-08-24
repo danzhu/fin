@@ -33,13 +33,6 @@ public:
               _contracts{ctrs}, _init{init}, _location{loc}
     {
     }
-    ~Function() noexcept = default;
-
-    Function(const Function &other) = delete;
-    Function(Function &&other) noexcept = default;
-
-    Function &operator=(const Function &other) = delete;
-    Function &operator=(Function &&other) noexcept = default;
 
     Library &library() const noexcept { return *_library; }
     std::string name() const noexcept { return _name; }

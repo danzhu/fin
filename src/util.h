@@ -1,11 +1,10 @@
 #ifndef FIN_UTIL_H
 #define FIN_UTIL_H
 
-#define PLURAL(num, str) (num) << ' ' << (str) << ((num) == 1 ? "" : "s")
-
-#include "typedefs.h"
 #include <stdexcept>
 #include <vector>
+
+#define PLURAL(num, str) (num) << ' ' << (str) << ((num) == 1 ? "" : "s")
 
 namespace Fin
 {
@@ -35,22 +34,21 @@ std::vector<T> popRange(std::vector<T> &vec, std::size_t amount)
 }
 
 template <typename T>
-constexpr std::enable_if_t<std::is_enum<T>::value, bool> hasFlag(T val, T flag)
+constexpr bool hasFlag(T val, T flag)
 {
+    static_assert(std::is_enum<T>::value, "enum type required");
     return (val & flag) != static_cast<T>(0);
 }
 
-template <typename T>
-constexpr std::enable_if_t<std::is_enum<T>::value, T>
-operator&(T self, T other) noexcept
+template <typename T, typename = std::enable_if_t<std::is_enum<T>::value>>
+constexpr T operator&(T self, T other) noexcept
 {
     using U = std::underlying_type_t<T>;
     return static_cast<T>(static_cast<U>(self) & static_cast<U>(other));
 }
 
-template <typename T>
-constexpr std::enable_if_t<std::is_enum<T>::value, T>
-operator|(T self, T other) noexcept
+template <typename T, typename = std::enable_if_t<std::is_enum<T>::value>>
+constexpr T operator|(T self, T other) noexcept
 {
     using U = std::underlying_type_t<T>;
     return static_cast<T>(static_cast<U>(self) | static_cast<U>(other));
