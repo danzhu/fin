@@ -29,7 +29,10 @@ constexpr int count() noexcept
 }
 
 template <typename T, typename Enable = std::true_type>
-struct Read;
+struct Read
+{
+    static_assert(sizeof(T) == -1, "unsupported argument type");
+};
 
 template <typename T>
 struct Read<T, typename IsPrimitive<T>::type>
@@ -82,7 +85,10 @@ struct Read<Contract &>
 };
 
 template <typename T, typename Enable = std::true_type>
-struct Write;
+struct Write
+{
+    static_assert(sizeof(T) == -1, "unsupported return type");
+};
 
 template <typename T>
 struct Write<T, typename IsPrimitive<T>::type>
