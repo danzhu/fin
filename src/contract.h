@@ -35,7 +35,7 @@ public:
     void addContract(const Function &fn) noexcept;
     void addArgOffset(const TypeInfo &info) noexcept;
     void addLocalOffset(const TypeInfo &info) noexcept;
-    void addMemberOffset(const Member &mem) noexcept;
+    void addMemberOffset(const Member &mem);
     bool initialize(Pc &target) noexcept;
     void sign() noexcept;
 

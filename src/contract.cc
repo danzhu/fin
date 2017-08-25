@@ -32,7 +32,7 @@ void Fin::Contract::addLocalOffset(const TypeInfo &info) noexcept
     _localAlignment = std::max(_localAlignment, info.alignment());
 }
 
-void Fin::Contract::addMemberOffset(const Member &mem) noexcept
+void Fin::Contract::addMemberOffset(const Member &mem)
 {
     if (!_typeContract)
         throw RuntimeError{"no type contract active"};
