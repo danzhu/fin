@@ -60,27 +60,23 @@ private:
 };
 
 template <>
-struct TypeTraits<Int>
+struct IsPrimitive<Int> : std::true_type
 {
-    using IsPrimitive = std::true_type;
 };
 
 template <>
-struct TypeTraits<Float>
+struct IsPrimitive<Float> : std::true_type
 {
-    using IsPrimitive = std::true_type;
 };
 
 template <>
-struct TypeTraits<Bool>
+struct IsPrimitive<Bool> : std::true_type
 {
-    using IsPrimitive = std::true_type;
 };
 
 template <>
-struct TypeTraits<Ptr>
+struct IsPrimitive<Ptr> : std::true_type
 {
-    using IsPrimitive = std::true_type;
 };
 
 inline constexpr Ptr operator+(Ptr self, Offset off) noexcept

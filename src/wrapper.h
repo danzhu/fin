@@ -31,7 +31,7 @@ template <typename T, typename Enable = std::true_type>
 struct Read;
 
 template <typename T>
-struct Read<T, typename TypeTraits<T>::IsPrimitive>
+struct Read<T, typename IsPrimitive<T>::type>
 {
     template <int Size, int Ctr>
     static T read(Runtime &rt, Contract &ctr)
@@ -84,7 +84,7 @@ template <typename T, typename Enable = std::true_type>
 struct Write;
 
 template <typename T>
-struct Write<T, typename TypeTraits<T>::IsPrimitive>
+struct Write<T, typename IsPrimitive<T>::type>
 {
     static void write(Stack &stack, T val) { stack.push(val); }
 };
