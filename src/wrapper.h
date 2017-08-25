@@ -132,12 +132,12 @@ struct ArgCreator<T, Args...>
 template <typename Fn, typename Tuple, std::size_t... Is>
 decltype(auto) applyArgs(Fn fn, Tuple tup, std::index_sequence<Is...>)
 {
+    (void)tup;
     return (*fn)(std::get<Is>(tup)...);
 }
 
 template <typename Ret, typename... Args>
-decltype(auto) invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr,
-                      std::true_type)
+Ret invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr, std::true_type)
 {
     constexpr int sz = detail::count<TypeInfo, Args...>();
     constexpr int ct = detail::count<Contract, Args...>();
@@ -148,11 +148,10 @@ decltype(auto) invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr,
 }
 
 template <typename Ret, typename... Args>
-decltype(auto) invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr,
-                      std::false_type)
+void invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr, std::false_type)
 {
     auto ret = detail::invoke(fn, rt, ctr, std::true_type{});
-    Write<Ret>::write(rt.stack(), ret);
+    Write<Ret>::write(rt.stack(), std::move(ret));
 }
 } // namespace detail
 
