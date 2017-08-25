@@ -12,7 +12,7 @@ class Memory;
 class Offset
 {
 public:
-    constexpr Offset() noexcept = default;
+    constexpr Offset() noexcept {}
 
     Offset operator+=(Offset other) noexcept
     {

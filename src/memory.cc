@@ -1,8 +1,8 @@
-#include "memory.h"
+#include "fin/memory.h"
 
-#include "log.h"
-#include "offset.h"
-#include "typeinfo.h"
+#include "fin/log.h"
+#include "fin/offset.h"
+#include "fin/typeinfo.h"
 #include <cstring>
 
 void Fin::Memory::move(Memory target, TypeInfo type) const noexcept

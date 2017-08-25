@@ -15,7 +15,7 @@ constexpr std::array<char, 16> HexMap{{'0', '1', '2', '3', '4', '5', '6', '7',
 class Memory
 {
 public:
-    constexpr Memory() noexcept = default;
+    constexpr Memory() noexcept {}
 
     void move(Memory target, TypeInfo type) const noexcept;
 

@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.5)
 
 project(fin CXX)
 
+# options
+option(DEBUG "Enable debug messages logging" 0)
+option(PEDANTIC "Disable auto-handling of execution errors" OFF)
+
 # c++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,27 +43,29 @@ else()
 endif()
 
 # output paths
-SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
-SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
 # files
 set(PY "${PROJECT_SOURCE_DIR}/py")
+set(GEN "${CMAKE_CURRENT_BINARY_DIR}/gen")
+
 file(GLOB SOURCES "src/*.cc")
-file(GLOB HEADERS "src/*.h")
+file(GLOB_RECURSE HEADERS "include/*.h")
 file(GLOB FINC "${PY}/finc/*.py")
 
+file(MAKE_DIRECTORY "${GEN}")
+
 # custom commands
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
 add_custom_command(
-    OUTPUT opcode.h
+    OUTPUT "${GEN}/opcode.h"
     DEPENDS "${PY}/instructions" "${PY}/instr.py" "${PY}/opcode.py"
-    COMMAND "${PY}/opcode.py" > opcode.h)
+    COMMAND "${PY}/opcode.py" > "${GEN}/opcode.h")
 
 add_custom_command(
-    OUTPUT opcode.cc
+    OUTPUT "${GEN}/opcode.cc"
     DEPENDS "${PY}/instructions" "${PY}/instr.py" "${PY}/opname.py"
-    COMMAND "${PY}/opname.py" > opcode.cc)
+    COMMAND "${PY}/opname.py" > "${GEN}/opcode.cc")
 
 add_custom_command(
     OUTPUT instructions.md
@@ -72,12 +78,20 @@ add_custom_command(
     COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test.fin" -o test.fm)
 
 # targets
-add_executable(fin ${SOURCES} ${HEADERS} opcode.h opcode.cc ${PY}/instructions)
+add_library(fin
+    ${SOURCES} ${HEADERS}
+    "${GEN}/opcode.h" "${GEN}/opcode.cc" "${PY}/instructions")
+target_include_directories(fin PRIVATE "${GEN}")
+target_include_directories(fin PUBLIC "${PROJECT_SOURCE_DIR}/include")
+
+add_executable(fin-bin main.cc)
+set_target_properties(fin-bin PROPERTIES OUTPUT_NAME fin)
+target_link_libraries(fin-bin fin)
 
 add_custom_target(doc DEPENDS instructions.md)
 
 add_custom_target(run
-    COMMAND fin test.fm
+    COMMAND fin-bin test.fm
     DEPENDS test.fm)
 
 # tests
@@ -110,10 +124,6 @@ test_compile("void_var" "cannot create variable of type Void")
 test_compile("args_unmatched" "no viable function overload")
 test_compile("no_symbol" "cannot find symbol 'i'")
 test_compile("unsized_array" "array is unsized")
-
-# options
-option(DEBUG "Enable debug messages logging" 0)
-option(PEDANTIC "Disable auto-handling of execution errors" off)
 
 if(DEBUG)
     target_compile_definitions(fin PRIVATE FIN_DEBUG=${DEBUG})

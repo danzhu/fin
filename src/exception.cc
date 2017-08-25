@@ -1,4 +1,4 @@
-#include "exception.h"
+#include "fin/exception.h"
 
 void Fin::RuntimeError::dummy() {}
 

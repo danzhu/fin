@@ -1,4 +1,4 @@
-#include "type.h"
+#include "fin/type.h"
 
 Fin::Member &Fin::Type::addMember(std::string fieldName) noexcept
 {

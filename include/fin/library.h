@@ -48,8 +48,8 @@ public:
     template <typename Ret, typename... Args>
     Function &addNative(std::string name, Ret (*fn)(Args...))
     {
-        constexpr Index sz = detail::count<TypeInfo, Args...>();
-        constexpr Index ct = detail::count<Contract, Args...>();
+        constexpr Index sz{detail::count<TypeInfo, Args...>()};
+        constexpr Index ct{detail::count<Contract, Args...>()};
 
         return addFunction(std::move(name), Wrapper<Ret, Args...>{fn}, sz, ct);
     }

@@ -1,7 +1,7 @@
-#include "stack.h"
+#include "fin/stack.h"
 
-#include "allocator.h"
-#include "util.h"
+#include "fin/allocator.h"
+#include "fin/util.h"
 
 Fin::Stack::Stack(Allocator &alloc, Offset cap) : _alloc{alloc}
 {

@@ -1,7 +1,7 @@
-#include "contract.h"
+#include "fin/contract.h"
 
-#include "exception.h"
-#include "log.h"
+#include "fin/exception.h"
+#include "fin/log.h"
 
 Fin::Contract &Fin::Contract::callType(const Type &type)
 {

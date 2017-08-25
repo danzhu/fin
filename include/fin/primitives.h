@@ -18,7 +18,7 @@ using Bool = bool;
 class Ptr
 {
 public:
-    constexpr Ptr() noexcept = default;
+    constexpr Ptr() noexcept {}
 
     Ptr &operator+=(Offset off) noexcept
     {
