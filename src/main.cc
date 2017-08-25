@@ -19,32 +19,32 @@ T input()
     return val;
 }
 
-Fin::Ptr alloc(Fin::Allocator *alloc, Fin::TypeInfo type, Fin::Int len)
+Fin::Ptr alloc(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Int len)
 {
     auto size = type.alignedSize() * len;
-    return alloc->alloc(size,
-                        Fin::Allocator::Access::Read |
-                                Fin::Allocator::Access::Write |
-                                Fin::Allocator::Access::Free);
+    return alloc.alloc(size,
+                       Fin::Allocator::Access::Read |
+                               Fin::Allocator::Access::Write |
+                               Fin::Allocator::Access::Free);
 }
 
-Fin::Ptr _realloc(Fin::Allocator *alloc, Fin::TypeInfo type, Fin::Ptr ptr,
+Fin::Ptr _realloc(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Ptr ptr,
                   Fin::Int len)
 {
     auto size = type.size().align(type.alignment()) * len;
-    return alloc->realloc(ptr, size);
+    return alloc.realloc(ptr, size);
 }
 
-void dealloc(Fin::Allocator *alloc, Fin::TypeInfo type, Fin::Ptr ptr)
+void dealloc(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Ptr ptr)
 {
-    alloc->dealloc(ptr);
+    alloc.dealloc(ptr);
 }
 
 void write(Fin::Int val) { std::cout.put(static_cast<char>(val)); }
 
 Fin::Int read() { return static_cast<Fin::Int>(std::cin.get()); }
 
-void backtrace(Fin::Runtime *rt) { rt->backtrace(std::cout); }
+void backtrace(Fin::Runtime &rt) { rt.backtrace(std::cout); }
 } // end of anonymous namespace
 
 int main(int argc, const char *argv[])

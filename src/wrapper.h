@@ -16,16 +16,17 @@ namespace detail
 template <typename T, typename U>
 constexpr int ind = std::is_same<T, U>::value ? 1 : 0;
 
-constexpr inline int sum() { return 0; }
-
-template <typename T, typename... Args>
-constexpr int sum(T val, Args... args)
+template <typename Tar>
+constexpr int count() noexcept
 {
-    return val + sum(args...);
+    return 0;
 }
 
-template <typename T, typename... Args>
-constexpr int count = sum(ind<T, Args>...);
+template <typename Tar, typename T, typename... Args>
+constexpr int count() noexcept
+{
+    return detail::ind<T, Tar> + detail::count<Tar, Args...>();
+}
 
 template <typename T, typename Enable = std::true_type>
 struct Read;
@@ -41,22 +42,22 @@ struct Read<T, typename IsPrimitive<T>::type>
 };
 
 template <>
-struct Read<Runtime *>
+struct Read<Runtime &>
 {
     template <int Size, int Ctr>
-    static Runtime *read(Runtime &rt, Contract &ctr)
+    static Runtime &read(Runtime &rt, Contract &ctr)
     {
-        return &rt;
+        return rt;
     }
 };
 
 template <>
-struct Read<Allocator *>
+struct Read<Allocator &>
 {
     template <int Size, int Ctr>
-    static Allocator *read(Runtime &rt, Contract &ctr)
+    static Allocator &read(Runtime &rt, Contract &ctr)
     {
-        return &rt.allocator();
+        return rt.allocator();
     }
 };
 
@@ -71,12 +72,12 @@ struct Read<TypeInfo>
 };
 
 template <>
-struct Read<Contract *>
+struct Read<Contract &>
 {
     template <int Size, int Ctr>
-    static Contract *read(Runtime &rt, Contract &ctr)
+    static Contract &read(Runtime &rt, Contract &ctr)
     {
-        return &ctr.contract(Ctr);
+        return ctr.contract(Ctr);
     }
 };
 
@@ -111,37 +112,41 @@ struct ArgCreator<T, Args...>
     template <int Size, int Ctr>
     static std::tuple<T, Args...> createArgs(Runtime &rt, Contract &ctr)
     {
-        constexpr int sz = Size - ind<T, TypeInfo>;
-        constexpr int ct = Ctr - ind<T, Contract>;
+        constexpr int sz = Size - detail::ind<T, TypeInfo>;
+        constexpr int ct = Ctr - detail::ind<T, Contract>;
 
         auto args = ArgCreator<Args...>::template createArgs<sz, ct>(rt, ctr);
-        auto arg = std::make_tuple(
-                detail::Read<T>::template read<sz, ct>(rt, ctr));
+
+        std::tuple<T> arg{Read<T>::template read<sz, ct>(rt, ctr)};
+
         return std::tuple_cat(arg, args);
     }
 };
 
-template <typename... Args>
-std::tuple<Args...> createArgs(Runtime &rt, Contract &ctr)
-{
-    constexpr int sz = count<TypeInfo, Args...>;
-    constexpr int ct = count<Contract, Args...>;
-
-    return ArgCreator<Args...>::template createArgs<sz, ct>(rt, ctr);
-}
-
 template <typename Fn, typename Tuple, std::size_t... Is>
-decltype(auto) applyArgs(Fn fn, const Tuple &tup, std::index_sequence<Is...>)
+decltype(auto) applyArgs(Fn fn, Tuple tup, std::index_sequence<Is...>)
 {
     return (*fn)(std::get<Is>(tup)...);
 }
 
 template <typename Ret, typename... Args>
-decltype(auto) invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr)
+decltype(auto) invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr,
+                      std::true_type)
 {
-    auto args = createArgs<Args...>(rt, ctr);
+    constexpr int sz = detail::count<TypeInfo, Args...>();
+    constexpr int ct = detail::count<Contract, Args...>();
+
+    auto args = ArgCreator<Args...>::template createArgs<sz, ct>(rt, ctr);
     auto idcs = std::make_index_sequence<sizeof...(Args)>();
-    return applyArgs(fn, args, idcs);
+    return detail::applyArgs(fn, std::move(args), idcs);
+}
+
+template <typename Ret, typename... Args>
+decltype(auto) invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr,
+                      std::false_type)
+{
+    auto ret = detail::invoke(fn, rt, ctr, std::true_type{});
+    Write<Ret>::write(rt.stack(), ret);
 }
 } // namespace detail
 
@@ -151,19 +156,9 @@ class Wrapper
 public:
     explicit Wrapper(Ret (*fn)(Args...)) noexcept : _fn{fn} {}
 
-    template <typename R = Ret,
-              std::enable_if_t<!std::is_void<R>::value, int> = 0>
     void operator()(Runtime &rt, Contract &ctr) const
     {
-        auto res = detail::invoke(_fn, rt, ctr);
-        detail::Write<Ret>::write(rt.stack(), res);
-    }
-
-    template <typename R = Ret,
-              std::enable_if_t<std::is_void<R>::value, int> = 0>
-    void operator()(Runtime &rt, Contract &ctr) const
-    {
-        detail::invoke(_fn, rt, ctr);
+        detail::invoke(_fn, rt, ctr, std::is_void<Ret>{});
     }
 
 private:

@@ -39,8 +39,8 @@ public:
     Function &addFunction(std::string name, Args &&... args) noexcept
     {
         Function fn{*this, name, std::forward<Args>(args)...};
-        auto it = _functions.emplace(std::move(name), std::move(fn)).first;
-        auto &res = it->second;
+        auto &res = _functions.emplace(std::move(name), std::move(fn))
+                            .first->second;
         _refFunctions.emplace_back(&res);
         return res;
     }
@@ -48,8 +48,8 @@ public:
     template <typename Ret, typename... Args>
     Function &addNative(std::string name, Ret (*fn)(Args...))
     {
-        constexpr Index sz = detail::count<TypeInfo, Args...>;
-        constexpr Index ct = detail::count<Contract, Args...>;
+        constexpr Index sz = detail::count<TypeInfo, Args...>();
+        constexpr Index ct = detail::count<Contract, Args...>();
 
         return addFunction(std::move(name), Wrapper<Ret, Args...>{fn}, sz, ct);
     }
@@ -58,8 +58,8 @@ public:
     Type &addType(std::string name, Args &&... args) noexcept
     {
         Type tp{*this, name, std::forward<Args>(args)...};
-        auto it = _types.emplace(std::move(name), std::move(tp)).first;
-        auto &res = it->second;
+        auto &res =
+                _types.emplace(std::move(name), std::move(tp)).first->second;
         addRefType(res);
         return res;
     }
