@@ -3,6 +3,7 @@
 
 #include "log.h"
 #include "memory.h"
+#include "primitives.h"
 #include "typedefs.h"
 #include <cstdint>
 #include <iosfwd>

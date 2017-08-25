@@ -2,6 +2,7 @@
 #define FIN_TYPEINFO_H
 
 #include "offset.h"
+#include "primitives.h"
 #include "type.h"
 
 namespace Fin
