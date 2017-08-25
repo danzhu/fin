@@ -16,7 +16,7 @@ namespace detail
 template <typename T, typename U>
 constexpr int ind = std::is_same<T, U>::value ? 1 : 0;
 
-constexpr int sum() { return 0; }
+constexpr inline int sum() { return 0; }
 
 template <typename T, typename... Args>
 constexpr int sum(T val, Args... args)
@@ -67,6 +67,16 @@ struct Read<TypeInfo>
     static TypeInfo read(Runtime &rt, Contract &ctr)
     {
         return ctr.size(Size);
+    }
+};
+
+template <>
+struct Read<Contract *>
+{
+    template <int Size, int Ctr>
+    static Contract *read(Runtime &rt, Contract &ctr)
+    {
+        return &ctr.contract(Ctr);
     }
 };
 
@@ -141,29 +151,23 @@ class Wrapper
 public:
     explicit Wrapper(Ret (*fn)(Args...)) noexcept : _fn{fn} {}
 
+    template <typename R = Ret,
+              std::enable_if_t<!std::is_void<R>::value, int> = 0>
     void operator()(Runtime &rt, Contract &ctr) const
     {
         auto res = detail::invoke(_fn, rt, ctr);
         detail::Write<Ret>::write(rt.stack(), res);
     }
 
-private:
-    Ret (*_fn)(Args...);
-};
-
-template <typename... Args>
-class Wrapper<void, Args...>
-{
-public:
-    explicit Wrapper(void (*fn)(Args...)) noexcept : _fn{fn} {}
-
+    template <typename R = Ret,
+              std::enable_if_t<std::is_void<R>::value, int> = 0>
     void operator()(Runtime &rt, Contract &ctr) const
     {
         detail::invoke(_fn, rt, ctr);
     }
 
 private:
-    void (*_fn)(Args...);
+    Ret (*_fn)(Args...);
 };
 } // namespace Fin
 

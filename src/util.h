@@ -40,14 +40,14 @@ constexpr bool hasFlag(T val, T flag)
     return (val & flag) != static_cast<T>(0);
 }
 
-template <typename T, typename = std::enable_if_t<std::is_enum<T>::value>>
+template <typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
 constexpr T operator&(T self, T other) noexcept
 {
     using U = std::underlying_type_t<T>;
     return static_cast<T>(static_cast<U>(self) & static_cast<U>(other));
 }
 
-template <typename T, typename = std::enable_if_t<std::is_enum<T>::value>>
+template <typename T, std::enable_if_t<std::is_enum<T>::value, int> = 0>
 constexpr T operator|(T self, T other) noexcept
 {
     using U = std::underlying_type_t<T>;

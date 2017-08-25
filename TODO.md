@@ -133,7 +133,7 @@
 - [x] internal free error
 - [x] custom exception
   - [ ] fix all `at` calls to std
-- [ ] rename `Allocator`
-- [ ] encapsulate `Library` and its items
-- [ ] fix noexcept default move
+- [x] ~~rename `Allocator`~~
+- [x] encapsulate `Library` and its items
+- [x] fix noexcept default move
 - [ ] use "allocated" and "freed" in allocator summary
