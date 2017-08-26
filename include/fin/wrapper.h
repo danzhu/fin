@@ -14,16 +14,16 @@ namespace Fin
 namespace detail
 {
 template <typename T, typename U>
-constexpr int ind = std::is_same<T, U>::value ? 1 : 0;
+constexpr Index ind = std::is_same<T, U>::value ? 1 : 0;
 
 template <typename Tar>
-constexpr int count() noexcept
+constexpr Index count() noexcept
 {
     return 0;
 }
 
 template <typename Tar, typename T, typename... Args>
-constexpr int count() noexcept
+constexpr Index count() noexcept
 {
     return detail::ind<T, Tar> + detail::count<Tar, Args...>();
 }
@@ -37,7 +37,7 @@ struct Read
 template <typename T>
 struct Read<T, typename IsPrimitive<T>::type>
 {
-    template <int Size, int Ctr>
+    template <Index Size, Index Ctr>
     static T read(Runtime &rt, Contract &ctr)
     {
         return rt.stack().pop<T>();
@@ -47,7 +47,7 @@ struct Read<T, typename IsPrimitive<T>::type>
 template <>
 struct Read<Runtime &>
 {
-    template <int Size, int Ctr>
+    template <Index Size, Index Ctr>
     static Runtime &read(Runtime &rt, Contract &ctr)
     {
         return rt;
@@ -57,7 +57,7 @@ struct Read<Runtime &>
 template <>
 struct Read<Allocator &>
 {
-    template <int Size, int Ctr>
+    template <Index Size, Index Ctr>
     static Allocator &read(Runtime &rt, Contract &ctr)
     {
         return rt.allocator();
@@ -67,7 +67,7 @@ struct Read<Allocator &>
 template <>
 struct Read<TypeInfo>
 {
-    template <int Size, int Ctr>
+    template <Index Size, Index Ctr>
     static TypeInfo read(Runtime &rt, Contract &ctr)
     {
         return ctr.size(Size);
@@ -77,7 +77,7 @@ struct Read<TypeInfo>
 template <>
 struct Read<Contract &>
 {
-    template <int Size, int Ctr>
+    template <Index Size, Index Ctr>
     static Contract &read(Runtime &rt, Contract &ctr)
     {
         return ctr.contract(Ctr);
@@ -102,7 +102,7 @@ struct ArgCreator;
 template <>
 struct ArgCreator<>
 {
-    template <int Size, int Ctr>
+    template <Index Size, Index Ctr>
     static std::tuple<> createArgs(Runtime &rt, Contract &ctr)
     {
         static_assert(Size == 0, "size is not 0");
@@ -115,11 +115,11 @@ struct ArgCreator<>
 template <typename T, typename... Args>
 struct ArgCreator<T, Args...>
 {
-    template <int Size, int Ctr>
+    template <Index Size, Index Ctr>
     static std::tuple<T, Args...> createArgs(Runtime &rt, Contract &ctr)
     {
-        constexpr int sz = Size - detail::ind<T, TypeInfo>;
-        constexpr int ct = Ctr - detail::ind<T, Contract>;
+        constexpr auto sz = Size - detail::ind<T, TypeInfo>;
+        constexpr auto ct = Ctr - detail::ind<T, Contract>;
 
         auto args = ArgCreator<Args...>::template createArgs<sz, ct>(rt, ctr);
 
@@ -139,8 +139,8 @@ decltype(auto) applyArgs(Fn fn, Tuple tup, std::index_sequence<Is...>)
 template <typename Ret, typename... Args>
 Ret invoke(Ret (*fn)(Args...), Runtime &rt, Contract &ctr, std::true_type)
 {
-    constexpr int sz = detail::count<TypeInfo, Args...>();
-    constexpr int ct = detail::count<Contract, Args...>();
+    constexpr auto sz = detail::count<TypeInfo, Args...>();
+    constexpr auto ct = detail::count<Contract, Args...>();
 
     auto args = ArgCreator<Args...>::template createArgs<sz, ct>(rt, ctr);
     auto idcs = std::make_index_sequence<sizeof...(Args)>();

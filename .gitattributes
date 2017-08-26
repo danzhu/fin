@@ -1,5 +1,0 @@
-* text=auto
-
-# auto format
-/src/*.cc text filter=clang
-/src/*.h text filter=clang

@@ -8,9 +8,9 @@
 void Fin::Memory::move(Memory target, TypeInfo type) const noexcept
 {
     LOG(2) << "\n  = 0x";
-    for (int i = type.size()._value - 1; i >= 0; --i)
+    for (auto p = &_data[type.size()._value - 1]; p != _data; --p)
     {
-        LOG(2) << ' ' << HexMap[_data[i] >> 4 & 0xF] << HexMap[_data[i] & 0xF];
+        LOG(2) << ' ' << HexMap[*p >> 4 & 0xF] << HexMap[*p & 0xF];
     }
 
     std::memmove(target._data, _data, type.size()._value);
