@@ -7,11 +7,12 @@
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 
 Fin::Allocator::~Allocator() noexcept
 {
     // cleanup any blocks still in-use
-    for (const auto &block : heap)
+    for (const auto &block : _blocks)
     {
         std::free(block.memory._data);
     }
@@ -110,8 +111,10 @@ void Fin::Allocator::setSize(Ptr ptr, Offset size)
     getBlock(ptr).size = size;
 }
 
-void Fin::Allocator::summary(std::ostream &out) const noexcept
+std::string Fin::Allocator::summary() const noexcept
 {
+    std::ostringstream out{};
+
     int inUse = 0;
     std::size_t inUseMem = 0;
     int stack = 0;
@@ -121,7 +124,7 @@ void Fin::Allocator::summary(std::ostream &out) const noexcept
     int freed = 0;
     std::size_t freedMem = 0;
 
-    for (const auto &block : heap)
+    for (const auto &block : _blocks)
     {
         // TODO: this makes assumptions on what they are used for,
         // maybe a better way to give summary?
@@ -158,26 +161,28 @@ void Fin::Allocator::summary(std::ostream &out) const noexcept
         << "  -------\n"
         << "   Freed: " << PLURAL(freedMem, "byte") << " in "
         << PLURAL(freed, "block") << "\n";
+
+    return out.str();
 }
 
 Fin::Allocator::Block &Fin::Allocator::getBlock(Ptr ptr)
 {
-    if (ptr._block >= heap.size())
+    if (ptr._block >= _blocks.size())
         throw RuntimeError{"invalid ptr block"};
-    return heap[ptr._block];
+    return _blocks[ptr._block];
 }
 
 Fin::Ptr Fin::Allocator::add(Memory mem, Offset size, Access access)
 {
 #ifndef FIN_PEDANTIC
     // recycle if possible
-    if (!freeStore.empty())
+    if (!_freeStore.empty())
     {
-        Ptr ptr{freeStore.top(), Offset{}};
-        freeStore.pop();
+        Ptr ptr{_freeStore.top(), Offset{}};
+        _freeStore.pop();
 
-        assert(ptr._block < heap.size());
-        auto &block = heap[ptr._block];
+        assert(ptr._block < _blocks.size());
+        auto &block = _blocks[ptr._block];
 
         assert(block.access == Access::None);
         assert(block.memory._data == nullptr);
@@ -188,21 +193,21 @@ Fin::Ptr Fin::Allocator::add(Memory mem, Offset size, Access access)
 #endif
 
     // no more freed blocks / pedantic, add new
-    Ptr ptr{static_cast<std::uint32_t>(heap.size()), Offset{}};
-    heap.emplace_back(Block{mem, size, access});
+    Ptr ptr{static_cast<std::uint32_t>(_blocks.size()), Offset{}};
+    _blocks.emplace_back(Block{mem, size, access});
 
     return ptr;
 }
 
 void Fin::Allocator::remove(std::uint32_t idx)
 {
-    assert(idx < heap.size());
+    assert(idx < _blocks.size());
     // preserve size so that statistics are correct
-    heap[idx].memory = Memory{};
-    heap[idx].access = Access::None;
+    _blocks[idx].memory = Memory{};
+    _blocks[idx].access = Access::None;
 
 #ifndef FIN_PEDANTIC
-    freeStore.emplace(idx);
+    _freeStore.emplace(idx);
 #endif
 }
 

@@ -26,9 +26,9 @@ public:
     void run();
     Library &createLibrary(LibraryID id);
     Library &getLibrary(const LibraryID &id);
-    void backtrace(std::ostream &out) const noexcept;
-    Allocator &allocator() noexcept { return alloc; }
-    Stack &stack() noexcept { return eval; }
+    std::string backtrace() const noexcept;
+    Allocator &allocator() noexcept { return _alloc; }
+    Stack &stack() noexcept { return _eval; }
 
 private:
     struct Frame
@@ -40,14 +40,14 @@ private:
         Offset param;
     };
 
-    Allocator alloc;
-    Stack eval;
-    Frame frame;
+    Allocator _alloc;
+    Stack _eval;
+    Frame _frame;
 
-    std::deque<Frame> rtStack;
-    std::map<LibraryID, std::unique_ptr<Library>> libraries;
-    std::vector<std::uint8_t> instrs;
-    std::unique_ptr<Contract> mainContract;
+    std::deque<Frame> _frames;
+    std::map<LibraryID, std::unique_ptr<Library>> _libraries;
+    std::vector<std::uint8_t> _instrs;
+    std::unique_ptr<Contract> _mainContract;
 
     void printFrame(std::ostream &out, const Frame &fr) const;
     std::string readStr();
@@ -71,7 +71,7 @@ private:
         T val = 0;
 
         std::uint8_t byte;
-        while ((byte = instrs.at(frame.pc++)) & 0b10000000)
+        while ((byte = _instrs.at(_frame.pc++)) & 0b10000000)
             val = static_cast<T>(val << 7) | (byte & 0b01111111);
 
         val = static_cast<T>(val << 6) | (byte & 0b00111111);
@@ -87,8 +87,8 @@ private:
     T readConst()
     {
         // FIXME: unaligned access
-        auto addr = &instrs.at(frame.pc);
-        jump(frame.pc + sizeof(T));
+        auto addr = &_instrs.at(_frame.pc);
+        jump(_frame.pc + sizeof(T));
 
         T val = *reinterpret_cast<T *>(addr);
         LOG(1) << ' ' << val;
@@ -98,9 +98,9 @@ private:
     template <typename Op>
     void binaryOp()
     {
-        auto op2 = eval.pop<typename Op::second_argument_type>();
-        auto op1 = eval.pop<typename Op::first_argument_type>();
-        eval.push(Op{}(op1, op2));
+        auto op2 = _eval.pop<typename Op::second_argument_type>();
+        auto op1 = _eval.pop<typename Op::first_argument_type>();
+        _eval.push(Op{}(op1, op2));
     }
 };
 } // namespace Fin

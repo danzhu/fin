@@ -13,27 +13,24 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 
-namespace
+Fin::Runtime::Runtime() : _eval{_alloc}
 {
-} // end of anonymous namespace
-
-Fin::Runtime::Runtime() : eval{alloc}
-{
-    instrs.emplace_back(static_cast<std::uint8_t>(Opcode::Term));
+    _instrs.emplace_back(static_cast<std::uint8_t>(Opcode::Term));
 }
 
 void Fin::Runtime::load(std::istream &src)
 {
     LOG(1) << "Loading...";
 
-    frame = Frame{};
-    frame.local = frame.param = eval.size();
-    frame.pc = static_cast<Pc>(instrs.size());
+    _frame = Frame{};
+    _frame.local = _frame.param = _eval.size();
+    _frame.pc = static_cast<Pc>(_instrs.size());
 
-    instrs.insert(instrs.end(), std::istreambuf_iterator<char>{src},
+    _instrs.insert(_instrs.end(), std::istreambuf_iterator<char>{src},
                   std::istreambuf_iterator<char>{});
-    instrs.emplace_back(static_cast<std::uint8_t>(Opcode::Term));
+    _instrs.emplace_back(static_cast<std::uint8_t>(Opcode::Term));
 
     execute();
 
@@ -45,18 +42,14 @@ void Fin::Runtime::run()
     LOG(1) << "Running...";
 
     checkLibrary();
-    mainContract =
-            std::make_unique<Contract>(frame.library->function("main()"));
+    _mainContract =
+            std::make_unique<Contract>(_frame.library->function("main()"));
 
-    frame.pc = 0;
-    call(*mainContract);
+    _frame.pc = 0;
+    call(*_mainContract);
     execute();
 
-    LOG(1) << '\n';
-
-#if FIN_DEBUG > 0
-    alloc.summary(std::cerr);
-#endif
+    LOG(1) << '\n' << _alloc.summary();
 }
 
 Fin::Library &Fin::Runtime::createLibrary(LibraryID id)
@@ -64,24 +57,26 @@ Fin::Library &Fin::Runtime::createLibrary(LibraryID id)
     auto lib = std::make_unique<Library>(id);
 
     auto p = lib.get();
-    libraries.emplace(std::move(id), std::move(lib));
+    _libraries.emplace(std::move(id), std::move(lib));
     return *p;
 }
 
 Fin::Library &Fin::Runtime::getLibrary(const LibraryID &id)
 {
     // TODO: load library if not available
-    return *libraries.at(id);
+    return *_libraries.at(id);
 }
 
-void Fin::Runtime::backtrace(std::ostream &out) const noexcept
+std::string Fin::Runtime::backtrace() const noexcept
 {
+    std::ostringstream out{};
     out << "Backtrace:\n";
 
-    for (const auto &fr : rtStack)
+    for (const auto &fr : _frames)
         printFrame(out, fr);
 
-    printFrame(out, frame);
+    printFrame(out, _frame);
+    return out.str();
 }
 
 void Fin::Runtime::printFrame(std::ostream &out, const Frame &fr) const
@@ -103,35 +98,36 @@ void Fin::Runtime::printFrame(std::ostream &out, const Frame &fr) const
 
     out << '\n';
 }
+
 void Fin::Runtime::jump(Pc target)
 {
-    if (target > instrs.size())
+    if (target > _instrs.size())
         throw RuntimeError{"jump target " + std::to_string(target) +
-                           " out of range " + std::to_string(instrs.size())};
-    frame.pc = target;
+                           " out of range " + std::to_string(_instrs.size())};
+    _frame.pc = target;
 }
 
 std::string Fin::Runtime::readStr()
 {
     auto len = readInt<std::uint16_t>();
-    auto val = std::string{reinterpret_cast<char *>(&instrs.at(frame.pc)), len};
+    auto val = std::string{reinterpret_cast<char *>(&_instrs.at(_frame.pc)), len};
 
     LOG(1) << " '" << val << "'";
 
-    jump(frame.pc + len);
+    jump(_frame.pc + len);
     return val;
 }
 
 Fin::Pc Fin::Runtime::readTarget()
 {
     auto offset = readInt<std::int32_t>();
-    return frame.pc + offset;
+    return _frame.pc + offset;
 }
 
 const Fin::Function &Fin::Runtime::readFunction()
 {
     auto idx = readInt<std::uint32_t>();
-    auto &fn = frame.library->refFunction(idx);
+    auto &fn = _frame.library->refFunction(idx);
 
     LOG(1) << " [" << fn.name() << "]";
 
@@ -141,7 +137,7 @@ const Fin::Function &Fin::Runtime::readFunction()
 const Fin::Type &Fin::Runtime::readType()
 {
     auto idx = readInt<std::uint32_t>();
-    auto &type = frame.library->refType(idx);
+    auto &type = _frame.library->refType(idx);
 
     LOG(1) << " [" << type.name() << "]";
 
@@ -151,7 +147,7 @@ const Fin::Type &Fin::Runtime::readType()
 Fin::Contract &Fin::Runtime::readContract()
 {
     auto idx = readInt<Index>();
-    auto &ctr = frame.contract->contract(idx);
+    auto &ctr = _frame.contract->contract(idx);
 
     LOG(1) << " [" << ctr.name() << "]";
 
@@ -161,7 +157,7 @@ Fin::Contract &Fin::Runtime::readContract()
 Fin::TypeInfo Fin::Runtime::readSize()
 {
     auto idx = readInt<Index>();
-    auto size = frame.contract->size(idx);
+    auto size = _frame.contract->size(idx);
 
     LOG(1) << " [" << size.size() << " | " << size.alignment() << "]";
 
@@ -171,7 +167,7 @@ Fin::TypeInfo Fin::Runtime::readSize()
 Fin::Offset Fin::Runtime::readOffset()
 {
     auto idx = readInt<Index>();
-    auto offset = frame.contract->offset(idx);
+    auto offset = _frame.contract->offset(idx);
 
     LOG(1) << " [" << offset << "]";
 
@@ -180,21 +176,21 @@ Fin::Offset Fin::Runtime::readOffset()
 
 void Fin::Runtime::ret()
 {
-    eval.resize(frame.param);
+    _eval.resize(_frame.param);
 
-    frame = pop(rtStack);
+    _frame = pop(_frames);
 }
 
 void Fin::Runtime::call(Contract &ctr)
 {
-    // store current frame
-    rtStack.emplace_back(frame);
+    // store current _frame
+    _frames.emplace_back(_frame);
 
-    // update frame
-    frame.contract = &ctr;
-    frame.local = frame.param = eval.size();
+    // update _frame
+    _frame.contract = &ctr;
+    _frame.local = _frame.param = _eval.size();
 
-    frame.library = &ctr.library();
+    _frame.library = &ctr.library();
 
     if (ctr.native())
     {
@@ -202,7 +198,7 @@ void Fin::Runtime::call(Contract &ctr)
 
         // emplace and pop even for native functions so that we can get full
         // backtrace
-        frame = pop(rtStack);
+        _frame = pop(_frames);
     }
     else
     {
@@ -219,21 +215,21 @@ void Fin::Runtime::call(Contract &ctr)
 void Fin::Runtime::finalizeCall()
 {
     // update param and local ptr
-    frame.param = frame.local - frame.contract->argOffset();
+    _frame.param = _frame.local - _frame.contract->argOffset();
 
     // reserve space for local
-    eval.resize(eval.size() + frame.contract->localOffset());
+    _eval.resize(_eval.size() + _frame.contract->localOffset());
 }
 
 void Fin::Runtime::checkLibrary()
 {
-    if (frame.library == nullptr)
+    if (_frame.library == nullptr)
         throw RuntimeError{"no library active"};
 }
 
 void Fin::Runtime::checkContract()
 {
-    if (frame.contract == nullptr)
+    if (_frame.contract == nullptr)
         throw RuntimeError{"no contract active"};
 }
 
@@ -246,7 +242,7 @@ void Fin::Runtime::execute()
     {
         LOG(2) << '\n';
 
-        auto op = static_cast<Opcode>(instrs.at(frame.pc++));
+        auto op = static_cast<Opcode>(_instrs.at(_frame.pc++));
         LOG(1) << "\n- " << op;
 
         switch (op)
@@ -256,7 +252,7 @@ void Fin::Runtime::execute()
 
         case Opcode::Cookie:
             // skip shebang
-            while (instrs.at(frame.pc++) != '\n')
+            while (_instrs.at(_frame.pc++) != '\n')
                 ;
             break;
 
@@ -265,7 +261,7 @@ void Fin::Runtime::execute()
             auto name = readStr();
 
             auto &lib = createLibrary(LibraryID{name});
-            frame.library = &lib;
+            _frame.library = &lib;
             break;
         }
 
@@ -279,7 +275,7 @@ void Fin::Runtime::execute()
             auto loc = readTarget();
             auto end = readTarget();
 
-            frame.library->addFunction(name, frame.pc, loc, gens, ctrs);
+            _frame.library->addFunction(name, _frame.pc, loc, gens, ctrs);
             jump(end);
             break;
         }
@@ -290,7 +286,7 @@ void Fin::Runtime::execute()
             auto gens = readInt<std::uint16_t>();
             auto end = readTarget();
 
-            refType = &frame.library->addType(name, gens, frame.pc);
+            refType = &_frame.library->addType(name, gens, _frame.pc);
             jump(end);
             break;
         }
@@ -303,7 +299,7 @@ void Fin::Runtime::execute()
             auto name = readStr();
 
             auto &mem = refType->addMember(name);
-            frame.library->addRefMember(mem);
+            _frame.library->addRefMember(mem);
             break;
         }
 
@@ -325,7 +321,7 @@ void Fin::Runtime::execute()
             auto name = readStr();
 
             auto &fn = refLibrary->function(name);
-            frame.library->addRefFunction(fn);
+            _frame.library->addRefFunction(fn);
             break;
         }
 
@@ -339,7 +335,7 @@ void Fin::Runtime::execute()
             auto name = readStr();
 
             auto &tp = refLibrary->type(name);
-            frame.library->addRefType(tp);
+            _frame.library->addRefType(tp);
             break;
         }
 
@@ -348,7 +344,7 @@ void Fin::Runtime::execute()
             checkContract();
 
             auto size = TypeInfo::native<Int>();
-            frame.contract->addSize(size);
+            _frame.contract->addSize(size);
             break;
         }
 
@@ -357,7 +353,7 @@ void Fin::Runtime::execute()
             checkContract();
 
             auto size = TypeInfo::native<Float>();
-            frame.contract->addSize(size);
+            _frame.contract->addSize(size);
             break;
         }
 
@@ -366,7 +362,7 @@ void Fin::Runtime::execute()
             checkContract();
 
             auto size = TypeInfo::native<Bool>();
-            frame.contract->addSize(size);
+            _frame.contract->addSize(size);
             break;
         }
 
@@ -375,7 +371,7 @@ void Fin::Runtime::execute()
             checkContract();
 
             auto size = TypeInfo::native<Ptr>();
-            frame.contract->addSize(size);
+            _frame.contract->addSize(size);
             break;
         }
 
@@ -385,8 +381,8 @@ void Fin::Runtime::execute()
 
             auto idx = readInt<Index>();
 
-            auto size = frame.contract->size(idx);
-            frame.contract->addSize(size);
+            auto size = _frame.contract->size(idx);
+            _frame.contract->addSize(size);
             break;
         }
 
@@ -396,10 +392,10 @@ void Fin::Runtime::execute()
 
             auto len = readInt<Int>();
 
-            auto size = frame.contract->popSize();
+            auto size = _frame.contract->popSize();
 
             size = TypeInfo{size.alignedSize() * len, size.alignment()};
-            frame.contract->addSize(size);
+            _frame.contract->addSize(size);
             break;
         }
 
@@ -410,7 +406,7 @@ void Fin::Runtime::execute()
 
             auto &type = readType();
 
-            auto &ctr = frame.contract->callType(type);
+            auto &ctr = _frame.contract->callType(type);
             call(ctr);
             break;
         }
@@ -420,10 +416,10 @@ void Fin::Runtime::execute()
             checkLibrary();
             checkContract();
 
-            TypeInfo size{frame.contract->localOffset(),
-                          frame.contract->localAlignment()};
+            TypeInfo size{_frame.contract->localOffset(),
+                          _frame.contract->localAlignment()};
             ret();
-            frame.contract->addSize(size);
+            _frame.contract->addSize(size);
             break;
         }
 
@@ -434,8 +430,8 @@ void Fin::Runtime::execute()
 
             auto idx = readInt<Index>();
 
-            auto mem = frame.library->refMember(idx);
-            frame.contract->addMemberOffset(mem);
+            auto mem = _frame.library->refMember(idx);
+            _frame.contract->addMemberOffset(mem);
             break;
         }
 
@@ -445,7 +441,7 @@ void Fin::Runtime::execute()
 
             auto size = readSize();
 
-            frame.contract->addArgOffset(size);
+            _frame.contract->addArgOffset(size);
             break;
         }
 
@@ -456,7 +452,7 @@ void Fin::Runtime::execute()
 
             auto size = readSize();
 
-            frame.contract->addLocalOffset(size);
+            _frame.contract->addLocalOffset(size);
             break;
         }
 
@@ -467,7 +463,7 @@ void Fin::Runtime::execute()
 
             auto &fn = readFunction();
 
-            frame.contract->addContract(fn);
+            _frame.contract->addContract(fn);
             break;
         }
 
@@ -475,7 +471,7 @@ void Fin::Runtime::execute()
             finalizeCall();
 
             // cleanup unneeded data
-            frame.contract->sign();
+            _frame.contract->sign();
             break;
 
         case Opcode::Call:
@@ -498,11 +494,11 @@ void Fin::Runtime::execute()
         {
             auto size = readSize();
 
-            auto src = eval.topSize(size);
+            auto src = _eval.topSize(size);
 
             ret();
 
-            auto dest = eval.pushSize(size);
+            auto dest = _eval.pushSize(size);
             src.move(dest, size);
             break;
         }
@@ -511,7 +507,7 @@ void Fin::Runtime::execute()
         {
             auto size = readSize();
 
-            eval.pushSize(size);
+            _eval.pushSize(size);
             break;
         }
 
@@ -519,7 +515,7 @@ void Fin::Runtime::execute()
         {
             auto size = readSize();
 
-            eval.popSize(size);
+            _eval.popSize(size);
             break;
         }
 
@@ -527,8 +523,8 @@ void Fin::Runtime::execute()
         {
             auto size = readSize();
 
-            auto src = eval.topSize(size);
-            auto dest = eval.pushSize(size);
+            auto src = _eval.topSize(size);
+            auto dest = _eval.pushSize(size);
 
             src.move(dest, size);
             break;
@@ -538,9 +534,9 @@ void Fin::Runtime::execute()
         {
             auto size = readSize();
 
-            auto ptr = eval.pop<Ptr>();
-            auto src = alloc.readSize(ptr, size);
-            auto dest = eval.pushSize(size);
+            auto ptr = _eval.pop<Ptr>();
+            auto src = _alloc.readSize(ptr, size);
+            auto dest = _eval.pushSize(size);
 
             src.move(dest, size);
             break;
@@ -550,9 +546,9 @@ void Fin::Runtime::execute()
         {
             auto size = readSize();
 
-            auto src = eval.popSize(size);
-            auto ptr = eval.pop<Ptr>();
-            auto dest = alloc.writeSize(ptr, size);
+            auto src = _eval.popSize(size);
+            auto ptr = _eval.pop<Ptr>();
+            auto dest = _alloc.writeSize(ptr, size);
 
             src.move(dest, size);
             break;
@@ -562,10 +558,10 @@ void Fin::Runtime::execute()
         {
             auto size = readSize();
 
-            auto idx = eval.pop<Int>();
-            auto addr = eval.pop<Ptr>();
+            auto idx = _eval.pop<Int>();
+            auto addr = _eval.pop<Ptr>();
 
-            eval.push<Ptr>(addr + size.alignedSize() * idx);
+            _eval.push<Ptr>(addr + size.alignedSize() * idx);
             break;
         }
 
@@ -573,7 +569,7 @@ void Fin::Runtime::execute()
         {
             auto offset = readOffset();
 
-            eval.push<Ptr>(eval.ptr() + frame.param + offset);
+            _eval.push<Ptr>(_eval.ptr() + _frame.param + offset);
             break;
         }
 
@@ -581,7 +577,7 @@ void Fin::Runtime::execute()
         {
             auto offset = readOffset();
 
-            eval.push<Ptr>(eval.ptr() + frame.local + offset);
+            _eval.push<Ptr>(_eval.ptr() + _frame.local + offset);
             break;
         }
 
@@ -589,7 +585,7 @@ void Fin::Runtime::execute()
         {
             auto offset = readOffset();
 
-            eval.top<Ptr>() += offset;
+            _eval.top<Ptr>() += offset;
             break;
         }
 
@@ -605,7 +601,7 @@ void Fin::Runtime::execute()
         {
             auto target = readTarget();
 
-            if (!eval.pop<bool>())
+            if (!_eval.pop<bool>())
                 jump(target);
             break;
         }
@@ -614,25 +610,25 @@ void Fin::Runtime::execute()
         {
             auto target = readTarget();
 
-            if (eval.pop<bool>())
+            if (_eval.pop<bool>())
                 jump(target);
             break;
         }
 
         case Opcode::ConstFalse:
-            eval.push(false);
+            _eval.push(false);
             break;
 
         case Opcode::ConstTrue:
-            eval.push(true);
+            _eval.push(true);
             break;
 
         case Opcode::Not:
-            eval.push(!eval.pop<bool>());
+            _eval.push(!_eval.pop<bool>());
             break;
 
         case Opcode::ConstI:
-            eval.push(readConst<Int>());
+            _eval.push(readConst<Int>());
             break;
 
         case Opcode::AddI:
@@ -656,7 +652,7 @@ void Fin::Runtime::execute()
             break;
 
         case Opcode::NegI:
-            eval.push(-eval.pop<Int>());
+            _eval.push(-_eval.pop<Int>());
             break;
 
         case Opcode::EqI:
@@ -684,7 +680,7 @@ void Fin::Runtime::execute()
             break;
 
         case Opcode::ConstF:
-            eval.push(readConst<Float>());
+            _eval.push(readConst<Float>());
             break;
 
         case Opcode::AddF:
@@ -705,14 +701,14 @@ void Fin::Runtime::execute()
 
         case Opcode::ModF:
         {
-            auto op2 = eval.pop<Float>();
-            auto op1 = eval.pop<Float>();
-            eval.push(std::fmod(op1, op2));
+            auto op2 = _eval.pop<Float>();
+            auto op1 = _eval.pop<Float>();
+            _eval.push(std::fmod(op1, op2));
             break;
         }
 
         case Opcode::NegF:
-            eval.push(-eval.pop<int32_t>());
+            _eval.push(-_eval.pop<int32_t>());
             break;
 
         case Opcode::EqF:
@@ -740,11 +736,11 @@ void Fin::Runtime::execute()
             break;
 
         case Opcode::CastIF:
-            eval.push(static_cast<Float>(eval.pop<Int>()));
+            _eval.push(static_cast<Float>(_eval.pop<Int>()));
             break;
 
         case Opcode::CastFI:
-            eval.push(static_cast<Int>(eval.pop<Float>()));
+            _eval.push(static_cast<Int>(_eval.pop<Float>()));
             break;
 
         default:

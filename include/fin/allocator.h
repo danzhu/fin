@@ -42,7 +42,7 @@ public:
     Memory writeSize(Ptr ptr, TypeInfo type);
     Memory get(Ptr ptr);
     void setSize(Ptr ptr, Offset size);
-    void summary(std::ostream &out) const noexcept;
+    std::string summary() const noexcept;
 
     template <typename T>
     T read(Ptr ptr)
@@ -80,8 +80,8 @@ private:
         Access access{Access::None};
     };
 
-    std::vector<Block> heap;
-    std::stack<std::uint32_t> freeStore;
+    std::vector<Block> _blocks;
+    std::stack<std::uint32_t> _freeStore;
 
     Block &getBlock(Ptr ptr);
     Ptr add(Memory mem, Offset size, Access access);

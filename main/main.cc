@@ -44,7 +44,7 @@ void write(Fin::Int val) { std::cout.put(static_cast<char>(val)); }
 
 Fin::Int read() { return static_cast<Fin::Int>(std::cin.get()); }
 
-void backtrace(Fin::Runtime &rt) { rt.backtrace(std::cout); }
+void backtrace(Fin::Runtime &rt) { std::cout << rt.backtrace(); }
 } // end of anonymous namespace
 
 int main(int argc, const char *argv[])
@@ -86,9 +86,8 @@ int main(int argc, const char *argv[])
     }
     catch (const std::exception &ex)
     {
-        std::cerr << "\nError: " << ex.what() << '\n';
-        runtime.backtrace(std::cerr);
-        runtime.allocator().summary(std::cerr);
+        std::cerr << "\nError: " << ex.what() << '\n'
+                  << runtime.backtrace() << runtime.allocator().summary();
         return 1;
     }
 
