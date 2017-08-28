@@ -26,7 +26,7 @@ Fin::Ptr Fin::Allocator::alloc(Offset size, Access access)
 
     auto ptr = add(Memory{addr}, size, access);
 
-    LOG(1) << "\n  A " << ptr << " [" << size << "]";
+    LOG(2) << "\n  A " << ptr << " [" << size << "]";
 
     return ptr;
 }
@@ -47,7 +47,7 @@ Fin::Ptr Fin::Allocator::realloc(Ptr ptr, Offset size)
     if (addr == nullptr)
         throw AllocationError{};
 
-    LOG(1) << "\n  R " << ptr << " [" << size << "]";
+    LOG(2) << "\n  R " << ptr << " [" << size << "]";
 
 #ifdef FIN_PEDANTIC
     // track every reallocation so that access to old memory can be tracked
@@ -73,7 +73,7 @@ void Fin::Allocator::dealloc(Ptr ptr)
 
     checkAccess(block, Access::Free);
 
-    LOG(1) << "\n  D " << ptr;
+    LOG(2) << "\n  D " << ptr;
 
     std::free(block.memory._data);
     remove(ptr._block);

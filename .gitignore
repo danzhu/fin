@@ -4,7 +4,3 @@
 
 # compiled files
 *.fm
-
-# cache files
-__pycache__
-.mypy_cache
