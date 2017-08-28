@@ -39,19 +39,16 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     /W4 \
     /wd4100")
 else()
-    message(WARNING "Compiler not recognized")
+    message(WARNING "Compiler not recognized, no warning flags set")
 endif()
-
-# output paths
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
 # files
 set(PY "${PROJECT_SOURCE_DIR}/py")
 set(GEN "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
-file(GLOB SOURCES "src/*.cc")
+file(GLOB SOURCES "src/fin/*.cc")
 file(GLOB_RECURSE HEADERS "include/*.h")
+file(GLOB MAIN "src/main/*.cc")
 file(GLOB FINC "${PY}/finc/*.py")
 
 file(MAKE_DIRECTORY "${GEN}")
@@ -80,11 +77,11 @@ add_custom_command(
 # targets
 add_library(fin
     ${SOURCES} ${HEADERS}
-    "${GEN}/opcode.h" "${GEN}/opcode.cc" "${PY}/instructions")
+    "${GEN}/opcode.cc" "${GEN}/opcode.h" "${PY}/instructions")
 target_include_directories(fin PRIVATE "${GEN}")
 target_include_directories(fin PUBLIC "${PROJECT_SOURCE_DIR}/include")
 
-add_executable(fin-bin main.cc)
+add_executable(fin-bin ${MAIN})
 set_target_properties(fin-bin PROPERTIES OUTPUT_NAME fin)
 target_link_libraries(fin-bin fin)
 
