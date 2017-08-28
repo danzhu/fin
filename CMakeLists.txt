@@ -46,9 +46,9 @@ endif()
 set(PY "${PROJECT_SOURCE_DIR}/py")
 set(GEN "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
-file(GLOB SOURCES "src/fin/*.cc")
+file(GLOB SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "include/*.h")
-file(GLOB MAIN "src/main/*.cc")
+file(GLOB MAIN "main/*.cc")
 file(GLOB FINC "${PY}/finc/*.py")
 
 file(MAKE_DIRECTORY "${GEN}")
@@ -91,6 +91,15 @@ add_custom_target(run
     COMMAND fin-bin test.fm
     DEPENDS test.fm)
 
+# preprocessor definitions
+if(DEBUG)
+    target_compile_definitions(fin PUBLIC FIN_DEBUG=${DEBUG})
+endif()
+
+if(PEDANTIC)
+    target_compile_definitions(fin PRIVATE FIN_PEDANTIC=1)
+endif()
+
 # tests
 enable_testing()
 
@@ -121,11 +130,3 @@ test_compile("void_var" "cannot create variable of type Void")
 test_compile("args_unmatched" "no viable function overload")
 test_compile("no_symbol" "cannot find symbol 'i'")
 test_compile("unsized_array" "array is unsized")
-
-if(DEBUG)
-    target_compile_definitions(fin PRIVATE FIN_DEBUG=${DEBUG})
-endif()
-
-if(PEDANTIC)
-    target_compile_definitions(fin PRIVATE FIN_PEDANTIC=1)
-endif()

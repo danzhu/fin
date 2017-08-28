@@ -81,10 +81,7 @@ private:
     };
 
     std::vector<Block> heap;
-
-#ifndef FIN_PEDANTIC
     std::stack<std::uint32_t> freeStore;
-#endif
 
     Block &getBlock(Ptr ptr);
     Ptr add(Memory mem, Offset size, Access access);

@@ -92,9 +92,5 @@ int main(int argc, const char *argv[])
         return 1;
     }
 
-#if FIN_DEBUG > 0
-    runtime.allocator().summary(std::cerr);
-#endif
-
     return 0;
 }

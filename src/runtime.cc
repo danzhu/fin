@@ -53,6 +53,10 @@ void Fin::Runtime::run()
     execute();
 
     LOG(1) << '\n';
+
+#if FIN_DEBUG > 0
+    alloc.summary(std::cerr);
+#endif
 }
 
 Fin::Library &Fin::Runtime::createLibrary(LibraryID id)
