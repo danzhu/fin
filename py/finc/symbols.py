@@ -27,12 +27,12 @@ class SymbolTable:
         self.symbols: Dict[str, Symbol] = {}
         self.references: Dict[str, Module] = {}
 
-    def _add_symbol(self, sym: Symbol) -> None:
-        if sym.name in self.symbols:
+    def _add_symbol(self, name: str, sym: Symbol) -> None:
+        if name in self.symbols:
             raise LookupError(
                 f"symbol '{sym.name}' exists as {self.symbols[sym.name]}")
 
-        self.symbols[sym.name] = sym
+        self.symbols[name] = sym
 
     def _find(self, name: str) -> Symbol:
         if name in self.symbols:
@@ -194,15 +194,15 @@ class Module(Scope):
         return path
 
     def add_module(self, mod: 'Module') -> None:
-        self._add_symbol(mod)
+        self._add_symbol(mod.name, mod)
         mod.parent = self
 
     def add_struct(self, struct: 'Struct') -> None:
-        self._add_symbol(struct)
+        self._add_symbol(struct.name, struct)
         struct.parent = self
 
     def add_enum(self, enum: 'Enumeration') -> None:
-        self._add_symbol(enum)
+        self._add_symbol(enum.name, enum)
         enum.parent = self
 
     def add_function(self, fn: 'Function') -> None:
@@ -225,7 +225,7 @@ class Module(Scope):
         assert False, 'TODO'
 
     def add_constant(self, const: Constant) -> None:
-        self._add_symbol(const)
+        self._add_symbol(const.name, const)
 
     def operators(self, name: str) -> Set['types.Match']:
         ops: Set[types.Match]
@@ -262,13 +262,13 @@ class Struct(Scope):
     def add_generic(self, name: str) -> Generic:
         gen = Generic(name, len(self.generics))
         self.generics.append(gen)
-        self._add_symbol(gen)
+        self._add_symbol(name, gen)
         return gen
 
     def add_field(self, name: str, tp: 'types.Type') -> Variable:
         field = Variable(name, tp, len(self.fields))
         self.fields.append(field)
-        self._add_symbol(field)
+        self._add_symbol(name, field)
         return field
 
     def overloads(self) -> Set['types.Match']:
@@ -282,7 +282,6 @@ class Enumeration(Scope):
 
         self.name = name
 
-        self.size = 4
         self.counter = 0
         self.generics: List['Generic'] = []
         self.variants: List['Variant'] = []
@@ -293,14 +292,14 @@ class Enumeration(Scope):
     def add_generic(self, name: str) -> 'Generic':
         gen = Generic(name, len(self.generics))
         self.generics.append(gen)
-        self._add_symbol(gen)
+        self._add_symbol(name, gen)
         return gen
 
     def add_variant(self, name: str) -> 'Variant':
         var = Variant(name, self)
         self.counter += 1
 
-        self._add_symbol(var)
+        self._add_symbol(name, var)
         self.variants.append(var)
         return var
 
@@ -323,9 +322,9 @@ class Variant(Scope):
         return f'{self.enum.name}:{self.name}'
 
     def add_field(self, name: str, tp: 'types.Type') -> Variable:
-        field = Variable(name, tp, len(self.fields))
+        field = Variable(f'{self.name}:{name}', tp, len(self.fields))
         self.fields.append(field)
-        self._add_symbol(field)
+        self._add_symbol(name, field)
         return field
 
     def overloads(self) -> Set['types.Match']:
@@ -357,7 +356,7 @@ class Function(Scope):
     def add_param(self, name: str, tp: 'types.Type') -> Variable:
         param = Variable(name, tp, len(self.params), is_arg=True)
 
-        self._add_symbol(param)
+        self._add_symbol(name, param)
         self.params.append(param)
         return param
 
@@ -370,7 +369,7 @@ class Function(Scope):
     def add_generic(self, name: str) -> 'Generic':
         gen = Generic(name, len(self.generics))
 
-        self._add_symbol(gen)
+        self._add_symbol(name, gen)
         self.generics.append(gen)
         return gen
 
@@ -403,5 +402,5 @@ class Block(SymbolTable):
     def add_local(self, name: str, tp: 'types.Type') -> Variable:
         var = self.ancestor(Function).add_local(name, tp)
         self.locals.append(var)
-        self._add_symbol(var)
+        self._add_symbol(name, var)
         return var

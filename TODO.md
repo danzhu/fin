@@ -8,8 +8,8 @@
   - [ ] Language Builtins
   - [ ] Runtime Library
   - [ ] Standard Library
-- [ ] Compiler Rewrite
 - [ ] Debugger
+- [ ] Compiler Rewrite
 
 ## Language
 
@@ -53,6 +53,7 @@
   - [ ] constants
   - [ ] immutable bindings
   - [x] mutable variables
+- [ ] strings
 
 ## Compiler
 
@@ -117,6 +118,13 @@
   - [ ] array destructuring
 - arrays
   - [ ] inline initialization
+- [ ] change native types from Struct to Native
+- [ ] reuse local stack space
+- [ ] fix
+  - [ ] enum
+  - [ ] pattern matching
+  - [ ] `break` / `return` value
+- [ ] refactor analyzer
 
 ## Runtime
 
@@ -126,8 +134,8 @@
 - [ ] globals
 - [x] remove module index
 - [x] template for automatic C++ binding
-  - [ ] auto generics and contracts calculation
-  - [ ] compile-time generics and contracts index generation
+  - [x] auto generics and contracts calculation
+  - [x] compile-time generics and contracts index generation
 - [ ] separate bytecode memory space for each library
 - [x] ~~managed pc~~
 - [x] internal free error
@@ -137,3 +145,4 @@
 - [x] encapsulate `Library` and its items
 - [x] fix noexcept default move
 - [ ] use "allocated" and "freed" in allocator summary
+- [ ] type recurse upper limit

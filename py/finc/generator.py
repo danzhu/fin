@@ -76,18 +76,18 @@ class Writer:
         elif isinstance(tp, types.Special):
             assert False, 'when?'
 
-        elif isinstance(tp, types.StructType):
-            if tp.struct == builtin.BOOL_SYM:
+        elif isinstance(tp, (types.StructType, types.EnumerationType)):
+            if tp.symbol == builtin.BOOL_SYM:
                 self.instr('size_b')
-            elif tp.struct == builtin.INT_SYM:
+            elif tp.symbol == builtin.INT_SYM:
                 self.instr('size_i')
-            elif tp.struct == builtin.FLOAT_SYM:
+            elif tp.symbol == builtin.FLOAT_SYM:
                 self.instr('size_f')
             else:
                 for gen in tp.generics:
                     self.type(gen)
 
-                self.instr('type_call', tp.struct.fullname())
+                self.instr('type_call', tp.symbol.fullname())
 
         else:
             assert False, f'unknown type {tp}'
@@ -205,14 +205,9 @@ class Generator:
             self._function_refs.add(fn)
 
     def ref_member(self, tp: types.Type, mem: str) -> None:
-        sym: Union[symbols.Struct, symbols.Enumeration]
-        if isinstance(tp, types.StructType):
-            sym = tp.struct
-        elif isinstance(tp, types.EnumerationType):
-            sym = tp.enum
-        else:
-            assert False
+        assert isinstance(tp, (types.StructType, types.EnumerationType))
 
+        sym = tp.symbol
         mod = sym.module()
         if mod == self._root.module:
             return
@@ -234,16 +229,10 @@ class Type:
                  writer: Writer) -> None:
         self.types: Dict[str, types.Type] = {}
 
-        fields: Iterable[symbols.Variable]
-        if isinstance(sym, symbols.Struct):
-            fields = sym.fields
-        elif isinstance(sym, symbols.Enumeration):
-            assert False, 'TODO'
-        else:
-            assert False
-
-        for field in fields:
-            self._type(field.type)
+        writer.indent()
+        self.writer = Writer(writer)
+        writer.dedent()
+        self._gen(sym)
 
         end = gen.label('END_TYPE')
 
@@ -261,25 +250,48 @@ class Type:
             writer.space()
 
         for tp_name, tp in sorted(self.types.items()):
-            writer.instr('!sz', type_name(tp))
+            writer.instr('!sz', tp_name)
             writer.type(tp)
             writer.space()
 
         writer.space()
         writer.comment('fields')
-        for field in fields:
-            writer.instr('field', type_name(field.type))
+        writer.extend(self.writer)
 
         writer.dedent()
         writer.instr('type_ret')
         writer.label(end)
 
         writer.indent()
-        for field in fields:
-            writer.instr('member', quote(field.name))
+        if isinstance(sym, symbols.Struct):
+            for field in sym.fields:
+                writer.instr('member', quote(field.name))
+        elif isinstance(sym, symbols.Enumeration):
+            writer.instr('member', quote('_value'))
+
+            for var in sym.variants:
+                for field in var.fields:
+                    writer.instr('member', quote(field.name))
+        else:
+            assert False
 
         writer.dedent()
         writer.space()
+
+    def _gen(self, sym: Union[symbols.Struct, symbols.Enumeration]) -> None:
+        if isinstance(sym, symbols.Struct):
+            for field in sym.fields:
+                self.writer.instr('local', self._type(field.type))
+        elif isinstance(sym, symbols.Enumeration):
+            # _value field
+            self.writer.instr('local', self._type(builtin.INT))
+
+            for var in sym.variants:
+                # TODO: reset offset
+                for field in var.fields:
+                    self.writer.instr('local', self._type(field.type))
+        else:
+            assert False
 
     def _type(self, tp: types.Type) -> str:
         name = type_name(tp)
@@ -336,12 +348,8 @@ class Function:
             if len(tp.member_refs) == 0:
                 continue
 
-            if isinstance(tp.type, types.StructType):
-                name = tp.type.struct.fullname()
-            elif isinstance(tp.type, types.EnumerationType):
-                name = tp.type.enum.fullname()
-            else:
-                assert False
+            assert isinstance(tp.type, (types.StructType, types.EnumerationType))
+            name = tp.type.symbol.fullname()
 
             # member refs
             writer.indent()
@@ -771,24 +779,35 @@ class Function:
         self.writer.instr('store', self._type(tp))
 
     def _CALL(self, node: Node) -> None:
-        if isinstance(node.match.source, symbols.Function):
+        sym = node.match.source
+
+        if isinstance(sym, symbols.Function):
             for c in node.children[1].children:
                 self._gen(c)
 
             self._call(node.match)
 
-        elif isinstance(node.match.source, symbols.Struct):
+        elif isinstance(sym, (symbols.Struct, symbols.Variant)):
             tmp = self._temp()
 
             tp = node.match.ret
             self._push_local(tmp, tp)
 
-            for i in range(len(node.children[1].children)):
-                child = node.children[1].children[i]
-                mem = self._member(tp, node.match.source.fields[i].name)
+            assert isinstance(tp, (types.StructType, types.EnumerationType))
 
+            if isinstance(sym, symbols.Variant):
                 self.writer.instr('addr_var', tmp)
-                self.writer.instr('addr_mem', mem)
+                self.writer.instr('addr_mem', self._member(tp, '_value'))
+                # TODO: user-defined value type
+                self.writer.instr('const_i', sym.value)
+                self.writer.instr('store', self._type(builtin.INT))
+
+            assert len(node.children[1].children) == len(sym.fields)
+
+            for child, field in zip(node.children[1].children,
+                    sym.fields):
+                self.writer.instr('addr_var', tmp)
+                self.writer.instr('addr_mem', self._member(tp, field.name))
                 self._gen(child)
                 self.writer.instr('store', self._type(child.target_type))
 
@@ -885,8 +904,9 @@ def type_name(tp: types.Type) -> str:
     if isinstance(tp, types.Generic):
         return tp.fullname()
 
-    if isinstance(tp, types.StructType):
-        name = tp.struct.fullname()
+    if isinstance(tp, (types.StructType, types.EnumerationType)):
+        name = tp.symbol.fullname()
+
         if len(tp.generics) > 0:
             name += '{' + \
                 ','.join(type_name(g) for g in tp.generics) + \

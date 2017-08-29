@@ -446,7 +446,6 @@ void Fin::Runtime::execute()
         }
 
         case Opcode::Local:
-        case Opcode::Field:
         {
             checkContract();
 

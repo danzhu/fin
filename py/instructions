@@ -47,8 +47,6 @@ param size:sz
 
 local size:sz
 
-field size:sz
-
 contract function:fn
 
 sign

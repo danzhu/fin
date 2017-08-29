@@ -1,45 +1,9 @@
 import rt
 
-struct Vec{T}
-    content &[T]
-    size Int
-    capacity Int
-
-def new{T}(cap Int) Vec{T}
-    Vec(rt::alloc(cap), 0, cap)
-
-def append{T}(self &Vec{T}, item T)
-    if self.size == self.capacity then
-        self.capacity *= 2
-        self.content := rt::realloc(self.content, self.capacity)
-    else if self.size == self.capacity + 1 then
-        self.capacity = 0
-
-    self.content[self.size] = item
-    self.size += 1
-
-def subscript{T}(self &Vec{T}, idx Int) &T
-    self.content[idx]
-
-def pop{T}(self &Vec{T}) T
-    self.size -= 1
-    self.content[self.size]
-
-def drop{T}(self Vec{T})
-    rt::dealloc(self.content)
+enum Opt{T}
+    Some(value T)
+    None
 
 def main()
-    let v Vec{Int} = new(4)
-    let i = 1
-    while TRUE do
-        v.append(if i > 1000 then break else i)
-        i *= 2
-        let i = i + 1
-
-    while
-        v.size
-        v.size > 0
-    do
-        v.pop().rt::print()
-
-    v.drop()
+    let opt = Opt::Some(2)
+    opt = Opt::None()

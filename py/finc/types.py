@@ -68,23 +68,14 @@ class Resolution:
                 and tp.length == other.length \
                 and self.match_type(tp.type, other.type, ret)
 
-        if isinstance(tp, StructType):
-            if not isinstance(other, StructType):
+        if isinstance(tp, (StructType, EnumerationType)):
+            if not isinstance(other, type(tp)):
                 return False
 
-            if tp.struct != other.struct:
-                return False
+            # silence type check error
+            assert isinstance(other, (StructType, EnumerationType))
 
-            if not tp.generics.match(other.generics, self, ret):
-                return False
-
-            return True
-
-        if isinstance(tp, EnumerationType):
-            if not isinstance(other, EnumerationType):
-                return False
-
-            if tp.enum != other.enum:
+            if tp.symbol != other.symbol:
                 return False
 
             if not tp.generics.match(other.generics, self, ret):
@@ -479,7 +470,7 @@ class StructType(Type):
                  struct: 'symbols.Struct',
                  gens: Generics = None,
                  flds: Variables = None) -> None:
-        self.struct = struct
+        self.symbol = struct
         self.generics = gens
         self.fields = flds
 
@@ -492,15 +483,15 @@ class StructType(Type):
                 self.fields = self.fields.resolve(gens.resolution())
 
     def __str__(self) -> str:
-        return f'{self.struct}{self.generics}'
+        return f'{self.symbol}{self.generics}'
 
     def fullname(self) -> str:
-        return f'{self.struct.fullname()}{self.generics.fullname()}'
+        return f'{self.symbol.fullname()}{self.generics.fullname()}'
 
     def resolve(self, res: Resolution) -> 'StructType':
         gens = self.generics.resolve(res)
         return StructType(
-            self.struct,
+            self.symbol,
             gens,
             self.fields.resolve(res)
         )
@@ -511,7 +502,7 @@ class EnumerationType(Type):
                  enum: 'symbols.Enumeration',
                  gens: Generics = None,
                  variants: Sequence[Variables] = None) -> None:
-        self.enum = enum
+        self.symbol = enum
         self.generics = gens
         self.variants = variants
 
@@ -525,15 +516,15 @@ class EnumerationType(Type):
                 self.variants = [v.resolve(res) for v in self.variants]
 
     def __str__(self) -> str:
-        return f'{self.enum}{self.generics}'
+        return f'{self.symbol}{self.generics}'
 
     def fullname(self) -> str:
-        return self.enum.fullname()
+        return self.symbol.fullname()
 
     def resolve(self, res: Resolution) -> 'EnumerationType':
         gens = self.generics.resolve(res)
         return EnumerationType(
-            self.enum,
+            self.symbol,
             gens,
             [v.resolve(res) for v in self.variants]
         )
