@@ -455,6 +455,14 @@ void Fin::Runtime::execute()
             break;
         }
 
+        case Opcode::Reset:
+        {
+            auto offset = readOffset();
+
+            _frame.contract->setCurrentOffset(offset);
+            break;
+        }
+
         case Opcode::Contract:
         {
             checkLibrary();

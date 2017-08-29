@@ -26,9 +26,11 @@ void Fin::Contract::addArgOffset(const TypeInfo &info) noexcept
 
 void Fin::Contract::addLocalOffset(const TypeInfo &info) noexcept
 {
-    auto offset = _localOffset.align(info.alignment());
+    auto offset = _currentOffset.align(info.alignment());
     addOffset(offset);
-    _localOffset = offset + info.size();
+    _currentOffset = offset + info.size();
+
+    _localOffset = std::max(_localOffset, _currentOffset);
     _localAlignment = std::max(_localAlignment, info.alignment());
 }
 

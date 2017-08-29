@@ -44,6 +44,7 @@ public:
     TypeInfo size(std::uint32_t idx) const { return _sizes.at(idx); }
     Offset offset(std::uint32_t idx) const { return _offsets.at(idx); }
     Contract &contract(std::uint32_t idx) { return _contracts.at(idx); }
+    void setCurrentOffset(Offset off) noexcept { _currentOffset = off; }
 
     Library &library() const noexcept { return *_library; }
     std::string name() const noexcept { return _name; }
@@ -65,6 +66,7 @@ private:
     NativeFunction _native;
     Offset _argOffset;
     Offset _localOffset;
+    Offset _currentOffset;
     Alignment _localAlignment{0};
 
     void addOffset(Offset off) noexcept;

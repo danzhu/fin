@@ -47,6 +47,8 @@ param size:sz
 
 local size:sz
 
+reset slot:off
+
 contract function:fn
 
 sign

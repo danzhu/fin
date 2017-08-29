@@ -281,15 +281,29 @@ class Type:
     def _gen(self, sym: Union[symbols.Struct, symbols.Enumeration]) -> None:
         if isinstance(sym, symbols.Struct):
             for field in sym.fields:
+                self.writer.instr('!off', field.name)
                 self.writer.instr('local', self._type(field.type))
+                self.writer.space()
         elif isinstance(sym, symbols.Enumeration):
             # _value field
+            self.writer.instr('!off', '_value')
             self.writer.instr('local', self._type(builtin.INT))
+            self.writer.space()
 
+            reset_target: str = None
             for var in sym.variants:
-                # TODO: reset offset
+                if len(var.fields) == 0:
+                    continue
+
+                if reset_target is None:
+                    reset_target = var.fields[0].name
+                else:
+                    self.writer.instr('reset', reset_target)
+
                 for field in var.fields:
+                    self.writer.instr('!off', field.name)
                     self.writer.instr('local', self._type(field.type))
+                    self.writer.space()
         else:
             assert False
 

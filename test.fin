@@ -1,9 +1,9 @@
 import rt
 
-enum Opt{T}
-    Some(value T)
-    None
+enum Res{T, E}
+    Ok(value T)
+    Err(error E)
 
 def main()
-    let opt = Opt::Some(2)
-    opt = Opt::None()
+    let res Res{Int, Float} = Res::Ok(12)
+    res = Res::Err(12.3)
