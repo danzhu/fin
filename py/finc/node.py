@@ -526,9 +526,6 @@ class Node:
 
                 tp = types.to_level(tp, self.level)
 
-            if isinstance(tp, types.Array) and tp.length is None:
-                self._error(f'cannot create variable of unsized array type')
-
             assert isinstance(syms, symbols.Block)
 
             self.variable = syms.add_local(name, tp)

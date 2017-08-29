@@ -151,7 +151,17 @@ class Resolution:
         else:
             reduction = 0.0
 
-        if isinstance(tp, (Array, StructType, EnumerationType, Generic)):
+        if isinstance(tp, Array):
+            # using unsized array is not allowed
+            if tp.length is None:
+                return None
+
+            if not self.match_type(tp, other, ret):
+                return None
+
+            return MATCH_PERFECT - reduction
+
+        if isinstance(tp, (StructType, EnumerationType, Generic)):
             if not self.match_type(tp, other, ret):
                 return None
 

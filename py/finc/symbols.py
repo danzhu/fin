@@ -112,6 +112,9 @@ class Variable(Symbol):
         self.index = idx
         self.is_arg = is_arg
 
+        if isinstance(tp, types.Array) and tp.length is None:
+            raise TypeError('cannot create variable of unsized array type')
+
     def __str__(self) -> str:
         return f'{self.name} {self.type}'
 

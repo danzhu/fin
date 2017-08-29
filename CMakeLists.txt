@@ -71,7 +71,8 @@ add_custom_command(
 
 add_custom_command(
     OUTPUT test.fm
-    DEPENDS test.fin "${PY}/compiler.py" "${PY}/asm.py" ${FINC}
+    DEPENDS "${PROJECT_SOURCE_DIR}/test.fin" "${PY}/compiler.py" "${PY}/asm.py"
+        ${FINC}
     COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test.fin" -o test.fm)
 
 # targets
