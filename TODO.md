@@ -146,3 +146,7 @@
 - [x] fix noexcept default move
 - [ ] use "allocated" and "freed" in allocator summary
 - [ ] type recurse upper limit
+- [ ] enhanced typeinfo
+  - [ ] name
+  - [ ] debug format information
+  - [ ] type verification

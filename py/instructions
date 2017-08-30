@@ -80,6 +80,10 @@ load_var slot:off size:sz
 
 store_var slot:off size:sz
 
+load_mem slot:off size:sz
+
+store_mem slot:off size:sz
+
 addr_off size:sz
 
 addr_arg slot:off

@@ -1,8 +1,16 @@
 import rt
 
+struct Vec
+    x Float
+    y Float
+
 enum Res{T, E}
     OK(value T)
     ERR(error E)
+
+def distance(vec Vec) Float
+    match vec
+        Vec(x, y) => x * x + y * y
 
 def print(res Res{Int, Float})
     match res
@@ -16,6 +24,9 @@ def fib(n Int) Int
         _ => fib(n - 2) + fib(n - 1)
 
 def main()
+    let vec = Vec(3., 4.)
+    vec.distance().rt::print()
+
     let res Res{Int, Float} = Res::OK(12)
     res.print()
 

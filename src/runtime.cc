@@ -585,6 +585,32 @@ void Fin::Runtime::execute()
             break;
         }
 
+        case Opcode::LoadMem:
+        {
+            auto offset = readOffset();
+            auto size = readSize();
+
+            auto ptr = _eval.pop<Ptr>();
+            auto src = _alloc.readSize(ptr + offset, size);
+            auto dest = _eval.pushSize(size);
+
+            src.move(dest, size);
+            break;
+        }
+
+        case Opcode::StoreMem:
+        {
+            auto offset = readOffset();
+            auto size = readSize();
+
+            auto src = _eval.popSize(size);
+            auto ptr = _eval.pop<Ptr>();
+            auto dest = _alloc.writeSize(ptr + offset, size);
+
+            src.move(dest, size);
+            break;
+        }
+
         case Opcode::AddrOff:
         {
             auto size = readSize();

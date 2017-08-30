@@ -576,8 +576,9 @@ class Function:
                 assert isinstance(pat.source, symbols.Variant)
 
                 self.writer.instr('addr_var', tmp)
-                self.writer.instr('addr_mem', self._member(pat.type, '_value'))
-                self.writer.instr('load', self._type(builtin.INT))
+                self.writer.instr('load_mem',
+                                  self._member(pat.type, '_value'),
+                                  self._type(builtin.INT))
                 self.writer.instr('const_i', str(pat.source.value))
                 self.writer.instr('eq_i')
                 self.writer.instr('br_false', nxt)
@@ -590,8 +591,9 @@ class Function:
                     continue
 
                 self.writer.instr('addr_var', tmp)
-                self.writer.instr('addr_mem', self._member(pat.type, f.name))
-                self.writer.instr('load', self._type(f.type))
+                self.writer.instr('load_mem',
+                                  self._member(pat.type, f.name),
+                                  self._type(f.type))
                 self._match(p, f.type, nxt)
 
             self._pop_local(tmp)
@@ -617,9 +619,10 @@ class Function:
 
         self._push_local(var_name(node.variable), node.variable.type)
         if node.children[1].type != 'EMPTY':
-            self.writer.instr('addr_var', var_name(node.variable))
             self._gen(node.children[1])
-            self.writer.instr('store', self._type(node.variable.type))
+            self.writer.instr('store_var',
+                              var_name(node.variable),
+                              self._type(node.variable.type))
 
     def _IF(self, node: Node) -> None:
         els = self.gen.label('ELSE')
@@ -784,10 +787,11 @@ class Function:
 
             if isinstance(sym, symbols.Variant):
                 self.writer.instr('addr_var', tmp)
-                self.writer.instr('addr_mem', self._member(tp, '_value'))
                 # TODO: user-defined value type
                 self.writer.instr('const_i', str(sym.value))
-                self.writer.instr('store', self._type(builtin.INT))
+                self.writer.instr('store_mem',
+                                  self._member(tp, '_value'),
+                                  self._type(builtin.INT))
 
             # silence type checker
             assert isinstance(sym, (symbols.Struct, symbols.Variant))
@@ -796,12 +800,12 @@ class Function:
 
             for child, field in zip(node.children[1].children, sym.fields):
                 self.writer.instr('addr_var', tmp)
-                self.writer.instr('addr_mem', self._member(tp, field.name))
                 self._gen(child)
-                self.writer.instr('store', self._type(child.target_type))
+                self.writer.instr('store_mem',
+                                  self._member(tp, field.name),
+                                  self._type(child.target_type))
 
-            self.writer.instr('addr_var', tmp)
-            self.writer.instr('load', self._type(tp))
+            self.writer.instr('load_var', tmp, self._type(tp))
             self._pop_local(tmp)
 
         else:
