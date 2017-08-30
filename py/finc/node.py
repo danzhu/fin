@@ -547,7 +547,9 @@ class Node:
 
             self.variables = []
             for v in self.pattern.variables():
-                self.variables.append(syms.add_local(v.name, v.type))
+                var = syms.add_local(v.name, v.type)
+                v.set_variable(var)
+                self.variables.append(var)
 
         elif self.type == 'WHILE':
             bks = self.children[1].decedents('BREAK')

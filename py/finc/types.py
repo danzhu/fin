@@ -324,13 +324,16 @@ class Generics(Iterable[Type], Sized):
         return '{' + ','.join(a.fullname() for a in self.args) + '}'
 
     def match(self, other: 'Generics', res: Resolution, ret: bool) -> bool:
+        if len(self.generics) != len(other.generics):
+            return False
+
         # FIXME: problematic generic matching
         for i in range(len(self.generics)):
-            if not ret and self.args[i] is None:
+            if not ret and isinstance(self.args[i], Generic):
                 res.generics[self.generics[i].name] = other.args[i]
                 continue
 
-            if ret and other.args[i] is None:
+            if ret and isinstance(other.args[i], Generic):
                 res.generics[other.generics[i].name] = self.args[i]
                 continue
 

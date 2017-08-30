@@ -121,8 +121,8 @@
 - [ ] change native types from Struct to Native
 - [ ] reuse local stack space
 - [ ] fix
-  - [ ] enum
-  - [ ] pattern matching
+  - [x] enum
+  - [x] pattern matching
   - [ ] `break` / `return` value
 - [ ] refactor analyzer
 

@@ -31,3 +31,16 @@ class ParserError(CompilerError):
 
 class AnalyzerError(CompilerError):
     pass
+
+
+class AssemblerError(Exception):
+    def __init__(self, msg: str, line: str, ln: int) -> None:
+        super().__init__(msg)
+        self.line = line
+        self.line_number = ln
+
+    def __str__(self) -> str:
+        val = super().__str__()
+        val += f'  at line {self.line_number}:'
+        val += f'\n\n    {self.line}'
+        return val

@@ -55,6 +55,8 @@ class Variable(Pattern):
         self.name = name
         self.type = tp
 
+        self.variable: symbols.Variable = None
+
     def __str__(self) -> str:
         return f'{self.name} {self.type}'
 
@@ -66,6 +68,9 @@ class Variable(Pattern):
 
     def variables(self) -> Iterator['Variable']:
         return iter([self])
+
+    def set_variable(self, var: symbols.Variable) -> None:
+        self.variable = var
 
 
 class Struct(Pattern):

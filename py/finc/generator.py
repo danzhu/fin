@@ -1,5 +1,5 @@
-from typing import Any, Dict, Set, List, Sequence, Iterable, Iterator, Union, \
-    Tuple, Sized, TypeVar, Generic, cast
+from typing import Dict, Set, List, Iterable, Iterator, Union, Sized, \
+    TypeVar, Generic
 from collections import OrderedDict
 from io import TextIOBase
 from . import builtin
@@ -47,8 +47,8 @@ class Writer:
     def dedent(self) -> None:
         self._indent -= 1
 
-    def instr(self, *args: object) -> None:
-        self._write(' '.join(str(a) for a in args))
+    def instr(self, *args: str) -> None:
+        self._write(' '.join(args))
 
     def comment(self, val: object) -> None:
         self._write(f'# {val}')
@@ -67,11 +67,13 @@ class Writer:
             self.instr('size_p')
 
         elif isinstance(tp, types.Array):
+            assert tp.length is not None
+
             self.type(tp.type)
-            self.instr('size_arr', 0 if tp.length is None else tp.length)
+            self.instr('size_arr', str(tp.length))
 
         elif isinstance(tp, types.Generic):
-            self.instr('size_dup', tp.symbol.index)
+            self.instr('size_dup', str(tp.symbol.index))
 
         elif isinstance(tp, types.Special):
             assert False, 'when?'
@@ -125,7 +127,8 @@ class KeyList(Generic[T], Iterable[T], Sized):
 
 
 class SymbolRef:
-    def __init__(self, sym: Union[symbols.Struct, symbols.Enumeration]) -> None:
+    def __init__(self,
+                 sym: Union[symbols.Struct, symbols.Enumeration]) -> None:
         self.symbol = sym
         self.member_refs: Set[str] = set()
 
@@ -240,7 +243,7 @@ class Type:
         gens = len(sym.generics)
 
         writer.comment(str(sym))
-        writer.instr('type', quote(name), gens, end)
+        writer.instr('type', quote(name), str(gens), end)
 
         writer.indent()
 
@@ -339,13 +342,13 @@ class Function:
 
         name = node.function.basename()
         gens = len(node.function.generics)
-        ctrs = 0 # TODO: contract bounds
+        ctrs = 0  # TODO: contract bounds
 
         begin = self.gen.label('BEGIN_FN')
         end = self.gen.label('END_FN')
 
         writer.comment(node)
-        writer.instr('fn', quote(name), gens, ctrs, begin, end)
+        writer.instr('fn', quote(name), str(gens), str(ctrs), begin, end)
 
         writer.indent()
 
@@ -362,7 +365,8 @@ class Function:
             if len(tp.member_refs) == 0:
                 continue
 
-            assert isinstance(tp.type, (types.StructType, types.EnumerationType))
+            assert isinstance(tp.type, (types.StructType,
+                                        types.EnumerationType))
             name = tp.type.symbol.fullname()
 
             # member refs
@@ -539,15 +543,22 @@ class Function:
         self.writer.instr(f'{op}_{name}')
 
     def _match(self, pat: pattern.Pattern, tp: types.Type, nxt: str) -> None:
-        self.writer.instr(f'# match {pat}')
+        self.writer.comment(f'match {pat}')
+
+        self.writer.indent()
         self._cast(tp, pat.type)
 
-        if isinstance(pat, pattern.Constant):
+        if isinstance(pat, pattern.Variable):
+            self.writer.instr('store_var',
+                              var_name(pat.variable),
+                              self._type(pat.type))
+
+        elif isinstance(pat, pattern.Constant):
             if isinstance(pat.value, int):
-                self.writer.instr('const_i', pat.value)
+                self.writer.instr('const_i', str(pat.value))
                 self.writer.instr('eq_i')
             elif isinstance(pat.value, float):
-                self.writer.instr('const_f', pat.value)
+                self.writer.instr('const_f', str(pat.value))
                 self.writer.instr('eq_f')
             else:
                 assert False
@@ -555,81 +566,40 @@ class Function:
             self.writer.instr('br_false', nxt)
 
         elif isinstance(pat, pattern.Struct):
-            fail = self._label('MATCH_FAIL')
-            succ = self._label('MATCH_SUCC')
-            size = pat.type.size()
+            tmp = self._temp()
+
+            self._push_local(tmp, pat.type)
+
+            self.writer.instr('store_var', tmp, self._type(pat.type))
 
             if isinstance(pat.type, types.EnumerationType):
                 assert isinstance(pat.source, symbols.Variant)
 
-                self.writer.instr('addr_st', -size)
-                self.writer.instr('load', pat.type.enum.size)  # int of variant
-                self.writer.instr('const_i', pat.source.value)
+                self.writer.instr('addr_var', tmp)
+                self.writer.instr('addr_mem', self._member(pat.type, '_value'))
+                self.writer.instr('load', self._type(builtin.INT))
+                self.writer.instr('const_i', str(pat.source.value))
                 self.writer.instr('eq_i')
-                self.writer.instr('br_false', fail)
+                self.writer.instr('br_false', nxt)
+                self.writer.space()
             else:
                 assert isinstance(pat.type, types.StructType)
 
-            src_size = pat.type.size()
-
-            self._indent += 1
-            for p, var in zip(pat.subpatterns, pat.fields):
-                if not p.tested():
+            for p, f in zip(pat.subpatterns, pat.fields):
+                if not p.tested() and not p.bound():
                     continue
 
-                offset = var.offset - src_size
-                self.writer.instr('addr_st', offset)
-                self.writer.instr('load', var.type.size())
-                self._match(p, var.type, fail)
+                self.writer.instr('addr_var', tmp)
+                self.writer.instr('addr_mem', self._member(pat.type, f.name))
+                self.writer.instr('load', self._type(f.type))
+                self._match(p, f.type, nxt)
 
-            self._indent -= 1
+            self.writer.dedent()
 
-            self.writer.instr('br', succ)
-
-            self.writer.instr(f'{fail}:')
-            self.writer.instr('pop', size)
-            self.writer.instr('br', nxt)
-
-            self.writer.instr(f'{succ}:')
-            self.writer.instr('pop', size)
+            self._pop_local(tmp)
 
         else:
             assert False
-
-    def _destructure(self, pat: pattern.Pattern, tp: types.Type) -> int:
-        self.writer.instr(f'# destructure {pat}')
-        self._cast(tp, pat.type)
-
-        if isinstance(pat, pattern.Variable):
-            return pat.type.size()
-
-        if isinstance(pat, pattern.Struct):
-            # note: works for both structs and enums
-
-            src_size = pat.type.size()
-            red_size = 0
-
-            self._indent += 1
-            for p, var in zip(pat.subpatterns, pat.fields):
-                if not p.bound():
-                    continue
-
-                # skip what we put on the stack,
-                # go back to the start of the struct / enum,
-                # and move forward to the field offset
-                offset = var.offset - src_size - red_size
-                self.writer.instr('addr_st', offset)
-                self.writer.instr('load', var.type.size())
-                red_size += self._destructure(p, var.type)
-
-            self._indent -= 1
-
-            assert red_size != 0
-            self.writer.instr('reduce', red_size, src_size)
-
-            return red_size
-
-        assert False
 
     def _BLOCK(self, node: Node) -> None:
         for c in node.children:
@@ -681,7 +651,7 @@ class Function:
 
         # no match found
         self.writer.instr('error')
-        self.writer.instr(end + ':')
+        self.writer.label(end)
 
     def _ARM(self, node: Node) -> None:
         match = node.ancestor('MATCH')
@@ -691,19 +661,22 @@ class Function:
         pat = node.children[0].pattern
         tp = match.children[0].target_type
 
-        if pat.tested():
+        for var in pat.variables():
+            self._push_local(var_name(var.variable), var.variable.type)
+
+        if pat.tested() or pat.bound():
             self.writer.instr('dup', self._type(tp))
             self._match(pat, tp, nxt)
 
-        if pat.bound():
-            self._destructure(pat, tp)
-        else:
-            self.writer.instr('pop', self._type(tp))
+        self.writer.instr('pop', self._type(tp))
 
         self._gen(node.children[1])
 
+        for var in pat.variables():
+            self._pop_local(var_name(var.variable))
+
         self.writer.instr('br', match.context['end'])
-        self.writer.instr(nxt + ':')
+        self.writer.label(nxt)
 
     def _WHILE(self, node: Node) -> None:
         start = self.gen.label('WHILE')
@@ -813,13 +786,15 @@ class Function:
                 self.writer.instr('addr_var', tmp)
                 self.writer.instr('addr_mem', self._member(tp, '_value'))
                 # TODO: user-defined value type
-                self.writer.instr('const_i', sym.value)
+                self.writer.instr('const_i', str(sym.value))
                 self.writer.instr('store', self._type(builtin.INT))
+
+            # silence type checker
+            assert isinstance(sym, (symbols.Struct, symbols.Variant))
 
             assert len(node.children[1].children) == len(sym.fields)
 
-            for child, field in zip(node.children[1].children,
-                    sym.fields):
+            for child, field in zip(node.children[1].children, sym.fields):
                 self.writer.instr('addr_var', tmp)
                 self.writer.instr('addr_mem', self._member(tp, field.name))
                 self._gen(child)
@@ -828,15 +803,6 @@ class Function:
             self.writer.instr('addr_var', tmp)
             self.writer.instr('load', self._type(tp))
             self._pop_local(tmp)
-
-        elif isinstance(node.match.source, symbols.Variant):
-            # FIXME: fill variant
-            # enum = cast(symbols.Enumeration, node.match.source.parent).size
-            # args = sum(c.target_type.size() for c in node.children[1].children)
-            # size = node.target_type.size() - enum - args
-            # if size > 0:
-            #     self.writer.instr('push', size)
-            assert False
 
         else:
             assert False

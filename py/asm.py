@@ -6,6 +6,7 @@ import io
 import argparse
 import struct
 import instr
+from finc import error
 
 
 BRANCH_SIZE = 4
@@ -122,7 +123,10 @@ class Assembler:
         # shebang
         self.tokens.append(Bytes(b'#!/usr/bin/env fin\n'))
 
+        ln = 0
         for line in src:
+            ln += 1
+
             line = line.split('#')[0].strip()
             if line == '':
                 continue
@@ -137,7 +141,10 @@ class Assembler:
             if len(segs) == 0:
                 continue
 
-            self.instr(segs[0], *segs[1:])
+            try:
+                self.instr(segs[0], *segs[1:])
+            except (LookupError, ValueError) as e:
+                raise error.AssemblerError(str(e), line, ln)
 
         syms: Dict[str, int] = {}
         location = 0
@@ -168,9 +175,10 @@ class Assembler:
         self.tokens.append(Bytes(pack('B', ins.opcode)))
 
         if len(args) != len(ins.params):
-            raise ValueError('incorrect number of arguments for\n' +
-                             f'{ins}\n' +
-                             f'expected {len(ins.params)}, got {len(args)}')
+            raise ValueError(
+                'incorrect number of arguments for' +
+                f'\n  {ins}' +
+                f'\n  expected {len(ins.params)}, got {len(args)}')
 
         if len(args) > 0:
             name = get_name(args[0])

@@ -1,9 +1,17 @@
 import rt
 
 enum Res{T, E}
-    Ok(value T)
-    Err(error E)
+    OK(value T)
+    ERR(error E)
+
+def print(res Res{Int, Float})
+    match res
+        Res::OK(val) => val.rt::print()
+        Res::ERR(err) => err.rt::print()
 
 def main()
-    let res Res{Int, Float} = Res::Ok(12)
-    res = Res::Err(12.3)
+    let res Res{Int, Float} = Res::OK(12)
+    res.print()
+
+    res = Res::ERR(12.3)
+    res.print()

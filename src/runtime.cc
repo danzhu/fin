@@ -561,6 +561,30 @@ void Fin::Runtime::execute()
             break;
         }
 
+        case Opcode::LoadVar:
+        {
+            auto offset = readOffset();
+            auto size = readSize();
+
+            auto src = _eval.at(_frame.local + offset, size);
+            auto dest = _eval.pushSize(size);
+
+            src.move(dest, size);
+            break;
+        }
+
+        case Opcode::StoreVar:
+        {
+            auto offset = readOffset();
+            auto size = readSize();
+
+            auto src = _eval.popSize(size);
+            auto dest = _eval.at(_frame.local + offset, size);
+
+            src.move(dest, size);
+            break;
+        }
+
         case Opcode::AddrOff:
         {
             auto size = readSize();
