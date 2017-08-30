@@ -594,12 +594,12 @@ class Function:
                 self.writer.instr('load', self._type(f.type))
                 self._match(p, f.type, nxt)
 
-            self.writer.dedent()
-
             self._pop_local(tmp)
 
         else:
             assert False
+
+        self.writer.dedent()
 
     def _BLOCK(self, node: Node) -> None:
         for c in node.children:

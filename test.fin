@@ -9,9 +9,17 @@ def print(res Res{Int, Float})
         Res::OK(val) => val.rt::print()
         Res::ERR(err) => err.rt::print()
 
+def fib(n Int) Int
+    match n
+        0 => 0
+        1 => 1
+        _ => fib(n - 2) + fib(n - 1)
+
 def main()
     let res Res{Int, Float} = Res::OK(12)
     res.print()
 
     res = Res::ERR(12.3)
     res.print()
+
+    fib(20).rt::print()
