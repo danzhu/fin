@@ -1,5 +1,4 @@
-from typing import Dict, Set, List, Iterable, Iterator, Union, Sized, \
-    TypeVar, Generic
+from typing import Dict, Set, List, Union
 from collections import OrderedDict
 from io import TextIOBase
 from . import builtin
@@ -7,9 +6,6 @@ from . import symbols
 from . import types
 from . import pattern
 from .node import Node
-
-
-T = TypeVar('T')
 
 
 OP_TABLE = {
@@ -103,27 +99,20 @@ class Writer:
         self.instr('contract', ctr.source.fullname())
 
 
-class KeyList(Generic[T], Iterable[T], Sized):
-    def __init__(self) -> None:
-        self.keys: Set[str] = set()
-        self.values: List[T] = []
+class TypeTree:
+    def __init__(self,
+                 val: 'types.Type' = None,
+                 parent: 'TypeTree' = None) -> None:
+        self.value = val
+        self.parent = parent
 
-    def __len__(self) -> int:
-        return len(self.values)
+    def push(self, val: types.Type) -> 'TypeTree':
+        assert val is not None
+        return TypeTree(val, self)
 
-    def __iter__(self) -> Iterator[T]:
-        return iter(self.values)
-
-    def __getitem__(self, key: int) -> T:
-        return self.values[key]
-
-    def add(self, key: str, val: T) -> bool:
-        if key in self.keys:
-            return False
-
-        self.keys.add(key)
-        self.values.append(val)
-        return True
+    def pop(self) -> 'TypeTree':
+        assert self.parent is not None
+        return self.parent
 
 
 class SymbolRef:
@@ -333,8 +322,11 @@ class Function:
         for param in node.function.params:
             self._type(param.type)
 
+        stk = TypeTree()
+        node.context = {'after': stk.push(node.function.ret)}
+
         self.writer = Writer(writer)
-        self._gen(node.children[3])
+        self._gen(node.children[3], stk)
         if node.function.ret == builtin.VOID:
             self.writer.instr('end')
         else:
@@ -415,15 +407,20 @@ class Function:
         self._temps += 1
         return temp
 
-    def _gen(self, node: Node) -> None:
+    def _gen(self, node: Node, stk: TypeTree) -> TypeTree:
         self.writer.comment(node)
 
         self.writer.indent()
 
-        getattr(self, f'_{node.type}')(node)
+        getattr(self, f'_{node.type}')(node, stk)
         self._cast(node.expr_type, node.target_type)
+        if node.target_type != builtin.VOID and \
+                node.target_type != builtin.DIVERGE:
+            stk = stk.push(node.target_type)
 
         self.writer.dedent()
+
+        return stk
 
     def _type(self, tp: types.Type) -> str:
         name = type_name(tp)
@@ -488,34 +485,24 @@ class Function:
             tp = types.to_level(tp, lvl)
             self.writer.instr('load', self._type(tp))
 
-    def _exit(self, node: Node, tar: Node) -> None:
-        # FIXME: broken in inline struct construction
-
-        has_val = node.target_type != builtin.VOID
-        assert not has_val, 'TODO'
-
-        while node is not tar:
-            assert node.parent is not None, 'cannot match stack'
-
-            if node.parent.type in ('IF', 'WHILE', 'MATCH'):
-                node = node.parent
-                continue
-
-            before = False
-            for child in reversed(node.parent.children):
-                if before:
-                    if child.target_type is not None \
-                            and child.target_type != builtin.VOID:
-                        self.writer.instr('pop', self._type(child.target_type))
-
-                    continue
-
-                if child is node:
-                    before = True
-
+    def _exit(self, stk: TypeTree, tar: TypeTree) -> None:
+        while stk is not tar:
             # TODO: RAII cleanup for local variables
+            self.writer.instr('pop', self._type(stk.value))
+            stk = stk.pop()
 
-            node = node.parent
+    def _reduce(self, stk: TypeTree, tar: TypeTree) -> None:
+        # TODO: no need for popping when stack is same,
+        # however the way stack is constructed (i.e. pushing target_type)
+        # prevents equality comparison between stack and target
+        tmp = self._temp()
+        self._push_local(tmp, stk.value)
+        self.writer.instr('store_var', tmp, self._type(stk.value))
+
+        self._exit(stk.pop(), tar.pop())
+
+        self.writer.instr('load_var', tmp, self._type(stk.value))
+        self._pop_local(tmp)
 
     def _call(self, match: types.Match) -> None:
         fn = match.source
@@ -603,60 +590,60 @@ class Function:
 
         self.writer.dedent()
 
-    def _BLOCK(self, node: Node) -> None:
+    def _BLOCK(self, node: Node, stk: TypeTree) -> None:
         for c in node.children:
-            self._gen(c)
+            stk = self._gen(c, stk)
             self.writer.space()
 
         for var in node.block.locals:
             self._pop_local(var_name(var))
 
-    def _EMPTY(self, node: Node) -> None:
+    def _EMPTY(self, node: Node, stk: TypeTree) -> None:
         pass
 
-    def _LET(self, node: Node) -> None:
+    def _LET(self, node: Node, stk: TypeTree) -> None:
         assert isinstance(node.variable, symbols.Variable)
 
         self._push_local(var_name(node.variable), node.variable.type)
         if node.children[1].type != 'EMPTY':
-            self._gen(node.children[1])
+            self._gen(node.children[1], stk)
             self.writer.instr('store_var',
                               var_name(node.variable),
                               self._type(node.variable.type))
 
-    def _IF(self, node: Node) -> None:
+    def _IF(self, node: Node, stk: TypeTree) -> None:
         els = self.gen.label('ELSE')
         end = self.gen.label('END_IF')
         has_else = node.children[2].type != 'EMPTY'
 
-        self._gen(node.children[0])  # comp
+        self._gen(node.children[0], stk)  # comp
         self.writer.instr('br_false', els if has_else else end)
-        self._gen(node.children[1])
+        self._gen(node.children[1], stk)
 
         if has_else:
             self.writer.instr('br', end)
             self.writer.label(els)
-            self._gen(node.children[2])
+            self._gen(node.children[2], stk)
 
         self.writer.label(end)
 
-    def _MATCH(self, node: Node) -> None:
+    def _MATCH(self, node: Node, stk: TypeTree) -> None:
         end = self.gen.label('END_MATCH')
 
         node.context = {
             'end': end
         }
 
-        self._gen(node.children[0])
+        self._gen(node.children[0], stk)
 
         for c in node.children[1].children:
-            self._gen(c)
+            self._gen(c, stk)
 
         # no match found
         self.writer.instr('error')
         self.writer.label(end)
 
-    def _ARM(self, node: Node) -> None:
+    def _ARM(self, node: Node, stk: TypeTree) -> None:
         match = node.ancestor('MATCH')
 
         nxt = self.gen.label('ARM')
@@ -673,7 +660,7 @@ class Function:
 
         self.writer.instr('pop', self._type(tp))
 
-        self._gen(node.children[1])
+        self._gen(node.children[1], stk)
 
         for var in pat.variables():
             self._pop_local(var_name(var.variable))
@@ -681,7 +668,7 @@ class Function:
         self.writer.instr('br', match.context['end'])
         self.writer.label(nxt)
 
-    def _WHILE(self, node: Node) -> None:
+    def _WHILE(self, node: Node, stk: TypeTree) -> None:
         start = self.gen.label('WHILE')
         cond = self.gen.label('COND')
         end = self.gen.label('END_WHILE')
@@ -689,68 +676,72 @@ class Function:
         node.context = {
             'break': end,
             'continue': cond,
-            'redo': start
+            'redo': start,
+            'before': stk,
+            'after': stk.push(node.target_type)
         }
 
         self.writer.instr('br', cond)
 
         self.writer.label(start)
-        self._gen(node.children[1])
+        self._gen(node.children[1], stk)
 
         self.writer.label(cond)
-        self._gen(node.children[0])  # comp
+        self._gen(node.children[0], stk)  # comp
         self.writer.instr('br_true', start)
 
-        self._gen(node.children[2])  # else
+        self._gen(node.children[2], stk)  # else
         self.writer.label(end)
 
-    def _BREAK(self, node: Node) -> None:
+    def _BREAK(self, node: Node, stk: TypeTree) -> None:
         tar = node.ancestor('WHILE')
 
-        self._gen(node.children[0])
-        self._exit(node.children[0], tar)
+        stk = self._gen(node.children[0], stk)
+        if node.children[0].target_type == builtin.VOID:
+            self._exit(stk, tar.context['after'])
+        else:
+            self._reduce(stk, tar.context['after'])
 
         self.writer.instr('br', tar.context['break'])
 
-    def _CONTINUE(self, node: Node) -> None:
+    def _CONTINUE(self, node: Node, stk: TypeTree) -> None:
         tar = node.ancestor('WHILE')
-        self._exit(node, tar)
+        self._exit(stk, tar.context['before'])
         self.writer.instr('br', tar.context['continue'])
 
-    def _REDO(self, node: Node) -> None:
+    def _REDO(self, node: Node, stk: TypeTree) -> None:
         tar = node.ancestor('WHILE')
-        self._exit(node, tar)
+        self._exit(stk, tar.context['before'])
         self.writer.instr('br', tar.context['redo'])
 
-    def _RETURN(self, node: Node) -> None:
+    def _RETURN(self, node: Node, stk: TypeTree) -> None:
         tar = node.ancestor('DEF')
 
-        self._gen(node.children[0])
-        # TODO: popping not necessary when no RAII needed
-        self._exit(node.children[0], tar)
+        stk = self._gen(node.children[0], stk)
 
+        # TODO: cleanup variables for RAII
         if node.children[0].target_type == builtin.VOID:
             self.writer.instr('end')
         else:
-            self.writer.instr('ret')
+            self.writer.instr('ret', self._type(tar.function.ret))
 
-    def _TEST(self, node: Node) -> None:
+    def _TEST(self, node: Node, stk: TypeTree) -> None:
         if node.value == 'NOT':
-            self._gen(node.children[0])
+            self._gen(node.children[0], stk)
             self.writer.instr('not')
             return
 
         jump = self.gen.label('SHORT_CIRCUIT')
         end = self.gen.label('END_TEST')
 
-        self._gen(node.children[0])
+        self._gen(node.children[0], stk)
 
         if node.value == 'AND':
             self.writer.instr('br_false', jump)
         else:
             self.writer.instr('br_true', jump)
 
-        self._gen(node.children[1])
+        self._gen(node.children[1], stk)
         self.writer.instr('br', end)
         self.writer.label(jump)
 
@@ -761,19 +752,19 @@ class Function:
 
         self.writer.label(end)
 
-    def _ASSN(self, node: Node) -> None:
-        self._gen(node.children[0])
-        self._gen(node.children[1])
+    def _ASSN(self, node: Node, stk: TypeTree) -> None:
+        stk = self._gen(node.children[0], stk)
+        stk = self._gen(node.children[1], stk)
 
         tp = node.children[1].target_type
         self.writer.instr('store', self._type(tp))
 
-    def _CALL(self, node: Node) -> None:
+    def _CALL(self, node: Node, stk: TypeTree) -> None:
         sym = node.match.source
 
         if isinstance(sym, symbols.Function):
             for c in node.children[1].children:
-                self._gen(c)
+                stk = self._gen(c, stk)
 
             self._call(node.match)
 
@@ -800,7 +791,7 @@ class Function:
 
             for child, field in zip(node.children[1].children, sym.fields):
                 self.writer.instr('addr_var', tmp)
-                self._gen(child)
+                self._gen(child, stk)
                 self.writer.instr('store_mem',
                                   self._member(tp, field.name),
                                   self._type(child.target_type))
@@ -811,21 +802,21 @@ class Function:
         else:
             assert False
 
-    def _OP(self, node: Node) -> None:
+    def _OP(self, node: Node, stk: TypeTree) -> None:
         for c in node.children:
-            self._gen(c)
+            stk = self._gen(c, stk)
 
         self._call(node.match)
 
-    def _INC_ASSN(self, node: Node) -> None:
+    def _INC_ASSN(self, node: Node, stk: TypeTree) -> None:
         # left
-        self._gen(node.children[0])
+        stk = self._gen(node.children[0], stk)
         tp = node.children[0].target_type
         self.writer.instr('dup', self._type(tp))
         self._cast(node.children[0].target_type, node.match.params[0].type)
 
         # right
-        self._gen(node.children[1])
+        stk = self._gen(node.children[1], stk)
 
         # call
         self._call(node.match)
@@ -835,26 +826,26 @@ class Function:
         self._cast(node.match.ret, ret)
         self.writer.instr('store', self._type(ret))
 
-    def _CAST(self, node: Node) -> None:
-        self._gen(node.children[0])
+    def _CAST(self, node: Node, stk: TypeTree) -> None:
+        self._gen(node.children[0], stk)
         self._call(node.match)
 
-    def _MEMBER(self, node: Node) -> None:
+    def _MEMBER(self, node: Node, stk: TypeTree) -> None:
         assert isinstance(node.variable, symbols.Variable)
 
-        self._gen(node.children[0])
+        self._gen(node.children[0], stk)
 
         tp = node.children[0].target_type
         mem = node.children[1].value
         self.writer.instr('addr_mem', self._member(tp, mem))
 
-    def _NUM(self, node: Node) -> None:
+    def _NUM(self, node: Node, stk: TypeTree) -> None:
         self.writer.instr('const_i', node.value)
 
-    def _FLOAT(self, node: Node) -> None:
+    def _FLOAT(self, node: Node, stk: TypeTree) -> None:
         self.writer.instr('const_f', node.value)
 
-    def _VAR(self, node: Node) -> None:
+    def _VAR(self, node: Node, stk: TypeTree) -> None:
         if isinstance(node.variable, symbols.Constant):
             tp = node.variable.type
             if not isinstance(tp, types.StructType):

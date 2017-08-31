@@ -47,6 +47,8 @@
   - [x] matching
   - [x] destructuring
 - [ ] traits
+  - [ ] constraints
+  - [ ] trait objects
 - [ ] iterators
   - [ ] continuation-based iteration
 - [ ] mutability
@@ -106,8 +108,8 @@
 - [x] fix incremental assignment stack inaccuracy
 - [ ] remove levelled assignment
 - [x] change postfix to prefix for reference
-- [ ] show token of unsized type error
-  - [ ] first bring back recursive definition check
+- [x] show variable of unsized type error
+- [ ] recursive struct / enum definition check
 - [ ] optimize `and` / `or` short-circuit
 - [x] ~~restrict struct construction to call syntax~~
 - [ ] make parentheses after enum optional
@@ -120,11 +122,14 @@
   - [ ] inline initialization
 - [ ] change native types from Struct to Native
 - [ ] reuse local stack space
-- [ ] fix
+- fixes for generic assembly overhaul
   - [x] enum
   - [x] pattern matching
-  - [ ] `break` / `return` value
+  - [x] `break` / `return` value
 - [ ] refactor analyzer
+- [ ] control flow analysis
+  - [ ] diverge spreading
+- [ ] remove code generator context in node
 
 ## Runtime
 

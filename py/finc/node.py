@@ -61,7 +61,7 @@ class Node:
         self.variables: List[symbols.Variable] = None
 
         # code generation
-        self.context: Dict[str, str] = None
+        self.context: Dict[str, Any] = None
 
     def __str__(self) -> str:
         content = self.type

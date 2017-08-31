@@ -1,36 +1,19 @@
 import rt
 
-struct Vec
-    x Float
-    y Float
-
-enum Res{T, E}
-    OK(value T)
-    ERR(error E)
-
-def distance(vec Vec) Float
-    match vec
-        Vec(x, y) => x * x + y * y
-
-def print(res Res{Int, Float})
-    match res
-        Res::OK(val) => val.rt::print()
-        Res::ERR(err) => err.rt::print()
-
 def fib(n Int) Int
-    match n
-        0 => 0
-        1 => 1
-        _ => fib(n - 2) + fib(n - 1)
+    if n == 0 or n == 1 then 1 + return n
+
+    fib(n - 2) + fib(n - 1)
 
 def main()
-    let vec = Vec(3., 4.)
-    vec.distance().rt::print()
-
-    let res Res{Int, Float} = Res::OK(12)
-    res.print()
-
-    res = Res::ERR(12.3)
-    res.print()
+    let i = 1
+    while TRUE do
+        if i > 1000 then
+            1 + break i
+        else
+            i *= 2
+    else
+        0
+    .rt::print()
 
     fib(20).rt::print()
