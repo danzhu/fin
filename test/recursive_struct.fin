@@ -1,0 +1,9 @@
+import rt
+
+struct Rec
+    val Int
+    rec Rec
+
+def test()
+    let rec Rec
+    rec = Rec(1, rec)
