@@ -1,0 +1,10 @@
+import rt
+
+def fib(n Int) Int
+    match n
+        0 => 0
+        1 => 1
+        _ => fib(n - 2) + fib(n - 1)
+
+def main()
+    rt::assert(fib(20) == 6765)

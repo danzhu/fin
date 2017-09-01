@@ -1,0 +1,11 @@
+import rt
+
+struct Vector
+    x Int
+    y Int
+
+def main()
+    let v = Vector(2, 3)
+    match v
+        Vector(x, y) => begin
+            rt::assert(x == 2 and y == 3)

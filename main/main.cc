@@ -47,6 +47,12 @@ Fin::Int read() { return static_cast<Fin::Int>(std::cin.get()); }
 void backtrace(Fin::Runtime &rt) { std::cout << rt.backtrace(); }
 } // end of anonymous namespace
 
+void _assert(Fin::Bool cond)
+{
+    if (!cond)
+        throw std::runtime_error{"assertion failed"};
+}
+
 int main(int argc, const char *argv[])
 {
     if (argc < 2)
@@ -78,6 +84,7 @@ int main(int argc, const char *argv[])
     fin.addNative("write(Int)", write);
     fin.addNative("read()Int", read);
     fin.addNative("backtrace()", backtrace);
+    fin.addNative("assert(Bool)", _assert);
 
     try
     {

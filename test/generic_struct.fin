@@ -1,0 +1,13 @@
+import rt
+
+struct Vector{T}
+    x T
+    y T
+
+def main()
+    let i = Vector(1, 2)
+
+    rt::assert(i.x == 1)
+
+    let f = Vector(3.4, 5.6)
+    let b Vector{Bool}

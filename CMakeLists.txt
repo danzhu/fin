@@ -106,11 +106,20 @@ enable_testing()
 
 # macro for testing compilation process
 macro(test_compile name regex)
-    add_test(NAME ${name}
-        COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test/${name}.fin")
+    add_test(NAME ${name} COMMAND
+        "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test/${name}.fin")
 
     set_tests_properties(${name} PROPERTIES
         PASS_REGULAR_EXPRESSION ${regex})
+endmacro()
+
+macro(test_exec name)
+    add_test(NAME ${name} COMMAND
+        ${CMAKE_COMMAND}
+        -DCOMPILER=${PY}/compiler.py
+        -DFIN=$<TARGET_FILE:fin-bin>
+        -DINPUT=${PROJECT_SOURCE_DIR}/test/${name}.fin
+        -P ${PROJECT_SOURCE_DIR}/TestExec.cmake)
 endmacro()
 
 test_compile("args_unmatched" "no viable function overload")
@@ -128,3 +137,8 @@ test_compile("recursive_struct" "recursive type definition")
 test_compile("resolve_failed" "cannot resolve function overload")
 test_compile("unsized_array" "cannot create variable of unsized array type")
 test_compile("void_var" "cannot create variable of type Void")
+
+test_exec("generic_struct")
+test_exec("pattern_enum")
+test_exec("pattern_int")
+test_exec("pattern_struct")

@@ -36,3 +36,6 @@ def read() Int
 
 def backtrace()
     0
+
+def assert(cond Bool)
+    0

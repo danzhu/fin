@@ -56,6 +56,8 @@
   - [ ] immutable bindings
   - [x] mutable variables
 - [ ] strings
+- [ ] globals
+- [ ] slices
 
 ## Compiler
 
@@ -136,7 +138,6 @@
 - [x] option to disable recycling freed ptrs
 - [x] rename method to function
 - [x] use `std::function` instead of native function ptr
-- [ ] globals
 - [x] remove module index
 - [x] template for automatic C++ binding
   - [x] auto generics and contracts calculation
@@ -155,3 +156,4 @@
   - [ ] name
   - [ ] debug format information
   - [ ] type verification
+- [ ] dynamic library loading
