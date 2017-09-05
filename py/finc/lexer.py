@@ -1,4 +1,4 @@
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Iterator
 import string
 import os
 from .error import LexerError
@@ -52,7 +52,7 @@ class Lexer:
 
         return self.states[name]
 
-    def read(self, src: Iterable[str]) -> Iterable[Token]:
+    def read(self, src: Iterable[str]) -> Iterator[Token]:
         self.ind_amount = None
         indent = 0
         ln = 0

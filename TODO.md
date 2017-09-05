@@ -123,7 +123,7 @@
 - arrays
   - [ ] inline initialization
 - [ ] change native types from Struct to Native
-- [ ] reuse local stack space
+- [x] reuse local stack space
 - fixes for generic assembly overhaul
   - [x] enum
   - [x] pattern matching

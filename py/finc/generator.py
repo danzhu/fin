@@ -130,6 +130,28 @@ class TypeList:
         return self.parent
 
 
+class TypeTree:
+    def __init__(self,
+                 name: str = None,
+                 tp: 'types.Type' = None,
+                 par: 'TypeTree' = None) -> None:
+        self.name = name
+        self.type = tp
+        self.parent = par
+        self.children: List[TypeTree] = []
+
+    def push(self, name: str, tp: types.Type) -> 'TypeTree':
+        assert name is not None
+        assert tp is not None
+
+        node = TypeTree(name, tp, self)
+        self.children.append(node)
+        return node
+
+    def pop(self) -> 'TypeTree':
+        return self.parent
+
+
 class SymbolRef:
     def __init__(self,
                  sym: Union[symbols.Struct, symbols.Enumeration]) -> None:
@@ -332,7 +354,7 @@ class Function:
         self._temps = 0
         self.types: Dict[str, TypeRef] = {}
         self.contracts: Dict[str, types.Match] = {}
-        self.locals: OrderedDict[str, types.Type] = OrderedDict()
+        self.locals = TypeTree()
 
         for param in node.function.params:
             self._type(param.type)
@@ -403,10 +425,8 @@ class Function:
 
         writer.space()
         writer.comment('locals')
-        for name, local_tp in self.locals.items():
-            writer.instr('!off', name)
-            writer.instr('local', type_name(local_tp))
-            writer.space()
+        assert self.locals.name is None, 'not all locals are popped'
+        self._write_local(writer, self.locals)
 
         writer.dedent()
         writer.instr('sign')
@@ -416,6 +436,20 @@ class Function:
 
         writer.label(end)
         writer.space()
+
+    def _write_local(self, writer: Writer, loc: TypeTree) -> None:
+        reset_target: str = None
+        for child in loc.children:
+            if reset_target is None:
+                reset_target = child.name
+            else:
+                writer.instr('reset', reset_target)
+
+            writer.instr('!off', child.name)
+            writer.instr('local', type_name(child.type))
+            writer.space()
+
+            self._write_local(writer, child)
 
     def _temp(self) -> str:
         temp = f't{self._temps}'
@@ -462,13 +496,14 @@ class Function:
         return name
 
     def _push_local(self, name: str, tp: types.Type) -> None:
-        assert name not in self.locals
+        # TODO: assert
+        # assert name not in self.locals
 
         self._type(tp)
-        self.locals[name] = tp
+        self.locals = self.locals.push(name, tp)
 
     def _pop_local(self, name: str) -> None:
-        pass
+        self.locals = self.locals.pop()
 
     def _cast(self, tp: types.Type, tar: types.Type) -> None:
         # diverge will never return so we can ignore casting
