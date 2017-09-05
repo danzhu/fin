@@ -75,11 +75,11 @@ class Writer:
             assert False, 'when?'
 
         elif isinstance(tp, (types.StructType, types.EnumerationType)):
-            if tp.symbol == builtin.BOOL_SYM:
+            if tp == builtin.BOOL:
                 self.instr('size_b')
-            elif tp.symbol == builtin.INT_SYM:
+            elif tp == builtin.INT:
                 self.instr('size_i')
-            elif tp.symbol == builtin.FLOAT_SYM:
+            elif tp == builtin.FLOAT:
                 self.instr('size_f')
             else:
                 for gen in tp.generics:

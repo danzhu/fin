@@ -122,7 +122,7 @@
   - [ ] array destructuring
 - arrays
   - [ ] inline initialization
-- [ ] change native types from Struct to Native
+- [x] ~~change native types from Struct to Native~~
 - [x] reuse local stack space
 - fixes for generic assembly overhaul
   - [x] enum
