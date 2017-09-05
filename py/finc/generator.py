@@ -99,18 +99,33 @@ class Writer:
         self.instr('contract', ctr.source.fullname())
 
 
-class TypeTree:
+class TypeList:
     def __init__(self,
                  val: 'types.Type' = None,
-                 parent: 'TypeTree' = None) -> None:
+                 parent: 'TypeList' = None) -> None:
         self.value = val
         self.parent = parent
 
-    def push(self, val: types.Type) -> 'TypeTree':
-        assert val is not None
-        return TypeTree(val, self)
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TypeList):
+            return False
 
-    def pop(self) -> 'TypeTree':
+        if self is other:
+            return True
+
+        if self.value != other.value:
+            return False
+
+        return self.parent == other.parent
+
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
+
+    def push(self, val: types.Type) -> 'TypeList':
+        assert val is not None
+        return TypeList(val, self)
+
+    def pop(self) -> 'TypeList':
         assert self.parent is not None
         return self.parent
 
@@ -322,7 +337,7 @@ class Function:
         for param in node.function.params:
             self._type(param.type)
 
-        stk = TypeTree()
+        stk = TypeList()
         node.context = {'after': stk.push(node.function.ret)}
 
         self.writer = Writer(writer)
@@ -407,7 +422,7 @@ class Function:
         self._temps += 1
         return temp
 
-    def _gen(self, node: Node, stk: TypeTree) -> TypeTree:
+    def _gen(self, node: Node, stk: TypeList) -> TypeList:
         self.writer.comment(node)
 
         self.writer.indent()
@@ -485,16 +500,17 @@ class Function:
             tp = types.to_level(tp, lvl)
             self.writer.instr('load', self._type(tp))
 
-    def _exit(self, stk: TypeTree, tar: TypeTree) -> None:
-        while stk is not tar:
+    def _exit(self, stk: TypeList, tar: TypeList) -> None:
+        while stk != tar:
             # TODO: RAII cleanup for local variables
             self.writer.instr('pop', self._type(stk.value))
             stk = stk.pop()
 
-    def _reduce(self, stk: TypeTree, tar: TypeTree) -> None:
-        # TODO: no need for popping when stack is same,
-        # however the way stack is constructed (i.e. pushing target_type)
-        # prevents equality comparison between stack and target
+    def _reduce(self, stk: TypeList, tar: TypeList) -> None:
+        # no need for popping when stack is same
+        if stk == tar:
+            return
+
         tmp = self._temp()
         self._push_local(tmp, stk.value)
         self.writer.instr('store_var', tmp, self._type(stk.value))
@@ -590,7 +606,7 @@ class Function:
 
         self.writer.dedent()
 
-    def _BLOCK(self, node: Node, stk: TypeTree) -> None:
+    def _BLOCK(self, node: Node, stk: TypeList) -> None:
         for c in node.children:
             stk = self._gen(c, stk)
             self.writer.space()
@@ -598,10 +614,10 @@ class Function:
         for var in node.block.locals:
             self._pop_local(var_name(var))
 
-    def _EMPTY(self, node: Node, stk: TypeTree) -> None:
+    def _EMPTY(self, node: Node, stk: TypeList) -> None:
         pass
 
-    def _LET(self, node: Node, stk: TypeTree) -> None:
+    def _LET(self, node: Node, stk: TypeList) -> None:
         assert isinstance(node.variable, symbols.Variable)
 
         self._push_local(var_name(node.variable), node.variable.type)
@@ -611,7 +627,7 @@ class Function:
                               var_name(node.variable),
                               self._type(node.variable.type))
 
-    def _IF(self, node: Node, stk: TypeTree) -> None:
+    def _IF(self, node: Node, stk: TypeList) -> None:
         els = self.gen.label('ELSE')
         end = self.gen.label('END_IF')
         has_else = node.children[2].type != 'EMPTY'
@@ -627,7 +643,7 @@ class Function:
 
         self.writer.label(end)
 
-    def _MATCH(self, node: Node, stk: TypeTree) -> None:
+    def _MATCH(self, node: Node, stk: TypeList) -> None:
         end = self.gen.label('END_MATCH')
 
         node.context = {
@@ -643,7 +659,7 @@ class Function:
         self.writer.instr('error')
         self.writer.label(end)
 
-    def _ARM(self, node: Node, stk: TypeTree) -> None:
+    def _ARM(self, node: Node, stk: TypeList) -> None:
         match = node.ancestor('MATCH')
 
         nxt = self.gen.label('ARM')
@@ -668,7 +684,7 @@ class Function:
         self.writer.instr('br', match.context['end'])
         self.writer.label(nxt)
 
-    def _WHILE(self, node: Node, stk: TypeTree) -> None:
+    def _WHILE(self, node: Node, stk: TypeList) -> None:
         start = self.gen.label('WHILE')
         cond = self.gen.label('COND')
         end = self.gen.label('END_WHILE')
@@ -693,7 +709,7 @@ class Function:
         self._gen(node.children[2], stk)  # else
         self.writer.label(end)
 
-    def _BREAK(self, node: Node, stk: TypeTree) -> None:
+    def _BREAK(self, node: Node, stk: TypeList) -> None:
         tar = node.ancestor('WHILE')
 
         stk = self._gen(node.children[0], stk)
@@ -704,17 +720,17 @@ class Function:
 
         self.writer.instr('br', tar.context['break'])
 
-    def _CONTINUE(self, node: Node, stk: TypeTree) -> None:
+    def _CONTINUE(self, node: Node, stk: TypeList) -> None:
         tar = node.ancestor('WHILE')
         self._exit(stk, tar.context['before'])
         self.writer.instr('br', tar.context['continue'])
 
-    def _REDO(self, node: Node, stk: TypeTree) -> None:
+    def _REDO(self, node: Node, stk: TypeList) -> None:
         tar = node.ancestor('WHILE')
         self._exit(stk, tar.context['before'])
         self.writer.instr('br', tar.context['redo'])
 
-    def _RETURN(self, node: Node, stk: TypeTree) -> None:
+    def _RETURN(self, node: Node, stk: TypeList) -> None:
         tar = node.ancestor('DEF')
 
         stk = self._gen(node.children[0], stk)
@@ -725,7 +741,7 @@ class Function:
         else:
             self.writer.instr('ret', self._type(tar.function.ret))
 
-    def _TEST(self, node: Node, stk: TypeTree) -> None:
+    def _TEST(self, node: Node, stk: TypeList) -> None:
         if node.value == 'NOT':
             self._gen(node.children[0], stk)
             self.writer.instr('not')
@@ -752,14 +768,14 @@ class Function:
 
         self.writer.label(end)
 
-    def _ASSN(self, node: Node, stk: TypeTree) -> None:
+    def _ASSN(self, node: Node, stk: TypeList) -> None:
         stk = self._gen(node.children[0], stk)
         stk = self._gen(node.children[1], stk)
 
         tp = node.children[1].target_type
         self.writer.instr('store', self._type(tp))
 
-    def _CALL(self, node: Node, stk: TypeTree) -> None:
+    def _CALL(self, node: Node, stk: TypeList) -> None:
         sym = node.match.source
 
         if isinstance(sym, symbols.Function):
@@ -802,13 +818,13 @@ class Function:
         else:
             assert False
 
-    def _OP(self, node: Node, stk: TypeTree) -> None:
+    def _OP(self, node: Node, stk: TypeList) -> None:
         for c in node.children:
             stk = self._gen(c, stk)
 
         self._call(node.match)
 
-    def _INC_ASSN(self, node: Node, stk: TypeTree) -> None:
+    def _INC_ASSN(self, node: Node, stk: TypeList) -> None:
         # left
         stk = self._gen(node.children[0], stk)
         tp = node.children[0].target_type
@@ -826,11 +842,11 @@ class Function:
         self._cast(node.match.ret, ret)
         self.writer.instr('store', self._type(ret))
 
-    def _CAST(self, node: Node, stk: TypeTree) -> None:
+    def _CAST(self, node: Node, stk: TypeList) -> None:
         self._gen(node.children[0], stk)
         self._call(node.match)
 
-    def _MEMBER(self, node: Node, stk: TypeTree) -> None:
+    def _MEMBER(self, node: Node, stk: TypeList) -> None:
         assert isinstance(node.variable, symbols.Variable)
 
         self._gen(node.children[0], stk)
@@ -839,13 +855,13 @@ class Function:
         mem = node.children[1].value
         self.writer.instr('addr_mem', self._member(tp, mem))
 
-    def _NUM(self, node: Node, stk: TypeTree) -> None:
+    def _NUM(self, node: Node, stk: TypeList) -> None:
         self.writer.instr('const_i', node.value)
 
-    def _FLOAT(self, node: Node, stk: TypeTree) -> None:
+    def _FLOAT(self, node: Node, stk: TypeList) -> None:
         self.writer.instr('const_f', node.value)
 
-    def _VAR(self, node: Node, stk: TypeTree) -> None:
+    def _VAR(self, node: Node, stk: TypeList) -> None:
         if isinstance(node.variable, symbols.Constant):
             tp = node.variable.type
             if not isinstance(tp, types.StructType):

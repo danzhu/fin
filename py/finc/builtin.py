@@ -5,7 +5,7 @@ from . import symbols
 def load_builtins() -> symbols.Module:
     mod = symbols.Module('', None, None)
 
-    NUM_TYPES = {INT, FLOAT}
+    NUM_TYPES = [INT, FLOAT]
 
     # classes
     for struct in {BOOL_SYM, INT_SYM, FLOAT_SYM}:
@@ -43,7 +43,7 @@ def load_builtins() -> symbols.Module:
 
     for val in NUM_TYPES:
         for res in NUM_TYPES:
-            if val == res:
+            if val is res:
                 continue
 
             fn = symbols.Function('cast')

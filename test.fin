@@ -9,7 +9,7 @@ def main()
     let i = 1
     while TRUE do
         if i > 1000 then
-            1 + break i
+            break i
         else
             i *= 2
     else

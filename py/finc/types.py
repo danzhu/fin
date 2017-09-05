@@ -11,6 +11,12 @@ MATCH_TO_VOID = 1.0
 
 
 class Type:
+    def __eq__(self, other: object) -> bool:
+        raise NotImplementedError()
+
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
+
     def fullname(self) -> str:
         raise NotImplementedError()
 
@@ -315,6 +321,12 @@ class Generics(Iterable[Type], Sized):
     def __len__(self) -> int:
         return len(self.generics)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Generics):
+            return False
+
+        return self.args == other.args
+
     def fullname(self) -> str:
         assert self._resolved
 
@@ -408,6 +420,12 @@ class Reference(Type):
     def __str__(self) -> str:
         return self.__format(self.type)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Reference):
+            return False
+
+        return self.type == other.type and self.level == other.type
+
     def fullname(self) -> str:
         return self.__format(self.type.fullname())
 
@@ -431,6 +449,12 @@ class Array(Type):
     def __str__(self) -> str:
         return self.__format(self.type, '; ')
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Array):
+            return False
+
+        return self.type == other.type and self.length == other.length
+
     def fullname(self) -> str:
         return self.__format(self.type.fullname(), ';')
 
@@ -447,6 +471,12 @@ class Generic(Type):
     def __str__(self) -> str:
         return self.name
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Generic):
+            return False
+
+        return self.symbol is other.symbol
+
     def fullname(self) -> str:
         return self.symbol.fullname()
 
@@ -460,6 +490,9 @@ class Special(Type):
 
     def __str__(self) -> str:
         return self.name
+
+    def __eq__(self, other: object) -> bool:
+        return self is other
 
     def fullname(self) -> str:
         assert False, 'should not use fullname on special'
@@ -487,6 +520,18 @@ class StructType(Type):
 
     def __str__(self) -> str:
         return f'{self.symbol}{self.generics}'
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, StructType):
+            return False
+
+        if self.symbol is not other.symbol:
+            return False
+
+        if self.generics != other.generics:
+            return False
+
+        return True
 
     def fullname(self) -> str:
         return f'{self.symbol.fullname()}{self.generics.fullname()}'
@@ -520,6 +565,18 @@ class EnumerationType(Type):
 
     def __str__(self) -> str:
         return f'{self.symbol}{self.generics}'
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EnumerationType):
+            return False
+
+        if self.symbol is not other.symbol:
+            return False
+
+        if self.generics != other.generics:
+            return False
+
+        return True
 
     def fullname(self) -> str:
         return self.symbol.fullname()

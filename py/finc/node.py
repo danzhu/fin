@@ -505,7 +505,7 @@ class Node:
             self.expr_type = self.children[-1].expr_type
 
         elif self.type == 'IF':
-            tps = {c.expr_type for c in self.children[1:]}
+            tps = [c.expr_type for c in self.children[1:]]
             res = types.Resolution()
             self.expr_type = res.interpolate_types(tps)
 
@@ -533,7 +533,7 @@ class Node:
 
         elif self.type == 'MATCH':
             arms = self.children[1].children
-            tps = {arm.expr_type for arm in arms}
+            tps = [arm.expr_type for arm in arms]
 
             res = types.Resolution()
             self.expr_type = res.interpolate_types(tps)
@@ -553,8 +553,8 @@ class Node:
 
         elif self.type == 'WHILE':
             bks = self.children[1].decedents('BREAK')
-            tps = {node.children[0].expr_type for node in bks}
-            tps.add(self.children[2].expr_type)  # else
+            tps = [node.children[0].expr_type for node in bks]
+            tps.append(self.children[2].expr_type)  # else
 
             res = types.Resolution()
             self.expr_type = res.interpolate_types(tps)
