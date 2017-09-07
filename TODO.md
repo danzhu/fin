@@ -132,6 +132,8 @@
 - [ ] control flow analysis
   - [ ] diverge spreading
 - [ ] remove code generator context in node
+- [ ] fix primitive constructor call
+- [ ] remove overload partial ordering
 
 ## Runtime
 

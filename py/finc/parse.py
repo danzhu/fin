@@ -1,4 +1,4 @@
-from typing import Iterable, Iterator, List, Callable
+from typing import Iterator, List, Callable
 from . import error
 from . import node
 from . import tokens
@@ -9,8 +9,8 @@ class Parser:
         self._src: Iterator[tokens.Token] = None
         self._lookahead: tokens.Token = None
 
-    def parse(self, src: Iterable[tokens.Token]):
-        self._src = iter(src)
+    def parse(self, src: Iterator[tokens.Token]):
+        self._src = src
         self._next()
         return self._file()
 

@@ -15,29 +15,37 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# warnings
+# compiler flags
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-    -Weverything \
-    -Wno-c++98-compat \
-    -Wno-c++98-compat-pedantic \
-    -Wno-covered-switch-default \
-    -Wno-missing-prototypes \
-    -Wno-padded \
-    -Wno-sign-conversion \
-    -Wno-unused-exception-parameter \
-    -Wno-unused-parameter \
-    -pedantic")
+        -Weverything \
+        -Wno-c++98-compat \
+        -Wno-c++98-compat-pedantic \
+        -Wno-covered-switch-default \
+        -Wno-missing-prototypes \
+        -Wno-padded \
+        -Wno-sign-conversion \
+        -Wno-unused-exception-parameter \
+        -Wno-unused-parameter \
+        -pedantic")
+
+    if(CMAKE_GENERATOR STREQUAL "Ninja")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
+    endif()
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-    -Wall \
-    -Wextra \
-    -Wno-unused-parameter \
-    -pedantic")
+        -Wall \
+        -Wextra \
+        -Wno-unused-parameter \
+        -pedantic")
+
+    if(CMAKE_GENERATOR STREQUAL "Ninja")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+    endif()
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-    /W4 \
-    /wd4100")
+        /W4 \
+        /wd4100")
 else()
     message(WARNING "Compiler not recognized, no warning flags set")
 endif()
@@ -46,10 +54,10 @@ endif()
 set(PY "${PROJECT_SOURCE_DIR}/py")
 set(GEN "${CMAKE_CURRENT_BINARY_DIR}/gen")
 
-file(GLOB SOURCES "src/*.cc")
-file(GLOB_RECURSE HEADERS "include/*.h")
-file(GLOB MAIN "main/*.cc")
-file(GLOB FINC "${PY}/finc/*.py")
+file(GLOB_RECURSE SOURCES "${PROJECT_SOURCE_DIR}/src/*.cc")
+file(GLOB_RECURSE HEADERS "${PROJECT_SOURCE_DIR}/include/*.h")
+file(GLOB_RECURSE MAIN "${PROJECT_SOURCE_DIR}/main/*.cc")
+file(GLOB_RECURSE FINC "${PY}/finc/*.py")
 
 file(MAKE_DIRECTORY "${GEN}")
 
@@ -65,20 +73,22 @@ add_custom_command(
     COMMAND "${PY}/opname.py" > "${GEN}/opcode.cc")
 
 add_custom_command(
-    OUTPUT instructions.md
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/instructions.md"
     DEPENDS "${PY}/instructions" "${PY}/instr.py"
-    COMMAND "${PY}/instr.py" > instructions.md)
+    COMMAND "${PY}/instr.py" > "${CMAKE_CURRENT_BINARY_DIR}/instructions.md")
 
 add_custom_command(
-    OUTPUT test.fm
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/test.fm"
     DEPENDS "${PROJECT_SOURCE_DIR}/test.fin" "${PY}/compiler.py" "${PY}/asm.py"
         ${FINC}
-    COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test.fin" -o test.fm)
+    COMMAND "${PY}/compiler.py" "${PROJECT_SOURCE_DIR}/test.fin"
+        -o "${CMAKE_CURRENT_BINARY_DIR}/test.fm")
+
+set_source_files_properties("${GEN}/opcode.h" "${GEN}/opcode.cc"
+    PROPERTIES GENERATED TRUE)
 
 # targets
-add_library(fin
-    ${SOURCES} ${HEADERS}
-    "${GEN}/opcode.cc" "${GEN}/opcode.h" "${PY}/instructions")
+add_library(fin ${SOURCES} "${GEN}/opcode.cc" ${HEADERS} "${GEN}/opcode.h")
 target_include_directories(fin PRIVATE "${GEN}")
 target_include_directories(fin PUBLIC "${PROJECT_SOURCE_DIR}/include")
 
@@ -86,11 +96,11 @@ add_executable(fin-bin ${MAIN})
 set_target_properties(fin-bin PROPERTIES OUTPUT_NAME fin)
 target_link_libraries(fin-bin fin)
 
-add_custom_target(doc DEPENDS instructions.md)
+add_custom_target(doc DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/instructions.md")
 
 add_custom_target(run
-    COMMAND fin-bin test.fm
-    DEPENDS test.fm)
+    COMMAND fin-bin "${CMAKE_CURRENT_BINARY_DIR}/test.fm"
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/test.fm")
 
 # preprocessor definitions
 if(DEBUG)

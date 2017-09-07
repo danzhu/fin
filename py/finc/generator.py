@@ -1,5 +1,4 @@
 from typing import Dict, Set, List, Union
-from collections import OrderedDict
 from io import TextIOBase
 from . import builtin
 from . import symbols

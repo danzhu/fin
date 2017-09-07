@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from typing import Set, Iterable, cast
+from typing import Iterable, cast
 import argparse
 import io
 import os
@@ -12,7 +12,6 @@ from finc import error
 from finc import generator
 from finc import lexer
 from finc import parse
-from finc import types
 
 
 class Compiler:
@@ -46,9 +45,11 @@ class Compiler:
         tokens = self.lexer.read(src)
 
         if stage == 'lex':
-            tokens = list(tokens)
-            for t in tokens:
+            lst = list(tokens)
+            for t in lst:
                 print(t)
+
+            tokens = iter(lst)
 
         ast = self.parser.parse(tokens)
 
