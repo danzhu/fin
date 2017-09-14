@@ -1,4 +1,4 @@
 import rt
 
 def test()
-    let i = rt::input()
+    let i = rt:input()

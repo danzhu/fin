@@ -5,13 +5,14 @@ import argparse
 import io
 import os
 import sys
-from asm import Assembler
 from finc import builtin
 from finc import symbols
 from finc import error
 from finc import generator
 from finc import lexer
 from finc import parse
+from finc import analyzer
+from asm import Assembler
 
 
 class Compiler:
@@ -23,6 +24,11 @@ class Compiler:
         builtins = builtin.load_builtins()
         self.root = symbols.Module('', None, builtins)
 
+        self.analyzeImport = analyzer.AnalyzeImport(self.root)
+        self.analyzeDeclare = analyzer.AnalyzeDeclare(self.root)
+        self.analyzeJump = analyzer.AnalyzeJump(self.root)
+        self.analyzeExpr = analyzer.AnalyzeExpr(self.root)
+
     def load_module(self,
                     mod_name: str,
                     parent: symbols.Module) -> symbols.Module:
@@ -33,7 +39,8 @@ class Compiler:
         with open(filename) as src:
             tokens = self.lexer.read(src)
             ast = self.parser.parse(tokens)
-            ast.declare(mod, self.root)
+            self.analyzeImport.analyze(ast, mod)
+            self.analyzeDeclare.analyze(ast, mod)
 
         return mod
 
@@ -59,7 +66,10 @@ class Compiler:
         self.load_module('rt', self.root)
 
         mod = symbols.Module(name, self.root)
-        ast.analyze(mod, self.root)
+        self.analyzeImport.analyze(ast, mod)
+        self.analyzeDeclare.analyze(ast, mod)
+        self.analyzeJump.analyze(ast, mod)
+        self.analyzeExpr.analyze(ast, mod)
 
         if stage == 'ast':
             ast.print()
@@ -67,7 +77,7 @@ class Compiler:
         with io.StringIO() as asm:
             assembly = cast(io.StringIO, asm)
 
-            generator.Generator(ast, cast(io.TextIOBase, assembly))
+            generator.Generator(ast, mod, cast(io.TextIOBase, assembly))
 
             if stage == 'asm':
                 print(assembly.getvalue())

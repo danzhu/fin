@@ -5,7 +5,7 @@ enum Opt
     NONE
 
 def main()
-    let opt = Opt::SOME(3)
+    let opt = Opt:SOME(3)
     match opt
-        Opt::NONE() => rt::assert(FALSE)
-        Opt::SOME(val) => rt::assert(val == 3)
+        Opt:NONE() => rt:assert(FALSE)
+        Opt:SOME(val) => rt:assert(val == 3)

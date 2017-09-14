@@ -1,10 +1,10 @@
-from typing import Dict, Set, List, Union
+from typing import Dict, Set, List, Union, Any
 from io import TextIOBase
 from . import builtin
 from . import symbols
 from . import types
 from . import pattern
-from .node import Node
+from . import ast
 
 
 OP_TABLE = {
@@ -171,40 +171,42 @@ class TypeRef:
 
 
 class Generator:
-    def __init__(self, root: Node, out: TextIOBase) -> None:
+    def __init__(self,
+                 root: ast.Node,
+                 mod: symbols.Module,
+                 out: TextIOBase) -> None:
         self._root = root
+        self._module = mod
 
         self._labels: Dict[str, int] = {}
         self._function_refs: Set[symbols.Function] = set()
         self._type_refs: Dict[str, SymbolRef] = {}
 
         body = Writer()
-        for c in root.children:
-            if c.type == 'IMPORT':
+        for decl in root.children():
+            if isinstance(decl, ast.Import):
                 continue
 
-            if c.type == 'STRUCT':
-                Type(self, c.struct, body)
-            elif c.type == 'ENUM':
-                Type(self, c.enum, body)
-            elif c.type == 'DEF':
-                Function(self, c, body)
+            if isinstance(decl, (ast.Struct, ast.Enum)):
+                Type(self, decl.symbol, body)
+            elif isinstance(decl, ast.Def):
+                Function(self, decl, body)
             else:
-                raise NotImplementedError()
+                assert False, 'unknown decl type'
 
             body.space()
 
         writer = Writer()
-        writer.instr('lib', quote(root.module.name))
+        writer.instr('lib', quote(mod.name))
         writer.space()
 
         ref_mod = None
         for fn in sorted(self._function_refs):
-            mod = fn.module()
+            module = fn.module()
 
-            if ref_mod != mod:
-                writer.instr('ref_lib', quote(mod.fullname()))
-                ref_mod = mod
+            if ref_mod != module:
+                writer.instr('ref_lib', quote(module.fullname()))
+                ref_mod = module
 
             writer.instr('ref_fn', quote(fn.basename()))
 
@@ -229,7 +231,7 @@ class Generator:
         mod = fn.module()
 
         # don't ref current module / builtin
-        if mod != self._root.module:
+        if mod != self._module:
             self._function_refs.add(fn)
 
     def ref_member(self, tp: types.Type, mem: str) -> None:
@@ -237,7 +239,7 @@ class Generator:
 
         sym = tp.symbol
         mod = sym.module()
-        if mod == self._root.module:
+        if mod == self._module:
             return
 
         name = sym.fullname()
@@ -346,30 +348,31 @@ class Type:
 class Function:
     def __init__(self,
                  gen: Generator,
-                 node: Node,
+                 node: ast.Def,
                  writer: Writer) -> None:
         self.gen = gen
 
         self._temps = 0
+        self._context: Dict[ast.Node, Dict[str, Any]] = {}
         self.types: Dict[str, TypeRef] = {}
         self.contracts: Dict[str, types.Match] = {}
         self.locals = TypeTree()
 
-        for param in node.function.params:
+        for param in node.symbol.params:
             self._type(param.type)
 
         stk = TypeList()
-        node.context = {'after': stk.push(node.function.ret)}
+        self._context[node] = {'after': stk.push(node.symbol.ret)}
 
         self.writer = Writer(writer)
-        self._gen(node.children[3], stk)
-        if node.function.ret == builtin.VOID:
+        self._gen(node.body, stk)
+        if node.symbol.ret == builtin.VOID:
             self.writer.instr('end')
         else:
-            self.writer.instr('ret', self._type(node.function.ret))
+            self.writer.instr('ret', self._type(node.symbol.ret))
 
-        name = node.function.basename()
-        gens = len(node.function.generics)
+        name = node.symbol.basename()
+        gens = len(node.symbol.generics)
         ctrs = 0  # TODO: contract bounds
 
         begin = self.gen.label('BEGIN_FN')
@@ -381,7 +384,7 @@ class Function:
         writer.indent()
 
         writer.comment('types')
-        for gen_sym in node.function.generics:
+        for gen_sym in node.symbol.generics:
             writer.instr('!sz', gen_sym.fullname())
             writer.space()
 
@@ -417,7 +420,7 @@ class Function:
 
         writer.space()
         writer.comment('params')
-        for param in node.function.params:
+        for param in node.symbol.params:
             writer.instr('!off', var_name(param))
             writer.instr('param', type_name(param.type))
             writer.space()
@@ -455,16 +458,15 @@ class Function:
         self._temps += 1
         return temp
 
-    def _gen(self, node: Node, stk: TypeList) -> TypeList:
-        self.writer.comment(node)
+    def _gen(self, node: ast.Expr, stk: TypeList) -> TypeList:
+        self.writer.comment(repr(node))
 
         self.writer.indent()
 
-        getattr(self, f'_{node.type}')(node, stk)
-        self._cast(node.expr_type, node.target_type)
-        if node.target_type != builtin.VOID and \
-                node.target_type != builtin.DIVERGE:
-            stk = stk.push(node.target_type)
+        self._expr(node, stk)
+        if node.expr_type != builtin.VOID and \
+                node.expr_type != builtin.DIVERGE:
+            stk = stk.push(node.expr_type)
 
         self.writer.dedent()
 
@@ -487,7 +489,7 @@ class Function:
         return name
 
     def _member(self, tp: types.Type, mem: str) -> str:
-        tp = types.to_level(tp, 0)
+        tp = types.remove_ref(tp)
         tp_name = self._type(tp)
         name = f'{tp_name}:{mem}'
         self.types[tp_name].ref_member(mem)
@@ -503,36 +505,6 @@ class Function:
 
     def _pop_local(self, name: str) -> None:
         self.locals = self.locals.pop()
-
-    def _cast(self, tp: types.Type, tar: types.Type) -> None:
-        # diverge will never return so we can ignore casting
-        if tp is None or tp == builtin.DIVERGE:
-            return
-
-        assert tar is not None
-        assert tar != builtin.UNKNOWN
-        assert tar != builtin.DIVERGE
-
-        if tar == builtin.VOID:
-            if tp != builtin.VOID:
-                self.writer.instr('pop', self._type(tp))
-
-            return
-
-        assert tp != builtin.UNKNOWN
-        assert tp != builtin.VOID
-
-        # TODO: need to change when cast is more than level reduction
-        if not isinstance(tp, types.Reference):
-            return
-
-        lvl = tp.level
-        tar_lvl = types.to_ref(tar).level
-
-        while lvl > tar_lvl:
-            lvl -= 1
-            tp = types.to_level(tp, lvl)
-            self.writer.instr('load', self._type(tp))
 
     def _exit(self, stk: TypeList, tar: TypeList) -> None:
         while stk != tar:
@@ -583,7 +555,12 @@ class Function:
         self.writer.comment(f'match {pat}')
 
         self.writer.indent()
-        self._cast(tp, pat.type)
+
+        # TODO: duplicate logic, merge with analyzer implicit cast generation
+        while tp != pat.type:
+            assert isinstance(tp, types.Reference)
+            tp = tp.type
+            self.writer.instr('load', self._type(tp))
 
         if isinstance(pat, pattern.Variable):
             self.writer.instr('store_var',
@@ -591,14 +568,14 @@ class Function:
                               self._type(pat.type))
 
         elif isinstance(pat, pattern.Constant):
-            if isinstance(pat.value, int):
+            if pat.type == builtin.INT:
                 self.writer.instr('const_i', str(pat.value))
                 self.writer.instr('eq_i')
-            elif isinstance(pat.value, float):
+            elif pat.type == builtin.FLOAT:
                 self.writer.instr('const_f', str(pat.value))
                 self.writer.instr('eq_f')
             else:
-                assert False
+                assert False, f'unknown const pattern type {pat.type}'
 
             self.writer.instr('br_false', nxt)
 
@@ -640,283 +617,298 @@ class Function:
 
         self.writer.dedent()
 
-    def _BLOCK(self, node: Node, stk: TypeList) -> None:
-        for c in node.children:
-            stk = self._gen(c, stk)
-            self.writer.space()
+    def _expr(self, expr: ast.Expr, stk: TypeList) -> None:
+        if isinstance(expr, ast.Block):
+            for child in expr:
+                stk = self._gen(child, stk)
+                self.writer.space()
 
-        for var in node.block.locals:
-            self._pop_local(var_name(var))
+            for loc in expr.block.locals:
+                self._pop_local(var_name(loc))
 
-    def _EMPTY(self, node: Node, stk: TypeList) -> None:
-        pass
+        elif isinstance(expr, ast.Let):
+            assert isinstance(expr.symbol, symbols.Variable)
 
-    def _LET(self, node: Node, stk: TypeList) -> None:
-        assert isinstance(node.variable, symbols.Variable)
+            self._push_local(var_name(expr.symbol), expr.symbol.type)
+            if expr.value is not None:
+                self._gen(expr.value, stk)
+                self.writer.instr('store_var',
+                                  var_name(expr.symbol),
+                                  self._type(expr.symbol.type))
 
-        self._push_local(var_name(node.variable), node.variable.type)
-        if node.children[1].type != 'EMPTY':
-            self._gen(node.children[1], stk)
-            self.writer.instr('store_var',
-                              var_name(node.variable),
-                              self._type(node.variable.type))
+        elif isinstance(expr, ast.If):
+            els = self.gen.label('ELSE')
+            end = self.gen.label('END_IF')
+            has_else = not isinstance(expr.failure, ast.Noop)
 
-    def _IF(self, node: Node, stk: TypeList) -> None:
-        els = self.gen.label('ELSE')
-        end = self.gen.label('END_IF')
-        has_else = node.children[2].type != 'EMPTY'
+            self._gen(expr.condition, stk)
+            self.writer.instr('br_false', els if has_else else end)
+            self._gen(expr.success, stk)
 
-        self._gen(node.children[0], stk)  # comp
-        self.writer.instr('br_false', els if has_else else end)
-        self._gen(node.children[1], stk)
+            if has_else:
+                self.writer.instr('br', end)
+                self.writer.label(els)
+                self._gen(expr.failure, stk)
 
-        if has_else:
+            self.writer.label(end)
+
+        elif isinstance(expr, ast.While):
+            start = self.gen.label('WHILE')
+            cond = self.gen.label('COND')
+            end = self.gen.label('END_WHILE')
+
+            self._context[expr] = {
+                'break': end,
+                'continue': cond,
+                'redo': start,
+                'before': stk,
+                'after': stk.push(expr.expr_type)
+            }
+
+            self.writer.instr('br', cond)
+
+            self.writer.label(start)
+            self._gen(expr.content, stk)
+
+            self.writer.label(cond)
+            self._gen(expr.condition, stk)
+            self.writer.instr('br_true', start)
+
+            self._gen(expr.failure, stk)
+            self.writer.label(end)
+
+        elif isinstance(expr, ast.Match):
+            end = self.gen.label('END_MATCH')
+
+            self._gen(expr.expr, stk)
+
+            for arm in expr.arms:
+                nxt = self.gen.label('ARM')
+
+                for var in arm.pat.variables():
+                    self._push_local(var_name(var.variable), var.variable.type)
+
+                if arm.pat.tested() or arm.pat.bound():
+                    self.writer.instr('dup', self._type(expr.expr.expr_type))
+                    self._match(arm.pat, expr.expr.expr_type, nxt)
+
+                self.writer.instr('pop', self._type(expr.expr.expr_type))
+
+                self._gen(arm.content, stk)
+
+                for var in arm.pat.variables():
+                    self._pop_local(var_name(var.variable))
+
+                self.writer.instr('br', end)
+                self.writer.label(nxt)
+
+            # abort when no match found
+            self.writer.instr('error')
+
+            self.writer.label(end)
+
+        elif isinstance(expr, ast.BinTest):
+            jump = self.gen.label('SHORT_CIRCUIT')
+            end = self.gen.label('END_TEST')
+
+            self._gen(expr.left, stk)
+
+            if expr.operator == 'and':
+                self.writer.instr('br_false', jump)
+            elif expr.operator == 'or':
+                self.writer.instr('br_true', jump)
+            else:
+                assert False, 'unknown binary test type'
+
+            self._gen(expr.right, stk)
             self.writer.instr('br', end)
-            self.writer.label(els)
-            self._gen(node.children[2], stk)
+            self.writer.label(jump)
 
-        self.writer.label(end)
+            if expr.operator == 'and':
+                self.writer.instr('const_false')
+            elif expr.operator == 'or':
+                self.writer.instr('const_true')
+            else:
+                assert False, 'unknown binary test type'
 
-    def _MATCH(self, node: Node, stk: TypeList) -> None:
-        end = self.gen.label('END_MATCH')
+            self.writer.label(end)
 
-        node.context = {
-            'end': end
-        }
-
-        self._gen(node.children[0], stk)
-
-        for c in node.children[1].children:
-            self._gen(c, stk)
-
-        # no match found
-        self.writer.instr('error')
-        self.writer.label(end)
-
-    def _ARM(self, node: Node, stk: TypeList) -> None:
-        match = node.ancestor('MATCH')
-
-        nxt = self.gen.label('ARM')
-
-        pat = node.children[0].pattern
-        tp = match.children[0].target_type
-
-        for var in pat.variables():
-            self._push_local(var_name(var.variable), var.variable.type)
-
-        if pat.tested() or pat.bound():
-            self.writer.instr('dup', self._type(tp))
-            self._match(pat, tp, nxt)
-
-        self.writer.instr('pop', self._type(tp))
-
-        self._gen(node.children[1], stk)
-
-        for var in pat.variables():
-            self._pop_local(var_name(var.variable))
-
-        self.writer.instr('br', match.context['end'])
-        self.writer.label(nxt)
-
-    def _WHILE(self, node: Node, stk: TypeList) -> None:
-        start = self.gen.label('WHILE')
-        cond = self.gen.label('COND')
-        end = self.gen.label('END_WHILE')
-
-        node.context = {
-            'break': end,
-            'continue': cond,
-            'redo': start,
-            'before': stk,
-            'after': stk.push(node.target_type)
-        }
-
-        self.writer.instr('br', cond)
-
-        self.writer.label(start)
-        self._gen(node.children[1], stk)
-
-        self.writer.label(cond)
-        self._gen(node.children[0], stk)  # comp
-        self.writer.instr('br_true', start)
-
-        self._gen(node.children[2], stk)  # else
-        self.writer.label(end)
-
-    def _BREAK(self, node: Node, stk: TypeList) -> None:
-        tar = node.ancestor('WHILE')
-
-        stk = self._gen(node.children[0], stk)
-        if node.children[0].target_type == builtin.VOID:
-            self._exit(stk, tar.context['after'])
-        else:
-            self._reduce(stk, tar.context['after'])
-
-        self.writer.instr('br', tar.context['break'])
-
-    def _CONTINUE(self, node: Node, stk: TypeList) -> None:
-        tar = node.ancestor('WHILE')
-        self._exit(stk, tar.context['before'])
-        self.writer.instr('br', tar.context['continue'])
-
-    def _REDO(self, node: Node, stk: TypeList) -> None:
-        tar = node.ancestor('WHILE')
-        self._exit(stk, tar.context['before'])
-        self.writer.instr('br', tar.context['redo'])
-
-    def _RETURN(self, node: Node, stk: TypeList) -> None:
-        tar = node.ancestor('DEF')
-
-        stk = self._gen(node.children[0], stk)
-
-        # TODO: cleanup variables for RAII
-        if node.children[0].target_type == builtin.VOID:
-            self.writer.instr('end')
-        else:
-            self.writer.instr('ret', self._type(tar.function.ret))
-
-    def _TEST(self, node: Node, stk: TypeList) -> None:
-        if node.value == 'NOT':
-            self._gen(node.children[0], stk)
+        elif isinstance(expr, ast.NotTest):
+            self._gen(expr.expr, stk)
             self.writer.instr('not')
-            return
 
-        jump = self.gen.label('SHORT_CIRCUIT')
-        end = self.gen.label('END_TEST')
+        elif isinstance(expr, ast.Call):
+            sym = expr.match.source
 
-        self._gen(node.children[0], stk)
+            if isinstance(sym, symbols.Function):
+                for child in expr.arguments:
+                    stk = self._gen(child, stk)
 
-        if node.value == 'AND':
-            self.writer.instr('br_false', jump)
-        else:
-            self.writer.instr('br_true', jump)
+                self._call(expr.match)
 
-        self._gen(node.children[1], stk)
-        self.writer.instr('br', end)
-        self.writer.label(jump)
+            elif isinstance(sym, (symbols.Struct, symbols.Variant)):
+                tmp = self._temp()
 
-        if node.value == 'AND':
-            self.writer.instr('const_false')
-        else:
-            self.writer.instr('const_true')
+                tp = expr.match.ret
+                self._push_local(tmp, tp)
 
-        self.writer.label(end)
+                assert isinstance(tp, (types.StructType,
+                                       types.EnumerationType))
 
-    def _ASSN(self, node: Node, stk: TypeList) -> None:
-        stk = self._gen(node.children[0], stk)
-        stk = self._gen(node.children[1], stk)
+                if isinstance(sym, symbols.Variant):
+                    self.writer.instr('addr_var', tmp)
+                    # TODO: user-defined value type
+                    self.writer.instr('const_i', str(sym.value))
+                    self.writer.instr('store_mem',
+                                      self._member(tp, '_value'),
+                                      self._type(builtin.INT))
 
-        tp = node.children[1].target_type
-        self.writer.instr('store', self._type(tp))
+                # silence type checker
+                assert isinstance(sym, (symbols.Struct, symbols.Variant))
 
-    def _CALL(self, node: Node, stk: TypeList) -> None:
-        sym = node.match.source
+                assert len(expr.arguments) == len(sym.fields)
+                for child, field in zip(expr.arguments, sym.fields):
+                    self.writer.instr('addr_var', tmp)
+                    self._gen(child, stk)
+                    self.writer.instr('store_mem',
+                                      self._member(tp, field.name),
+                                      self._type(child.expr_type))
 
-        if isinstance(sym, symbols.Function):
-            for c in node.children[1].children:
-                stk = self._gen(c, stk)
+                self.writer.instr('load_var', tmp, self._type(tp))
+                self._pop_local(tmp)
 
-            self._call(node.match)
+            else:
+                assert False, 'unknown match source type'
 
-        elif isinstance(sym, (symbols.Struct, symbols.Variant)):
-            tmp = self._temp()
+        elif isinstance(expr, ast.Method):
+            stk = self._gen(expr.object, stk)
 
-            tp = node.match.ret
-            self._push_local(tmp, tp)
+            for child in expr.arguments:
+                stk = self._gen(child, stk)
 
-            assert isinstance(tp, (types.StructType, types.EnumerationType))
+            self._call(expr.match)
 
-            if isinstance(sym, symbols.Variant):
-                self.writer.instr('addr_var', tmp)
-                # TODO: user-defined value type
-                self.writer.instr('const_i', str(sym.value))
-                self.writer.instr('store_mem',
-                                  self._member(tp, '_value'),
-                                  self._type(builtin.INT))
+        elif isinstance(expr, ast.Op):
+            for child in expr.arguments:
+                stk = self._gen(child, stk)
 
-            # silence type checker
-            assert isinstance(sym, (symbols.Struct, symbols.Variant))
+            self._call(expr.match)
 
-            assert len(node.children[1].children) == len(sym.fields)
+        elif isinstance(expr, ast.Cast):
+            self._gen(expr.expr, stk)
+            self._call(expr.match)
 
-            for child, field in zip(node.children[1].children, sym.fields):
-                self.writer.instr('addr_var', tmp)
-                self._gen(child, stk)
-                self.writer.instr('store_mem',
-                                  self._member(tp, field.name),
-                                  self._type(child.target_type))
+        elif isinstance(expr, ast.Member):
+            self._gen(expr.expr, stk)
 
-            self.writer.instr('load_var', tmp, self._type(tp))
-            self._pop_local(tmp)
+            assert expr.member.path is None, 'member path not implemented'
 
-        else:
-            assert False
+            tp = expr.expr.expr_type
+            mem = expr.member.name
+            self.writer.instr('addr_mem', self._member(tp, mem))
 
-    def _OP(self, node: Node, stk: TypeList) -> None:
-        for c in node.children:
-            stk = self._gen(c, stk)
+        elif isinstance(expr, ast.Var):
+            if isinstance(expr.variable, symbols.Constant):
+                tp = expr.variable.type
+                if not isinstance(tp, types.StructType):
+                    raise NotImplementedError()
 
-        self._call(node.match)
-
-    def _INC_ASSN(self, node: Node, stk: TypeList) -> None:
-        # left
-        stk = self._gen(node.children[0], stk)
-        tp = node.children[0].target_type
-        self.writer.instr('dup', self._type(tp))
-        self._cast(node.children[0].target_type, node.match.params[0].type)
-
-        # right
-        stk = self._gen(node.children[1], stk)
-
-        # call
-        self._call(node.match)
-
-        # assn
-        ret = types.to_level(node.children[0].target_type, 0)
-        self._cast(node.match.ret, ret)
-        self.writer.instr('store', self._type(ret))
-
-    def _CAST(self, node: Node, stk: TypeList) -> None:
-        self._gen(node.children[0], stk)
-        self._call(node.match)
-
-    def _MEMBER(self, node: Node, stk: TypeList) -> None:
-        assert isinstance(node.variable, symbols.Variable)
-
-        self._gen(node.children[0], stk)
-
-        tp = node.children[0].target_type
-        mem = node.children[1].value
-        self.writer.instr('addr_mem', self._member(tp, mem))
-
-    def _NUM(self, node: Node, stk: TypeList) -> None:
-        self.writer.instr('const_i', node.value)
-
-    def _FLOAT(self, node: Node, stk: TypeList) -> None:
-        self.writer.instr('const_f', node.value)
-
-    def _VAR(self, node: Node, stk: TypeList) -> None:
-        if isinstance(node.variable, symbols.Constant):
-            tp = node.variable.type
-            if not isinstance(tp, types.StructType):
-                raise NotImplementedError()
-
-            if isinstance(node.variable.value, bool):
-                if node.variable.value:
-                    self.writer.instr('const_true')
+                if isinstance(expr.variable.value, bool):
+                    if expr.variable.value:
+                        self.writer.instr('const_true')
+                    else:
+                        self.writer.instr('const_false')
                 else:
-                    self.writer.instr('const_false')
-            else:
-                raise NotImplementedError()
+                    raise NotImplementedError()
 
-        elif isinstance(node.variable, symbols.Variable):
-            if node.variable.is_arg:
-                self.writer.instr('addr_arg', var_name(node.variable))
+            elif isinstance(expr.variable, symbols.Variable):
+                if expr.variable.is_arg:
+                    self.writer.instr('addr_arg', var_name(expr.variable))
+                else:
+                    self.writer.instr('addr_var', var_name(expr.variable))
+
             else:
-                self.writer.instr('addr_var', var_name(node.variable))
+                assert False, 'unknown var type'
+
+        elif isinstance(expr, ast.Const):
+            if expr.type == 'num':
+                self.writer.instr('const_i', expr.value)
+            elif expr.type == 'float':
+                self.writer.instr('const_f', expr.value)
+            else:
+                assert False, 'unknown const type'
+
+        elif isinstance(expr, ast.Assn):
+            stk = self._gen(expr.variable, stk)
+            stk = self._gen(expr.value, stk)
+
+            self.writer.instr('store', self._type(expr.value.expr_type))
+
+        elif isinstance(expr, ast.IncAssn):
+            # left
+            stk = self._gen(expr.variable, stk)
+            self.writer.instr('dup', self._type(expr.variable.expr_type))
+            # FIXME: this only works for buitin operators
+            self.writer.instr('load', self._type(expr.match.params[0].type))
+
+            # right
+            stk = self._gen(expr.value, stk)
+
+            # call
+            self._call(expr.match)
+
+            # assn
+            self.writer.instr('store', self._type(expr.match.ret))
+
+        elif isinstance(expr, ast.Return):
+            stk = self._gen(expr.value, stk)
+
+            cxt = self._context[expr.target]
+
+            self._exit(stk, cxt['before'])
+
+            # TODO: cleanup variables for RAII
+            if expr.value.expr_type == builtin.VOID:
+                self.writer.instr('end')
+            else:
+                self.writer.instr('ret', self._type(expr.value.expr_type))
+
+        elif isinstance(expr, ast.Break):
+            stk = self._gen(expr.value, stk)
+            cxt = self._context[expr.target]
+
+            if expr.value.expr_type == builtin.VOID:
+                self._exit(stk, cxt['after'])
+            else:
+                self._reduce(stk, cxt['after'])
+
+            self.writer.instr('br', cxt['break'])
+
+        elif isinstance(expr, ast.Continue):
+            cxt = self._context[expr.target]
+
+            self._exit(stk, cxt['before'])
+            self.writer.instr('br', cxt['continue'])
+
+        elif isinstance(expr, ast.Redo):
+            cxt = self._context[expr.target]
+
+            self._exit(stk, cxt['before'])
+            self.writer.instr('br', cxt['redo'])
+
+        elif isinstance(expr, ast.Noop):
+            # well, it's noop
+            pass
+
+        elif isinstance(expr, ast.Deref):
+            self._gen(expr.expr, stk)
+            self.writer.instr('load', self._type(expr.expr_type))
+
+        elif isinstance(expr, ast.Void):
+            self.writer.instr('pop', self._type(expr.expr.expr_type))
 
         else:
-            assert False
+            assert False, f'unknown expr type {expr}'
 
 
 def type_name(tp: types.Type) -> str:

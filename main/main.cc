@@ -72,19 +72,19 @@ int main(int argc, const char *argv[])
     Fin::Runtime runtime{};
 
     auto &fin = runtime.createLibrary(Fin::LibraryID{"rt"});
-    fin.addNative("print(Int)", print<Fin::Int>);
-    fin.addNative("print(Float)", print<Fin::Float>);
-    fin.addNative("print(Bool)", print<Fin::Bool>);
+    fin.addNative("print(Int)Void", print<Fin::Int>);
+    fin.addNative("print(Float)Void", print<Fin::Float>);
+    fin.addNative("print(Bool)Void", print<Fin::Bool>);
     fin.addNative("input()Int", input<Fin::Int>);
     fin.addNative("input()Float", input<Fin::Float>);
     fin.addNative("input()Bool", input<Fin::Bool>);
     fin.addNative("alloc(Int)&[0]", alloc);
     fin.addNative("realloc(&[0],Int)&[0]", _realloc);
-    fin.addNative("dealloc(&0)", dealloc);
+    fin.addNative("dealloc(&0)Void", dealloc);
     fin.addNative("write(Int)", write);
     fin.addNative("read()Int", read);
-    fin.addNative("backtrace()", backtrace);
-    fin.addNative("assert(Bool)", _assert);
+    fin.addNative("backtrace()Void", backtrace);
+    fin.addNative("assert(Bool)Void", _assert);
 
     try
     {

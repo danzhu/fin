@@ -85,9 +85,9 @@
   - [x] `else`
   - [x] `redo`
   - [x] `break ...`
-  - [ ] disallow loop control inside condition and else
+  - [x] disallow loop control inside condition and else
   - [ ] loop labels
-- [ ] levelled equality comparison
+- [x] ~~levelled equality comparison~~
 - [x] unify module / struct / function to symbol table
   - [x] remove context in symbol table
 - structs
@@ -108,7 +108,7 @@
   - [x] array allocation
   - [x] struct (single instance) allocation
 - [x] fix incremental assignment stack inaccuracy
-- [ ] remove levelled assignment
+- [x] remove levelled assignment
 - [x] change postfix to prefix for reference
 - [x] show variable of unsized type error
 - [ ] recursive struct / enum definition check
@@ -128,12 +128,17 @@
   - [x] enum
   - [x] pattern matching
   - [x] `break` / `return` value
-- [ ] refactor analyzer
+- [x] refactor analyzer
 - [ ] control flow analysis
   - [ ] diverge spreading
-- [ ] remove code generator context in node
+- [ ] remove code generator context
 - [ ] fix primitive constructor call
 - [ ] remove overload partial ordering
+- fixes for ast overhaul
+  - [ ] line / col for ast
+  - [ ] call node arg / ret value in error msg
+  - [ ] forward errors in symbols
+  - [ ] level reduction partial ordering
 
 ## Runtime
 

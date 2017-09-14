@@ -1,8 +1,9 @@
-from .tokens import Token
+from . import ast
+from . import tokens
 
 
 class CompilerError(Exception):
-    def __init__(self, msg: str, token: Token) -> None:
+    def __init__(self, msg: str, token: tokens.Token) -> None:
         super().__init__(msg)
         self.token = token
 
@@ -30,7 +31,9 @@ class ParserError(CompilerError):
 
 
 class AnalyzerError(CompilerError):
-    pass
+    def __init__(self, msg: str, node: ast.Node) -> None:
+        # TODO: print token location
+        super().__init__(msg, None)
 
 
 class AssemblerError(Exception):

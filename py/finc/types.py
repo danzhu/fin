@@ -1,7 +1,6 @@
 from typing import Any, Sequence, List, Dict, Iterator, Iterable, Union, Set, \
     Sized
 import math
-from .symbols import Variable
 from . import builtin
 from . import symbols
 
@@ -66,7 +65,6 @@ class Resolution:
 
         if isinstance(tp, Reference):
             return isinstance(other, Reference) \
-                and tp.level == other.level \
                 and self.match_unsized(tp.type, other.type, ret)
 
         if isinstance(tp, Array):
@@ -134,12 +132,25 @@ class Resolution:
             other = self.generics[other.name]
 
         if isinstance(tp, Reference):
-            if not isinstance(other, Reference) \
-                    or tp.level > other.level \
-                    or not self.match_unsized(tp.type, other.type, ret):
+            # cannot cast from non-reference to reference
+            if not isinstance(other, Reference):
                 return None
 
-            return MATCH_PERFECT - 1.0 + tp.level / other.level
+            # remove common references
+            while isinstance(tp, Reference) and isinstance(other, Reference):
+                tp = tp.type
+                other = other.type
+
+            reduction = 0.0
+
+            while isinstance(other, Reference):
+                other = other.type
+                reduction = 1.0
+
+            if not self.match_unsized(tp, other, ret):
+                return None
+
+            return MATCH_PERFECT - reduction
 
         if isinstance(other, Reference):
             # auto reduction to level 0
@@ -170,30 +181,44 @@ class Resolution:
         res: Type = builtin.DIVERGE
         unknown = False
         for other in tps:
+            if other == builtin.VOID:
+                return builtin.VOID
+
             if other == builtin.UNKNOWN:
                 unknown = True
                 continue
-
-            if other == builtin.VOID:
-                return builtin.VOID
 
             # diverge does not affect any type
             if res == builtin.DIVERGE:
                 res = other
                 continue
-            elif other == builtin.DIVERGE:
+
+            if other == builtin.DIVERGE:
                 continue
 
             if isinstance(res, Reference):
-                if not isinstance(other, Reference):
-                    other = Reference(other, 0)
+                left: Type = res
+                right: Type = other
+                lvl = 0
+                while isinstance(left, Reference) and \
+                        isinstance(right, Reference):
+                    left = left.type
+                    right = right.type
+                    lvl += 1
 
-                # FIXME: generics might cause problems
-                if not self.match_type(res.type, other.type, False):
+                # use the size that accepts implicit conversion from the other
+                if self.match_type(left, right, True):
+                    tp = left
+                elif self.match_type(right, left, True):
+                    tp = right
+                else:
+                    # cannot match
                     return builtin.VOID
 
-                lvl = min(res.level, other.level)
-                res = to_level(res.type, lvl)
+                for _ in range(lvl):
+                    tp = Reference(tp)
+
+                res = tp
                 continue
 
             if isinstance(other, Reference):
@@ -247,7 +272,7 @@ class Match:
     def __repr__(self) -> str:
         return f'{self} {self._levels}'
 
-    def update(self, args: List[Type], ret: Type) -> bool:
+    def update(self, args: Sequence[Type], ret: Type) -> bool:
         # None: type mismatch
         # 1: casting to none
         # 2: level reduction
@@ -369,7 +394,7 @@ class Generics(Iterable[Type], Sized):
         return res
 
 
-class Variables(Iterable['symbols.Variable']):
+class Variables(Iterable['symbols.Variable'], Sized):
     def __init__(self, vs: Sequence['symbols.Variable']) -> None:
         self.variables = vs
 
@@ -378,10 +403,10 @@ class Variables(Iterable['symbols.Variable']):
     def __str__(self) -> str:
         return ', '.join(str(v) for v in self.variables)
 
-    def __iter__(self) -> Iterator[Variable]:
+    def __iter__(self) -> Iterator['symbols.Variable']:
         return iter(self.variables)
 
-    def __getitem__(self, idx: Union[int, str]) -> Variable:
+    def __getitem__(self, idx: Union[int, str]) -> 'symbols.Variable':
         if isinstance(idx, int):
             return self.variables[idx]
 
@@ -389,6 +414,9 @@ class Variables(Iterable['symbols.Variable']):
             return self._symbols.get(idx, None)
 
         assert False
+
+    def __len__(self) -> int:
+        return len(self.variables)
 
     def accept(self,
                args: Sequence[Type],
@@ -408,14 +436,11 @@ class Variables(Iterable['symbols.Variable']):
 
 
 class Reference(Type):
-    def __init__(self, tp: Type, lvl: int) -> None:
-        assert not isinstance(tp, Reference)
-
+    def __init__(self, tp: Type) -> None:
         self.type = tp
-        self.level = lvl
 
     def __format(self, tp: Any) -> str:
-        return '&' * self.level + str(tp)
+        return '&' + str(tp)
 
     def __str__(self) -> str:
         return self.__format(self.type)
@@ -424,14 +449,14 @@ class Reference(Type):
         if not isinstance(other, Reference):
             return False
 
-        return self.type == other.type and self.level == other.type
+        return self.type == other.type
 
     def fullname(self) -> str:
         return self.__format(self.type.fullname())
 
     def resolve(self, res: Resolution) -> 'Reference':
         tp = self.type.resolve(res)
-        return Reference(tp, self.level)
+        return Reference(tp)
 
 
 class Array(Type):
@@ -495,7 +520,7 @@ class Special(Type):
         return self is other
 
     def fullname(self) -> str:
-        assert False, 'should not use fullname on special'
+        return self.name
 
     def resolve(self, res: Resolution) -> 'Special':
         return self
@@ -590,33 +615,31 @@ class EnumerationType(Type):
         )
 
 
-def to_level(tp: Type, lvl: int) -> Type:
-    assert tp is not None
-    assert tp != builtin.UNKNOWN
-
-    if isinstance(tp, Reference):
-        tp = tp.type
-
-    if lvl > 0:
-        tp = Reference(tp, lvl)
-
-    return tp
-
-
-def to_ref(tp: Type) -> Reference:
+def deref(tp: Type) -> Type:
     assert tp is not None
     assert tp != builtin.UNKNOWN
 
     if not isinstance(tp, Reference):
-        tp = Reference(tp, 0)
+        raise TypeError(f'cannot dereference {tp}')
+
+    return tp.type
+
+
+def remove_ref(tp: Type) -> Type:
+    assert tp is not None
+    assert tp != builtin.UNKNOWN
+
+    while isinstance(tp, Reference):
+        tp = tp.type
 
     return tp
 
 
 def resolve_overload(overloads: Set[Match],
-                     args: List[Type],
+                     args: Sequence[Type],
                      ret: Type) -> Set[Match]:
-    assert None not in args and ret is not None
+    assert None not in args, f'None in {args}'
+    assert ret is not None, f'{ret} == None'
 
     res: Set[Match] = set()
 

@@ -5,4 +5,4 @@ struct Test
 
 def test()
     let val Test
-    val.rt::print()
+    val.rt:print()

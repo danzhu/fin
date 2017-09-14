@@ -1,3 +1,0 @@
-def test()
-    let i = 1
-    let p &Int = i

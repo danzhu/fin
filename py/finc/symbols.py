@@ -1,7 +1,6 @@
 from typing import Tuple, Dict, Any, Set, List, TypeVar
 import typing
 from . import types
-from . import builtin
 
 
 TTbl = TypeVar('TTbl', bound='SymbolTable')
@@ -119,12 +118,7 @@ class Variable(Symbol):
         return f'{self.name} {self.type}'
 
     def var_type(self) -> 'types.Type':
-        if isinstance(self.type, types.Reference):
-            lvl = self.type.level
-        else:
-            lvl = 0
-
-        return types.to_level(self.type, lvl + 1)
+        return types.Reference(self.type)
 
 
 class Generic(Symbol):
@@ -349,7 +343,7 @@ class Function(Scope):
 
     def basename(self) -> str:
         params = ','.join(p.type.fullname() for p in self.params)
-        ret = self.ret.fullname() if self.ret != builtin.VOID else ''
+        ret = self.ret.fullname()
 
         return f'{self.name}({params}){ret}'
 

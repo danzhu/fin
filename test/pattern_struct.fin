@@ -8,4 +8,4 @@ def main()
     let v = Vector(2, 3)
     match v
         Vector(x, y) => begin
-            rt::assert(x == 2 and y == 3)
+            rt:assert(x == 2 and y == 3)

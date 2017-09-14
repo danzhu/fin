@@ -43,7 +43,7 @@ void Fin::Runtime::run()
 
     checkLibrary();
     _mainContract =
-            std::make_unique<Contract>(_frame.library->function("main()"));
+            std::make_unique<Contract>(_frame.library->function("main()Void"));
 
     _frame.pc = 0;
     call(*_mainContract);

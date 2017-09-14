@@ -54,36 +54,36 @@ def load_builtins() -> symbols.Module:
     # array subscript
     fn = symbols.Function('subscript')
     t = fn.add_generic('T')
-    fn.add_param('arr', types.Reference(types.Array(types.Generic(t)), 1))
+    fn.add_param('arr', types.Reference(types.Array(types.Generic(t))))
     fn.add_param('index', INT)
-    fn.set_ret(types.Reference(types.Generic(t), 1))
+    fn.set_ret(types.Reference(types.Generic(t)))
     mod.add_function(fn)
 
     # alloc
     fn = symbols.Function('alloc')
     t = fn.add_generic('T')
-    fn.set_ret(types.Reference(types.Generic(t), 1))
+    fn.set_ret(types.Reference(types.Generic(t)))
     mod.add_function(fn)
 
     fn = symbols.Function('alloc')
     t = fn.add_generic('T')
     fn.add_param('length', INT)
-    fn.set_ret(types.Reference(types.Array(types.Generic(t)), 1))
+    fn.set_ret(types.Reference(types.Array(types.Generic(t))))
     mod.add_function(fn)
 
     # dealloc
     fn = symbols.Function('dealloc')
     t = fn.add_generic('T')
-    fn.add_param('reference', types.Reference(types.Generic(t), 1))
+    fn.add_param('reference', types.Reference(types.Generic(t)))
     fn.set_ret(VOID)
     mod.add_function(fn)
 
     # realloc
     fn = symbols.Function('realloc')
     t = fn.add_generic('T')
-    fn.add_param('array', types.Reference(types.Array(types.Generic(t)), 1))
+    fn.add_param('array', types.Reference(types.Array(types.Generic(t))))
     fn.add_param('length', INT)
-    fn.set_ret(types.Reference(types.Array(types.Generic(t)), 1))
+    fn.set_ret(types.Reference(types.Array(types.Generic(t))))
     mod.add_function(fn)
 
     return mod

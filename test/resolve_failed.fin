@@ -1,4 +1,4 @@
 import rt
 
 def test()
-    rt::input().rt::print()
+    rt:input().rt:print()

@@ -1,6 +1,6 @@
 from typing import Iterator, List, Callable
 from . import error
-from . import node
+from . import ast
 from . import tokens
 
 
@@ -35,80 +35,89 @@ class Parser:
         self._expect('ID')
         return name
 
-    def _params(self, fn: Callable[[], node.Node]) -> List[node.Node]:
-        self._expect('LPAREN')
-        if self._lookahead.type == 'RPAREN':
+    def _params(self,
+                paren: str,
+                fn: Callable[[], ast.TNode]) -> ast.List[ast.TNode]:
+        self._expect(f'L{paren}')
+        if self._lookahead.type == f'R{paren}':
             self._next()
-            return []
+            return ast.List([])
 
         children = []
         while True:
             children.append(fn())
 
             tp = self._lookahead.type
-            self._expect('COMMA', 'RPAREN')
-            if tp == 'RPAREN':
+            self._expect('COMMA', f'R{paren}')
+            if tp == f'R{paren}':
                 break
 
-        return children
+        return ast.List(children)
 
-    def _children(self, tp: str, fn: Callable[[], node.Node]) -> node.Node:
+    def _children(self,
+                  fn: Callable[[], ast.TNode]) -> ast.List[ast.TNode]:
         self._expect('INDENT')
 
         children = []
         while self._lookahead.type != 'DEDENT':
             children.append(fn())
+            self._expect('EOL')
 
         self._next()  # DEDENT
 
-        return node.Node(tp, None, children)
+        return ast.List(children)
 
-    def _empty(self) -> node.Node:
-        return node.Node('EMPTY', self._lookahead, ())
-
-    def _file(self) -> node.Node:
-        children = []
+    def _file(self) -> ast.File:
+        decls: List[ast.Decl] = []
         while self._lookahead.type != 'EOF':
             if self._lookahead.type == 'IMPORT':
-                children.append(self._import())
+                decls.append(self._import())
             elif self._lookahead.type == 'DEF':
-                children.append(self._def())
+                decls.append(self._def())
             elif self._lookahead.type == 'STRUCT':
-                children.append(self._struct())
+                decls.append(self._struct())
             elif self._lookahead.type == 'ENUM':
-                children.append(self._enum())
+                decls.append(self._enum())
             else:
                 self._expect()
 
-        return node.Node('FILE', None, children)
+        return ast.File(decls)
 
-    def _import(self) -> node.Node:
+    def _import(self) -> ast.Import:
         token = self._lookahead
         self._expect('IMPORT')
-        name = self._name()
+        path = self._path()
         self._expect('EOL')
-        return node.Node('IMPORT', token, (name,))
+        return ast.Import(path)
 
-    def _pattern(self) -> node.Node:
+    def _pattern(self) -> ast.Pattern:
         token = self._lookahead
 
         if token.type == 'UNDERSCORE':
             self._next()
-            return node.Node('PAT_ANY', token, ())
+            return ast.PatternAny()
 
         if token.type in ('NUM', 'FLOAT'):
+            tp = token.type.lower()
             self._next()
-            return node.Node(f'PAT_{token.type}', token, (), token.value)
+            return ast.PatternConst(token.value, tp)
 
-        name = self._name()
+        path = self._path()
 
         if self._lookahead.type != 'LPAREN':
-            return node.Node('PAT_VAR', token, (name,))
+            # if path is not a single id
+            if path.path is not None:
+                # this will always raise;
+                # we expect a left parenthesis after path in pattern
+                self._expect('LPAREN')
 
-        children = node.Node('PAT_PARAMS', None, self._params(self._pattern))
-        return node.Node('PAT_STRUCT', token, (name, children))
+            # otherwise this is a variable pattern
+            return ast.PatternVar(path.name)
 
-    def _gens(self) -> node.Node:
+        args = self._params('PAREN', self._pattern)
+        return ast.PatternCall(path, args)
+
+    def _gens(self) -> ast.List[ast.Generic]:
         children = []
         self._expect('LBRACE')
 
@@ -116,7 +125,7 @@ class Parser:
             token = self._lookahead
             name = self._id()
 
-            children.append(node.Node('ID', token, (), name))
+            children.append(ast.Generic(name))
 
             tp = self._lookahead.type
             self._expect('COMMA', 'RBRACE')
@@ -124,9 +133,9 @@ class Parser:
             if tp == 'RBRACE':
                 break
 
-        return node.Node('GEN_PARAMS', None, children)
+        return ast.List(children)
 
-    def _struct(self) -> node.Node:
+    def _struct(self) -> ast.Struct:
         self._expect('STRUCT')
         token = self._lookahead
         name = self._id()
@@ -134,21 +143,20 @@ class Parser:
         if self._lookahead.type == 'LBRACE':
             gens = self._gens()
         else:
-            gens = self._empty()
+            gens = ast.List([])
 
-        fields = self._children('FIELDS', self._field)
+        fields = self._children(self._field)
         self._expect('EOL')
 
-        return node.Node('STRUCT', token, (gens, fields), name)
+        return ast.Struct(name, gens, fields)
 
-    def _field(self) -> node.Node:
+    def _field(self) -> ast.Field:
         token = self._lookahead
         name = self._id()
         tp = self._type()
-        self._expect('EOL')
-        return node.Node('FIELD', token, (tp,), name)
+        return ast.Field(name, tp)
 
-    def _enum(self) -> node.Node:
+    def _enum(self) -> ast.Enum:
         self._expect('ENUM')
         token = self._lookahead
         name = self._id()
@@ -156,27 +164,25 @@ class Parser:
         if self._lookahead.type == 'LBRACE':
             gens = self._gens()
         else:
-            gens = self._empty()
+            gens = ast.List([])
 
-        variants = self._children('VARIANTS', self._variant)
+        variants = self._children(self._variant)
         self._expect('EOL')
 
-        return node.Node('ENUM', token, (gens, variants), name)
+        return ast.Enum(name, gens, variants)
 
-    def _variant(self) -> node.Node:
+    def _variant(self) -> ast.Variant:
         token = self._lookahead
         name = self._id()
 
         if self._lookahead.type == 'LPAREN':
-            params = self._params(self._param)
+            params = self._params('PAREN', self._field)
         else:
-            params = []
+            params = ast.List([])
 
-        self._expect('EOL')
+        return ast.Variant(name, params)
 
-        return node.Node('VARIANT', token, params, name)
-
-    def _def(self) -> node.Node:
+    def _def(self) -> ast.Def:
         self._expect('DEF')
         token = self._lookahead
 
@@ -185,46 +191,42 @@ class Parser:
         if self._lookahead.type == 'LBRACE':
             gens = self._gens()
         else:
-            gens = self._empty()
+            gens = ast.List([])
 
-        params = node.Node('PARAMS', None, self._params(self._param))
+        params = self._params('PAREN', self._param)
 
         if self._lookahead.type != 'INDENT':
             ret = self._type()
         else:
-            ret = self._empty()
+            ret = None
 
         cont = self._block()
         self._expect('EOL')
-        return node.Node('DEF', token, (gens, params, ret, cont), name)
+        return ast.Def(name, gens, params, ret, cont)
 
-    def _let(self) -> node.Node:
+    def _let(self) -> ast.Let:
         token = self._lookahead
         self._expect('LET')
         name = self._id()
 
-        if self._lookahead.type in ['ASSN', 'COLON', 'EOL']:
-            tp = self._empty()
-        else:
+        if self._lookahead.type not in ['ASSN', 'EOL']:
             tp = self._type()
+        else:
+            tp = None
 
-        lvl = 0
-        if self._lookahead.type in ['ASSN', 'COLON']:
-            while self._lookahead.type == 'COLON':
-                self._next()
-                lvl += 1
-            self._expect('ASSN')
+        if self._lookahead.type == 'ASSN':
+            self._next()  # ASSN
             val = self._test()
 
         elif self._lookahead.type == 'EOL':
-            val = self._empty()
+            val = None
 
         else:
             self._expect()
 
-        return node.Node('LET', token, (tp, val), name, lvl)
+        return ast.Let(name, tp, val)
 
-    def _if(self) -> node.Node:
+    def _if(self) -> ast.If:
         token = self._lookahead
         self._expect('IF')
         cond = self._block()
@@ -234,35 +236,26 @@ class Parser:
             self._next()  # ELSE
             fail = self._block()
         else:
-            fail = self._empty()
+            fail = ast.Noop()
 
-        return node.Node('IF', token, (cond, succ, fail))
+        return ast.If(cond, succ, fail)
 
-    def _match(self) -> node.Node:
+    def _match(self) -> ast.Match:
         token = self._lookahead
         self._expect('MATCH')
         val = self._test()
-        arms = self._children('ARMS', self._arm)
-        return node.Node('MATCH', token, (val, arms))
+        arms = self._children(self._arm)
+        return ast.Match(val, arms)
 
-    def _arm(self) -> node.Node:
-        pat = node.Node('PATTERN', None, (self._pattern(),))
+    def _arm(self) -> ast.Arm:
+        pat = self._pattern()
 
-        tp = self._lookahead.type
-        self._expect('ARM', 'EOL')
+        self._expect('ARM')
+        cont = self._block()
 
-        if tp == 'ARM':
-            cont = self._test()
-        elif tp == 'EOL':
-            cont = self._block()
-        else:
-            assert False
+        return ast.Arm(pat, cont)
 
-        self._expect('EOL')
-
-        return node.Node('ARM', None, (pat, cont))
-
-    def _while(self) -> node.Node:
+    def _while(self) -> ast.While:
         token = self._lookahead
         self._expect('WHILE')
         cond = self._block()
@@ -273,257 +266,248 @@ class Parser:
             self._next()  # ELSE
             fail = self._block()
         else:
-            fail = self._empty()
+            fail = ast.Noop()
 
-        return node.Node('WHILE', token, (cond, cont, fail))
+        return ast.While(cond, cont, fail)
 
-    def _param(self) -> node.Node:
+    def _param(self) -> ast.Param:
         token = self._lookahead
         name = self._id()
         tp = self._type()
-        return node.Node('PARAM', token, (tp,), name)
+        return ast.Param(name, tp)
 
-    def _name(self) -> node.Node:
+    def _path(self) -> ast.Path:
         token = self._lookahead
         name = self._id()
 
-        n = node.Node('ID', token, (), name)
+        n = ast.Path(None, name)
 
-        while self._lookahead.type == 'SCOPE':
+        while self._lookahead.type == 'COLON':
             self._next()
             token = self._lookahead
-            member = node.Node('ID', self._lookahead, (), self._id())
-            n = node.Node('SCOPE', token, (n, member))
+            n = ast.Path(n, self._id())
 
         return n
 
-    def _type(self) -> node.Node:
+    def _type(self) -> ast.Type:
         token = self._lookahead
 
         if self._lookahead.type == 'AMP':
-            lvl = 0
-            while self._lookahead.type == 'AMP':
-                self._next()
-                lvl += 1
-
+            self._next()  # AMP
             tp = self._type()
-            return node.Node('REF', token, (tp,), None, lvl)
+            return ast.TypeRef(tp)
 
         if self._lookahead.type == 'LBRACKET':
             self._next()  # LBRACKET
             tp = self._type()
 
+            size = None
             if self._lookahead.type == 'SEMICOLON':
                 self._next()
 
                 num = self._lookahead
                 self._expect('NUM')
-                size = node.Node(num.type, num, (), num.value)
-            else:
-                size = self._empty()
+                size = ast.Const(num.value, 'num')
 
             self._expect('RBRACKET')
-            return node.Node('ARRAY', token, (tp, size))
+            return ast.TypeArray(tp, size)
 
         if self._lookahead.type == 'ID':
-            name = self._name()
-
-            children = []
+            name = self._path()
             if self._lookahead.type == 'LBRACE':
-                self._next()
+                gens = self._params('BRACE', self._type)
+            else:
+                gens = ast.List([])
 
-                while True:
-                    children.append(self._type())
-
-                    sym = self._lookahead.type
-                    self._expect('COMMA', 'RBRACE')
-                    if sym == 'RBRACE':
-                        break
-
-            gens = node.Node('GEN_ARGS', None, children)
-            return node.Node('TYPE', token, (name, gens))
+            return ast.TypeNamed(name, gens)
 
         self._expect()
         assert False
 
-    def _block(self) -> node.Node:
-        stmts = []
+    def _block(self) -> ast.Expr:
+        if self._lookahead.type != 'INDENT':
+            return self._test()
 
-        if self._lookahead.type == 'INDENT':
-            self._next()  # INDENT
-            while self._lookahead.type != 'DEDENT':
-                if self._lookahead.type == 'LET':
-                    stmt = self._let()
-                else:
-                    stmt = self._test()
+        self._next()  # INDENT
+        stmts: List[ast.Expr] = []
+        while self._lookahead.type != 'DEDENT':
+            stmt: ast.Expr
+            if self._lookahead.type == 'LET':
+                stmt = self._let()
+            else:
+                stmt = self._test()
 
-                self._expect('EOL')
-                stmts.append(stmt)
+            self._expect('EOL')
+            stmts.append(stmt)
 
-            self._next()
-        else:
-            stmts.append(self._test())
+        self._next()  # DEDENT
+        return ast.Block(stmts)
 
-        return node.Node('BLOCK', None, stmts)
-
-    def _test(self) -> node.Node:
+    def _test(self) -> ast.Expr:
         n = self._or_test()
 
-        if self._lookahead.type not in ['ASSN', 'INC_ASSN', 'COLON']:
-            return n
+        if self._lookahead.type == 'ASSN':
+            token = self._lookahead
+            self._next()  # ASSN
+
+            val = self._test()
+            return ast.Assn(n, val)
 
         if self._lookahead.type == 'INC_ASSN':
             token = self._lookahead
+            # PLUS_ASSN -> plus
             op = self._lookahead.variant.split('_', 1)[0].lower()
             self._next()  # INC_ASSN
+
             val = self._test()
-            return node.Node('INC_ASSN', token, (n, val), op)
+            return ast.IncAssn(n, op, val)
 
-        token = self._lookahead
-        lvl = 0
-        while self._lookahead.type == 'COLON':
-            self._next()
-            lvl += 1
-        op = None
-        self._expect('ASSN')
+        return n
 
-        val = self._test()
-        return node.Node('ASSN', token, (n, val), op, lvl)
-
-    def _or_test(self) -> node.Node:
+    def _or_test(self) -> ast.Expr:
         n = self._and_test()
         while self._lookahead.type == 'OR':
             token = self._lookahead
             self._next()
             r = self._and_test()
-            n = node.Node('TEST', token, (n, r), 'OR')
+            n = ast.BinTest(n, 'or', r)
+
         return n
 
-    def _and_test(self) -> node.Node:
+    def _and_test(self) -> ast.Expr:
         n = self._not_test()
         while self._lookahead.type == 'AND':
             token = self._lookahead
             self._next()
             r = self._not_test()
-            n = node.Node('TEST', token, (n, r), 'AND')
+            n = ast.BinTest(n, 'and', r)
+
         return n
 
-    def _not_test(self) -> node.Node:
-        if self._lookahead.type == 'NOT':
-            token = self._lookahead
-            self._next()
-            val = self._not_test()
-            return node.Node('TEST', token, (val,), 'NOT')
+    def _not_test(self) -> ast.Expr:
+        if self._lookahead.type != 'NOT':
+            return self._comp()
 
-        return self._comp()
+        token = self._lookahead
+        self._next()
+        val = self._not_test()
+        return ast.NotTest(val)
 
-    def _comp(self) -> node.Node:
+    def _comp(self) -> ast.Expr:
         n = self._expr()
-        if self._lookahead.type == 'COMP':
-            token = self._lookahead
-            if self._lookahead.variant == 'EQ':
-                op = 'equal'
-            elif self._lookahead.variant == 'NE':
-                op = 'notEqual'
-            elif self._lookahead.variant == 'LT':
-                op = 'less'
-            elif self._lookahead.variant == 'LE':
-                op = 'lessEqual'
-            elif self._lookahead.variant == 'GT':
-                op = 'greater'
-            elif self._lookahead.variant == 'GE':
-                op = 'greaterEqual'
-            else:
-                assert False
-            self._next()
-            r = self._expr()
-            n = node.Node('OP', token, (n, r), op)
-        return n
+        if self._lookahead.type != 'COMP':
+            return n
 
-    def _expr(self) -> node.Node:
-        n = self._term()
+        token = self._lookahead
+        if self._lookahead.variant == 'EQ':
+            op = 'equal'
+        elif self._lookahead.variant == 'NE':
+            op = 'notEqual'
+        elif self._lookahead.variant == 'LT':
+            op = 'less'
+        elif self._lookahead.variant == 'LE':
+            op = 'lessEqual'
+        elif self._lookahead.variant == 'GT':
+            op = 'greater'
+        elif self._lookahead.variant == 'GE':
+            op = 'greaterEqual'
+        else:
+            assert False
+
+        self._next()  # COMP
+        r = self._expr()
+        return ast.Op(op, ast.List([n, r]))
+
+    def _expr(self) -> ast.Expr:
+        n: ast.Expr = self._term()
         while self._lookahead.type in ['PLUS', 'MINUS']:
             token = self._lookahead
             op = self._lookahead.type.lower()
             self._next()
             r = self._term()
-            n = node.Node('OP', token, (n, r), op)
+            n = ast.Op(op, ast.List([n, r]))
+
         return n
 
-    def _term(self) -> node.Node:
+    def _term(self) -> ast.Expr:
         n = self._factor()
         while self._lookahead.type in ['MULTIPLIES', 'DIVIDES', 'MODULUS']:
             token = self._lookahead
             op = self._lookahead.type.lower()
             self._next()
             r = self._factor()
-            n = node.Node('OP', token, (n, r), op)
+            n = ast.Op(op, ast.List([n, r]))
+
         return n
 
-    def _factor(self) -> node.Node:
-        if self._lookahead.type in ['PLUS', 'MINUS']:
-            token = self._lookahead
-            if self._lookahead.type == 'PLUS':
-                op = 'pos'
-            elif self._lookahead.type == 'MINUS':
-                op = 'neg'
-            else:
-                assert False
-            self._next()
-            val = self._factor()
-            return node.Node('OP', token, (val,), op)
-        else:
+    def _factor(self) -> ast.Expr:
+        if self._lookahead.type not in ['PLUS', 'MINUS']:
             return self._atom_expr()
 
-    def _atom_expr(self) -> node.Node:
+        token = self._lookahead
+        if self._lookahead.type == 'PLUS':
+            op = 'pos'
+        elif self._lookahead.type == 'MINUS':
+            op = 'neg'
+        else:
+            assert False, 'unreachable'
+
+        self._next()
+        val = self._factor()
+        return ast.Op(op, ast.List([val]))
+
+    def _atom_expr(self) -> ast.Expr:
         n = self._atom()
 
         while True:
             if self._lookahead.type == 'DOT':
                 self._next()  # DOT
                 token = self._lookahead
-                name = self._name()
+                name = self._path()
 
                 if self._lookahead.type == 'LPAREN':
                     # method call
-                    children = [n] + self._params(self._test)
-                    args = node.Node('ARGS', None, children)
-                    n = node.Node('CALL', token, (name, args))
+                    args = self._params('PAREN', self._test)
+                    n = ast.Method(n, name, args)
                 else:
                     # member access
-                    n = node.Node('MEMBER', token, (n, name))
+                    n = ast.Member(n, name)
 
             elif self._lookahead.type == 'LBRACKET':
                 token = self._lookahead
                 self._next()  # LBRACKET
                 idx = self._test()
                 self._expect('RBRACKET')
-                n = node.Node('OP', token, (n, idx), 'subscript')
+                n = ast.Op('subscript', ast.List([n, idx]))
 
             elif self._lookahead.type == 'ARROW':
                 token = self._lookahead
                 self._next()
                 tp = self._type()
-                n = node.Node('CAST', token, (n, tp))
+                n = ast.Cast(n, tp)
 
             else:
                 break
 
         return n
 
-    def _atom(self) -> node.Node:
+    def _atom(self) -> ast.Expr:
         if self._lookahead.type == 'ID':
             token = self._lookahead
-            name = self._name()
+            name = self._path()
 
             if self._lookahead.type == 'LPAREN':
-                args = node.Node('ARGS', None, self._params(self._test))
-                return node.Node('CALL', token, (name, args))
+                args = self._params('PAREN', self._test)
+                return ast.Call(name, args)
 
-            return node.Node('VAR', token, (name,))
+            return ast.Var(name)
 
         if self._lookahead.type in ['NUM', 'FLOAT']:
-            return self._const()
+            tp = self._lookahead.type.lower()
+            token = self._lookahead
+            self._next()
+
+            return ast.Const(token.value, tp)
 
         if self._lookahead.type == 'LPAREN':
             self._next()
@@ -544,38 +528,29 @@ class Parser:
             self._expect('BEGIN')
             return self._block()
 
-        if self._lookahead.type == 'RETURN':
+        if self._lookahead.type in ['RETURN', 'BREAK']:
             token = self._lookahead
-            self._next()  # RETURN
-            # FIXME: hacks
-            if self._lookahead.type not in ('EOL', 'THEN', 'DO', 'ELSE'):
+            self._next()  # RETURN / BREAK
+
+            # TODO: remove this hack
+            if self._lookahead.type not in ['EOL', 'THEN', 'DO', 'ELSE']:
                 val = self._test()
             else:
-                val = self._empty()
+                val = ast.Noop()
 
-            return node.Node('RETURN', token, (val,))
-
-        if self._lookahead.type == 'BREAK':
-            token = self._lookahead
-            self._next()  # BREAK
-            # FIXME: hacks
-            if self._lookahead.type not in ('EOL', 'THEN', 'DO', 'ELSE'):
-                val = self._test()
-            else:
-                val = self._empty()
-
-            return node.Node('BREAK', token, (val,))
+            if token.type == 'RETURN':
+                return ast.Return(val)
+            elif token.type == 'BREAK':
+                return ast.Break(val)
 
         if self._lookahead.type in ['CONTINUE', 'REDO']:
             token = self._lookahead
-            tp = self._lookahead.type
-            self._next()
-            return node.Node(tp, token, ())
+            self._next()  # CONTINUE / REDO
+
+            if token.type == 'CONTINUE':
+                return ast.Continue()
+            elif token.type == 'REDO':
+                return ast.Redo()
 
         self._expect()
-        assert False
-
-    def _const(self) -> node.Node:
-        token = self._lookahead
-        self._expect('NUM', 'FLOAT')
-        return node.Node(token.type, token, (), token.value)
+        assert False, 'unreachable'

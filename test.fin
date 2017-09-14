@@ -1,19 +1,10 @@
 import rt
 
 def fib(n Int) Int
-    if n == 0 or n == 1 then 1 + return n
-
-    fib(n - 2) + fib(n - 1)
+    match n
+        0 => 0
+        1 => 1
+        _ => fib(n - 2) + fib(n - 1)
 
 def main()
-    let i = 1
-    while TRUE do
-        if i > 1000 then
-            break i
-        else
-            i *= 2
-    else
-        0
-    .rt::print()
-
-    fib(20).rt::print()
+    rt:print(fib(20))
