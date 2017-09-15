@@ -10,7 +10,7 @@ from finc import symbols
 from finc import error
 from finc import generator
 from finc import lexer
-from finc import parse
+from finc import parser
 from finc import analyzer
 from asm import Assembler
 
@@ -18,7 +18,7 @@ from asm import Assembler
 class Compiler:
     def __init__(self) -> None:
         self.lexer = lexer.Lexer()
-        self.parser = parse.Parser()
+        self.parser = parser.Parser()
         self.assembler = Assembler()
 
         builtins = builtin.load_builtins()
@@ -87,22 +87,22 @@ class Compiler:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Fin compiler.')
-    parser.add_argument('src', type=argparse.FileType(), metavar='input',
-                        help='source file')
-    parser.add_argument('-o', '--out', dest='out', metavar='<output>',
-                        type=argparse.FileType('wb'), default='a.fm',
-                        help='write output to <output>')
-    parser.add_argument('-n', '--name', dest='name', metavar='<name>',
-                        default='main',
-                        help='name of the module')
-    parser.add_argument('-s', '--stage', dest='stage', metavar='<stage>',
-                        default='exec',
-                        choices=['lex', 'parse', 'ast', 'asm', 'exec'],
-                        help='compilation stage')
-    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                        help='enable debug information')
-    args = parser.parse_args()
+    ag = argparse.ArgumentParser(description='Fin compiler.')
+    ag.add_argument('src', type=argparse.FileType(), metavar='input',
+                    help='source file')
+    ag.add_argument('-o', '--out', dest='out', metavar='<output>',
+                    type=argparse.FileType('wb'), default='a.fm',
+                    help='write output to <output>')
+    ag.add_argument('-n', '--name', dest='name', metavar='<name>',
+                    default='main',
+                    help='name of the module')
+    ag.add_argument('-s', '--stage', dest='stage', metavar='<stage>',
+                    default='exec',
+                    choices=['lex', 'parse', 'ast', 'asm', 'exec'],
+                    help='compilation stage')
+    ag.add_argument('-d', '--debug', dest='debug', action='store_true',
+                    help='enable debug information')
+    args = ag.parse_args()
 
     compiler = Compiler()
 

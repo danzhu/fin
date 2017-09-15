@@ -113,7 +113,7 @@
 - [x] show variable of unsized type error
 - [ ] recursive struct / enum definition check
 - [ ] optimize `and` / `or` short-circuit
-- [x] ~~restrict struct construction to call syntax~~
+- [x] restrict struct construction to call syntax
 - [ ] make parentheses after enum optional
 - pattern matching
   - [x] struct destructuring
@@ -135,7 +135,7 @@
 - [ ] fix primitive constructor call
 - [ ] remove overload partial ordering
 - fixes for ast overhaul
-  - [ ] line / col for ast
+  - [x] line / col for ast
   - [ ] call node arg / ret value in error msg
   - [ ] forward errors in symbols
   - [ ] level reduction partial ordering

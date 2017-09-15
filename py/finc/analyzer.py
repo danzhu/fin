@@ -22,13 +22,13 @@ def get_symbol(syms: symbols.SymbolTable,
 
 
 def get_type(syms: symbols.SymbolTable,
-             tp: ast.Type) -> types.Type:
-    if tp is None:
+             node: ast.Type) -> types.Type:
+    if node is None:
         return None
 
-    if isinstance(tp, ast.TypeNamed):
+    if isinstance(node, ast.TypeNamed):
         sym = get_symbol(syms,
-                         tp.path,
+                         node.path,
                          symbols.Struct,
                          symbols.Enumeration,
                          symbols.Generic)
@@ -38,16 +38,20 @@ def get_type(syms: symbols.SymbolTable,
                                 symbols.Generic))
 
         if isinstance(sym, symbols.Generic):
-            if len(tp.generics) != 0:
-                raise TypeError('generic type cannot have generic arguments')
+            if len(node.generics) != 0:
+                raise error.AnalyzerError(
+                    'generic type cannot have generic arguments',
+                    node)
 
             return types.Generic(sym)
 
-        if len(tp.generics) != len(sym.generics):
-            raise TypeError('unmatched generic arguments')
+        if len(node.generics) != len(sym.generics):
+            raise error.AnalyzerError(
+                'unmatched generic arguments',
+                node)
 
         gens = types.Generics(sym.generics,
-                              [get_type(syms, g) for g in tp.generics])
+                              [get_type(syms, g) for g in node.generics])
 
         if isinstance(sym, symbols.Struct):
             return types.StructType(sym, gens)
@@ -57,15 +61,15 @@ def get_type(syms: symbols.SymbolTable,
 
         assert False, 'unreachable'
 
-    if isinstance(tp, ast.TypeRef):
-        child = get_type(syms, tp.type)
+    if isinstance(node, ast.TypeRef):
+        child = get_type(syms, node.type)
         return types.Reference(child)
 
-    if isinstance(tp, ast.TypeArray):
-        child = get_type(syms, tp.type)
+    if isinstance(node, ast.TypeArray):
+        child = get_type(syms, node.type)
 
-        if tp.length is not None:
-            leng = int(tp.length.value)
+        if node.length is not None:
+            leng = int(node.length.value)
             return types.Array(child, leng)
 
         return types.Array(child)
@@ -132,8 +136,10 @@ def get_pattern(node: ast.Pattern,
 
 class OverloadSet:
     def __init__(self,
+                 node: ast.Expr,
                  matches: Set[types.Match],
                  args: Sequence[types.Type]) -> None:
+        self.node = node
         self.matches = matches
         self.args = args
 
@@ -141,14 +147,18 @@ class OverloadSet:
         self.matches = types.resolve_overload(self.matches, self.args, ret)
 
         if len(self.matches) == 0:
-            raise TypeError('no viable function overload')
+            raise error.AnalyzerError(
+                'no viable function overload',
+                self.node)
 
         if len(self.matches) > 1:
             if not required:
                 return None
 
-            raise TypeError('cannot resolve function overload between\n' +
-                            '\n'.join('    ' + str(fn) for fn in self.matches))
+            raise error.AnalyzerError(
+                'cannot resolve function overload between\n' +
+                '\n'.join('    ' + str(fn) for fn in self.matches),
+                self.node)
 
         match = next(iter(self.matches))
 
@@ -156,7 +166,9 @@ class OverloadSet:
             if not required:
                 return None
 
-            raise TypeError(f'cannot resolve generic parameters\n  {match}')
+            raise error.AnalyzerError(
+                f'cannot resolve generic parameters\n  {match}',
+                self.node)
 
         return match
 
@@ -165,6 +177,9 @@ class Analyzer:
     def __init__(self,
                  root: symbols.Module) -> None:
         self.root = root
+
+    def analyze(self, file: ast.File, mod: symbols.Module) -> None:
+        raise NotImplementedError()
 
 
 class AnalyzeImport(Analyzer):
@@ -413,7 +428,7 @@ class AnalyzeExpr(Analyzer):
 
             expr.expr_type = builtin.UNKNOWN
             args = [c.expr_type for c in expr.arguments]
-            os = OverloadSet(matches, args)
+            os = OverloadSet(expr, matches, args)
             self.matches[expr] = os
 
             match = os.resolve(expr.expr_type)
@@ -438,7 +453,7 @@ class AnalyzeExpr(Analyzer):
             expr.expr_type = builtin.UNKNOWN
             args = [expr.object.expr_type] + \
                 [c.expr_type for c in expr.arguments]
-            os = OverloadSet(matches, args)
+            os = OverloadSet(expr, matches, args)
             self.matches[expr] = os
 
             match = os.resolve(expr.expr_type)
@@ -457,7 +472,7 @@ class AnalyzeExpr(Analyzer):
 
             expr.expr_type = builtin.UNKNOWN
             args = [c.expr_type for c in expr.arguments]
-            os = OverloadSet(matches, args)
+            os = OverloadSet(expr, matches, args)
             self.matches[expr] = os
 
             match = os.resolve(expr.expr_type)
@@ -475,7 +490,7 @@ class AnalyzeExpr(Analyzer):
             matches = sym.overloads()
             expr.expr_type = get_type(syms, expr.type)
             args = [expr.expr.expr_type]
-            os = OverloadSet(matches, args)
+            os = OverloadSet(expr, matches, args)
             expr.match = os.resolve(expr.expr_type, required=True)
 
         elif isinstance(expr, ast.Member):
@@ -531,7 +546,7 @@ class AnalyzeExpr(Analyzer):
             expr.expr_type = builtin.VOID
             args = [expr.variable.expr_type, expr.value.expr_type]
             ret = types.remove_ref(expr.variable.expr_type)
-            os = OverloadSet(matches, args)
+            os = OverloadSet(expr, matches, args)
 
             expr.match = os.resolve(ret, required=True)
             expr.expr_type = builtin.VOID

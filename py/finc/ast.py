@@ -3,12 +3,17 @@ from . import symbols
 from . import builtin
 from . import types
 from . import pattern
+from . import tokens
 
 
 TNode = typing.TypeVar('TNode', bound='Node')
 
 
 class Node:
+    def __init__(self) -> None:
+        self.start_token: tokens.Token = None
+        self.end_token: tokens.Token = None
+
     def __str__(self) -> str:
         return self.__class__.__name__
 
@@ -17,6 +22,10 @@ class Node:
 
     def _detail(self) -> typing.List[object]:
         return [self.__class__.__name__]
+
+    def set_loc(self, start: tokens.Token, end: tokens.Token) -> None:
+        self.start_token = start
+        self.end_token = end
 
     def children(self) -> typing.Iterable['Node']:
         raise NotImplementedError()

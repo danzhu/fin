@@ -3,37 +3,52 @@ from . import tokens
 
 
 class CompilerError(Exception):
-    def __init__(self, msg: str, token: tokens.Token) -> None:
+    def __init__(self,
+                 msg: str,
+                 start: tokens.Token,
+                 end: tokens.Token) -> None:
         super().__init__(msg)
-        self.token = token
+
+        self.start = start
+        self.end = end
 
     def __str__(self) -> str:
         val = super().__str__()
-        if self.token is not None:
-            val += f'\n  at line {self.token.line},' \
-                + f' column {self.token.column}:'
+        if self.start is None:
+            return val
 
-            line = self.token.src.lstrip()
-            indent = len(self.token.src) - len(line)
-            val += f'\n\n    {line}'
-            val += '    ' + ' ' * (self.token.column - 1 - indent)
-            val += '^' * len(self.token.value or ' ')
+        val += f'\n  at line {self.start.line},' \
+            + f' column {self.start.column}:'
+
+        line = self.start.src.lstrip()
+        indent = len(self.start.src) - len(line)
+        val += f'\n\n    {line}'
+        val += '    ' + ' ' * (self.start.column - 1 - indent)
+
+        # display error marker to end token only if on the same line
+        if self.start.line == self.end.line:
+            val += '^' * (self.end.column +
+                          len(self.end.value or ' ') -
+                          self.start.column)
+        else:
+            val += '^' * len(self.start.value)
 
         return val
 
 
 class LexerError(CompilerError):
-    pass
+    def __init__(self, msg: str, tok: tokens.Token) -> None:
+        super().__init__(msg, tok, tok)
 
 
 class ParserError(CompilerError):
-    pass
+    def __init__(self, msg: str, tok: tokens.Token) -> None:
+        super().__init__(msg, tok, tok)
 
 
 class AnalyzerError(CompilerError):
     def __init__(self, msg: str, node: ast.Node) -> None:
-        # TODO: print token location
-        super().__init__(msg, None)
+        super().__init__(msg, node.start_token, node.end_token)
 
 
 class AssemblerError(Exception):

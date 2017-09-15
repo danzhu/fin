@@ -1,13 +1,31 @@
-from typing import Iterator, List, Callable
+from typing import Iterator, List, Callable, TypeVar, cast
+from functools import wraps
 from . import error
 from . import ast
 from . import tokens
+
+
+TFn = TypeVar('TFn', bound=Callable[..., ast.Node])
+
+
+def set_loc(fn: TFn) -> TFn:
+    @wraps(fn)
+    def wrap(self: 'Parser', *args, **kargs) -> ast.Node:
+        start = self._lookahead
+        node = fn(self, *args, **kargs)
+        end = self._prev
+
+        node.set_loc(start, end)
+        return node
+
+    return cast(TFn, wrap)
 
 
 class Parser:
     def __init__(self) -> None:
         self._src: Iterator[tokens.Token] = None
         self._lookahead: tokens.Token = None
+        self._prev: tokens.Token = None
 
     def parse(self, src: Iterator[tokens.Token]):
         self._src = src
@@ -15,6 +33,7 @@ class Parser:
         return self._file()
 
     def _next(self) -> None:
+        self._prev = self._lookahead
         self._lookahead = next(self._src)
 
     def _expect(self, *types: str) -> None:
@@ -54,8 +73,7 @@ class Parser:
 
         return ast.List(children)
 
-    def _children(self,
-                  fn: Callable[[], ast.TNode]) -> ast.List[ast.TNode]:
+    def _children(self, fn: Callable[[], ast.TNode]) -> ast.List[ast.TNode]:
         self._expect('INDENT')
 
         children = []
@@ -67,6 +85,7 @@ class Parser:
 
         return ast.List(children)
 
+    @set_loc
     def _file(self) -> ast.File:
         decls: List[ast.Decl] = []
         while self._lookahead.type != 'EOF':
@@ -83,24 +102,24 @@ class Parser:
 
         return ast.File(decls)
 
+    @set_loc
     def _import(self) -> ast.Import:
-        token = self._lookahead
         self._expect('IMPORT')
         path = self._path()
         self._expect('EOL')
         return ast.Import(path)
 
+    @set_loc
     def _pattern(self) -> ast.Pattern:
-        token = self._lookahead
-
-        if token.type == 'UNDERSCORE':
+        if self._lookahead.type == 'UNDERSCORE':
             self._next()
             return ast.PatternAny()
 
-        if token.type in ('NUM', 'FLOAT'):
-            tp = token.type.lower()
+        if self._lookahead.type in ('NUM', 'FLOAT'):
+            tp = self._lookahead.type.lower()
+            val = self._lookahead.value
             self._next()
-            return ast.PatternConst(token.value, tp)
+            return ast.PatternConst(val, tp)
 
         path = self._path()
 
@@ -117,12 +136,12 @@ class Parser:
         args = self._params('PAREN', self._pattern)
         return ast.PatternCall(path, args)
 
+    @set_loc
     def _gens(self) -> ast.List[ast.Generic]:
         children = []
         self._expect('LBRACE')
 
         while True:
-            token = self._lookahead
             name = self._id()
 
             children.append(ast.Generic(name))
@@ -135,9 +154,9 @@ class Parser:
 
         return ast.List(children)
 
+    @set_loc
     def _struct(self) -> ast.Struct:
         self._expect('STRUCT')
-        token = self._lookahead
         name = self._id()
 
         if self._lookahead.type == 'LBRACE':
@@ -150,15 +169,15 @@ class Parser:
 
         return ast.Struct(name, gens, fields)
 
+    @set_loc
     def _field(self) -> ast.Field:
-        token = self._lookahead
         name = self._id()
         tp = self._type()
         return ast.Field(name, tp)
 
+    @set_loc
     def _enum(self) -> ast.Enum:
         self._expect('ENUM')
-        token = self._lookahead
         name = self._id()
 
         if self._lookahead.type == 'LBRACE':
@@ -171,8 +190,8 @@ class Parser:
 
         return ast.Enum(name, gens, variants)
 
+    @set_loc
     def _variant(self) -> ast.Variant:
-        token = self._lookahead
         name = self._id()
 
         if self._lookahead.type == 'LPAREN':
@@ -182,9 +201,9 @@ class Parser:
 
         return ast.Variant(name, params)
 
+    @set_loc
     def _def(self) -> ast.Def:
         self._expect('DEF')
-        token = self._lookahead
 
         name = self._id()
 
@@ -204,8 +223,8 @@ class Parser:
         self._expect('EOL')
         return ast.Def(name, gens, params, ret, cont)
 
+    @set_loc
     def _let(self) -> ast.Let:
-        token = self._lookahead
         self._expect('LET')
         name = self._id()
 
@@ -226,8 +245,8 @@ class Parser:
 
         return ast.Let(name, tp, val)
 
+    @set_loc
     def _if(self) -> ast.If:
-        token = self._lookahead
         self._expect('IF')
         cond = self._block()
         self._expect('THEN')
@@ -240,13 +259,14 @@ class Parser:
 
         return ast.If(cond, succ, fail)
 
+    @set_loc
     def _match(self) -> ast.Match:
-        token = self._lookahead
         self._expect('MATCH')
         val = self._test()
         arms = self._children(self._arm)
         return ast.Match(val, arms)
 
+    @set_loc
     def _arm(self) -> ast.Arm:
         pat = self._pattern()
 
@@ -255,8 +275,8 @@ class Parser:
 
         return ast.Arm(pat, cont)
 
+    @set_loc
     def _while(self) -> ast.While:
-        token = self._lookahead
         self._expect('WHILE')
         cond = self._block()
         self._expect('DO')
@@ -270,28 +290,26 @@ class Parser:
 
         return ast.While(cond, cont, fail)
 
+    @set_loc
     def _param(self) -> ast.Param:
-        token = self._lookahead
         name = self._id()
         tp = self._type()
         return ast.Param(name, tp)
 
+    @set_loc
     def _path(self) -> ast.Path:
-        token = self._lookahead
         name = self._id()
 
         n = ast.Path(None, name)
 
         while self._lookahead.type == 'COLON':
             self._next()
-            token = self._lookahead
             n = ast.Path(n, self._id())
 
         return n
 
+    @set_loc
     def _type(self) -> ast.Type:
-        token = self._lookahead
-
         if self._lookahead.type == 'AMP':
             self._next()  # AMP
             tp = self._type()
@@ -324,6 +342,7 @@ class Parser:
         self._expect()
         assert False
 
+    @set_loc
     def _block(self) -> ast.Expr:
         if self._lookahead.type != 'INDENT':
             return self._test()
@@ -343,18 +362,17 @@ class Parser:
         self._next()  # DEDENT
         return ast.Block(stmts)
 
+    @set_loc
     def _test(self) -> ast.Expr:
         n = self._or_test()
 
         if self._lookahead.type == 'ASSN':
-            token = self._lookahead
             self._next()  # ASSN
 
             val = self._test()
             return ast.Assn(n, val)
 
         if self._lookahead.type == 'INC_ASSN':
-            token = self._lookahead
             # PLUS_ASSN -> plus
             op = self._lookahead.variant.split('_', 1)[0].lower()
             self._next()  # INC_ASSN
@@ -364,41 +382,41 @@ class Parser:
 
         return n
 
+    @set_loc
     def _or_test(self) -> ast.Expr:
         n = self._and_test()
         while self._lookahead.type == 'OR':
-            token = self._lookahead
             self._next()
             r = self._and_test()
             n = ast.BinTest(n, 'or', r)
 
         return n
 
+    @set_loc
     def _and_test(self) -> ast.Expr:
         n = self._not_test()
         while self._lookahead.type == 'AND':
-            token = self._lookahead
             self._next()
             r = self._not_test()
             n = ast.BinTest(n, 'and', r)
 
         return n
 
+    @set_loc
     def _not_test(self) -> ast.Expr:
         if self._lookahead.type != 'NOT':
             return self._comp()
 
-        token = self._lookahead
         self._next()
         val = self._not_test()
         return ast.NotTest(val)
 
+    @set_loc
     def _comp(self) -> ast.Expr:
         n = self._expr()
         if self._lookahead.type != 'COMP':
             return n
 
-        token = self._lookahead
         if self._lookahead.variant == 'EQ':
             op = 'equal'
         elif self._lookahead.variant == 'NE':
@@ -418,10 +436,10 @@ class Parser:
         r = self._expr()
         return ast.Op(op, ast.List([n, r]))
 
+    @set_loc
     def _expr(self) -> ast.Expr:
         n: ast.Expr = self._term()
         while self._lookahead.type in ['PLUS', 'MINUS']:
-            token = self._lookahead
             op = self._lookahead.type.lower()
             self._next()
             r = self._term()
@@ -429,10 +447,10 @@ class Parser:
 
         return n
 
+    @set_loc
     def _term(self) -> ast.Expr:
         n = self._factor()
         while self._lookahead.type in ['MULTIPLIES', 'DIVIDES', 'MODULUS']:
-            token = self._lookahead
             op = self._lookahead.type.lower()
             self._next()
             r = self._factor()
@@ -440,11 +458,11 @@ class Parser:
 
         return n
 
+    @set_loc
     def _factor(self) -> ast.Expr:
         if self._lookahead.type not in ['PLUS', 'MINUS']:
             return self._atom_expr()
 
-        token = self._lookahead
         if self._lookahead.type == 'PLUS':
             op = 'pos'
         elif self._lookahead.type == 'MINUS':
@@ -456,13 +474,13 @@ class Parser:
         val = self._factor()
         return ast.Op(op, ast.List([val]))
 
+    @set_loc
     def _atom_expr(self) -> ast.Expr:
         n = self._atom()
 
         while True:
             if self._lookahead.type == 'DOT':
                 self._next()  # DOT
-                token = self._lookahead
                 name = self._path()
 
                 if self._lookahead.type == 'LPAREN':
@@ -474,14 +492,12 @@ class Parser:
                     n = ast.Member(n, name)
 
             elif self._lookahead.type == 'LBRACKET':
-                token = self._lookahead
                 self._next()  # LBRACKET
                 idx = self._test()
                 self._expect('RBRACKET')
                 n = ast.Op('subscript', ast.List([n, idx]))
 
             elif self._lookahead.type == 'ARROW':
-                token = self._lookahead
                 self._next()
                 tp = self._type()
                 n = ast.Cast(n, tp)
@@ -491,9 +507,9 @@ class Parser:
 
         return n
 
+    @set_loc
     def _atom(self) -> ast.Expr:
         if self._lookahead.type == 'ID':
-            token = self._lookahead
             name = self._path()
 
             if self._lookahead.type == 'LPAREN':
@@ -504,10 +520,10 @@ class Parser:
 
         if self._lookahead.type in ['NUM', 'FLOAT']:
             tp = self._lookahead.type.lower()
-            token = self._lookahead
+            val = self._lookahead.value
             self._next()
 
-            return ast.Const(token.value, tp)
+            return ast.Const(val, tp)
 
         if self._lookahead.type == 'LPAREN':
             self._next()
@@ -529,28 +545,32 @@ class Parser:
             return self._block()
 
         if self._lookahead.type in ['RETURN', 'BREAK']:
-            token = self._lookahead
+            tp = self._lookahead.type
             self._next()  # RETURN / BREAK
 
             # TODO: remove this hack
             if self._lookahead.type not in ['EOL', 'THEN', 'DO', 'ELSE']:
-                val = self._test()
+                value = self._test()
             else:
-                val = ast.Noop()
+                value = ast.Noop()
 
-            if token.type == 'RETURN':
-                return ast.Return(val)
-            elif token.type == 'BREAK':
-                return ast.Break(val)
+            if tp == 'RETURN':
+                return ast.Return(value)
+            elif tp == 'BREAK':
+                return ast.Break(value)
+            else:
+                assert False, 'unreachable'
 
         if self._lookahead.type in ['CONTINUE', 'REDO']:
-            token = self._lookahead
+            tp = self._lookahead.type
             self._next()  # CONTINUE / REDO
 
-            if token.type == 'CONTINUE':
+            if tp == 'CONTINUE':
                 return ast.Continue()
-            elif token.type == 'REDO':
+            elif tp == 'REDO':
                 return ast.Redo()
+            else:
+                assert False, 'unreachable'
 
         self._expect()
         assert False, 'unreachable'
