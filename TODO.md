@@ -139,6 +139,9 @@
   - [ ] call node arg / ret value in error msg
   - [ ] forward errors in symbols
   - [ ] level reduction partial ordering
+- compiler warnings
+  - [ ] unused variables
+  - [ ] unreachable code
 
 ## Runtime
 

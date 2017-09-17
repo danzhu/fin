@@ -1,6 +1,7 @@
 #ifndef FIN_EXCEPTION_H
 #define FIN_EXCEPTION_H
 
+#include <new>
 #include <stdexcept>
 
 namespace Fin
