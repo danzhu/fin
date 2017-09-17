@@ -1,0 +1,4 @@
+import rt
+
+def test()
+    rt:missing()

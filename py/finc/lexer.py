@@ -161,7 +161,7 @@ class Lexer:
         if eol_token is not None:
             yield eol_token
 
-        if self.ind_amount > 0:
+        if self.ind_amount is not None:
             for _ in range(indent // self.ind_amount):
                 yield Token('DEDENT', line, ln)
                 yield Token('EOL', line, ln)

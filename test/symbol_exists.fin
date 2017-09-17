@@ -1,0 +1,5 @@
+struct Test
+    a Int
+
+struct Test
+    b Float

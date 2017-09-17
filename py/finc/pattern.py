@@ -6,7 +6,7 @@ from . import symbols
 
 
 class Pattern:
-    type: types.Type
+    type: 'types.Type'
 
     def tested(self) -> bool:
         raise NotImplementedError()
@@ -17,7 +17,7 @@ class Pattern:
     def variables(self) -> Iterator['Variable']:
         return iter([])
 
-    def resolve(self, res: types.Resolution) -> None:
+    def resolve(self, res: 'types.Resolution') -> None:
         self.type = self.type.resolve(res)
 
 
@@ -36,7 +36,7 @@ class Wildcard(Pattern):
 
 
 class Constant(Pattern):
-    def __init__(self, value: Any, tp: types.Type) -> None:
+    def __init__(self, value: Any, tp: 'types.Type') -> None:
         self.value = value
         self.type = tp
 
@@ -51,7 +51,7 @@ class Constant(Pattern):
 
 
 class Variable(Pattern):
-    def __init__(self, name: str, tp: types.Type) -> None:
+    def __init__(self, name: str, tp: 'types.Type') -> None:
         self.name = name
         self.type = tp
 
@@ -69,12 +69,13 @@ class Variable(Pattern):
     def variables(self) -> Iterator['Variable']:
         return iter([self])
 
-    def set_variable(self, var: symbols.Variable) -> None:
+    def set_variable(self, var: 'symbols.Variable') -> None:
         self.variable = var
 
 
 class Struct(Pattern):
-    def __init__(self, src: Union[symbols.Struct, symbols.Variant]) -> None:
+    def __init__(self,
+                 src: Union['symbols.Struct', 'symbols.Variant']) -> None:
         self.source = src
 
         if isinstance(src, symbols.Struct):
@@ -108,7 +109,7 @@ class Struct(Pattern):
     def variables(self) -> Iterator[Variable]:
         return chain.from_iterable(pat.variables() for pat in self.subpatterns)
 
-    def resolve(self, res: types.Resolution) -> None:
+    def resolve(self, res: 'types.Resolution') -> None:
         super().resolve(res)
 
         # get the actual fields and resolve them

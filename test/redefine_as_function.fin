@@ -1,0 +1,5 @@
+struct Fn
+    f Int
+
+def Fn()
+    let i = 0

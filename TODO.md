@@ -136,8 +136,8 @@
 - [ ] remove overload partial ordering
 - fixes for ast overhaul
   - [x] line / col for ast
-  - [ ] call node arg / ret value in error msg
-  - [ ] forward errors in symbols
+  - [x] ~~call node arg / ret value in error msg~~
+  - [x] forward errors in symbols
   - [ ] level reduction partial ordering
 - compiler warnings
   - [ ] unused variables

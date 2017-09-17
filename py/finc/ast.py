@@ -15,7 +15,7 @@ class Node:
         self.end_token: tokens.Token = None
 
     def __str__(self) -> str:
-        return self.__class__.__name__
+        return type(self).__name__
 
     def __repr__(self) -> str:
         return ' '.join(str(e) for e in self._detail() if e is not None)

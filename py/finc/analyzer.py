@@ -136,10 +136,8 @@ def get_pattern(node: ast.Pattern,
 
 class OverloadSet:
     def __init__(self,
-                 node: ast.Expr,
                  matches: Set[types.Match],
                  args: Sequence[types.Type]) -> None:
-        self.node = node
         self.matches = matches
         self.args = args
 
@@ -147,18 +145,18 @@ class OverloadSet:
         self.matches = types.resolve_overload(self.matches, self.args, ret)
 
         if len(self.matches) == 0:
-            raise error.AnalyzerError(
+            raise error.SymbolError(
                 'no viable function overload',
-                self.node)
+                None)
 
         if len(self.matches) > 1:
             if not required:
                 return None
 
-            raise error.AnalyzerError(
+            raise error.SymbolError(
                 'cannot resolve function overload between\n' +
                 '\n'.join('    ' + str(fn) for fn in self.matches),
-                self.node)
+                None)
 
         match = next(iter(self.matches))
 
@@ -166,9 +164,9 @@ class OverloadSet:
             if not required:
                 return None
 
-            raise error.AnalyzerError(
+            raise error.SymbolError(
                 f'cannot resolve generic parameters\n  {match}',
-                self.node)
+                None)
 
         return match
 
@@ -196,29 +194,36 @@ class AnalyzeDeclare(Analyzer):
         # structs / enums must be declared first for recursive definition
         # and for usage as arg / ret of functions
         for decl in file.items:
-            if isinstance(decl, ast.Def):
-                decl.symbol = symbols.Function(decl.name)
-                mod.add_function(decl.symbol)
+            try:
+                if isinstance(decl, ast.Def):
+                    decl.symbol = symbols.Function(decl.name)
+                    mod.add_function(decl.symbol)
 
-            elif isinstance(decl, ast.Struct):
-                decl.symbol = symbols.Struct(decl.name)
-                mod.add_struct(decl.symbol)
+                elif isinstance(decl, ast.Struct):
+                    decl.symbol = symbols.Struct(decl.name)
+                    mod.add_struct(decl.symbol)
 
-            elif isinstance(decl, ast.Enum):
-                decl.symbol = symbols.Enumeration(decl.name)
-                mod.add_enum(decl.symbol)
+                elif isinstance(decl, ast.Enum):
+                    decl.symbol = symbols.Enumeration(decl.name)
+                    mod.add_enum(decl.symbol)
+            except error.SymbolError as e:
+                raise error.AnalyzerError(str(e), decl, e.symbol)
 
         # define structs and declare functions next so they can be used
         # anywhere in functions
         for decl in file.items:
-            if isinstance(decl, ast.Def):
-                self._declare_function(decl)
+            try:
+                if isinstance(decl, ast.Def):
+                    self._declare_function(decl)
 
-            elif isinstance(decl, ast.Struct):
-                self._define_struct(decl)
+                elif isinstance(decl, ast.Struct):
+                    self._define_struct(decl)
 
-            elif isinstance(decl, ast.Enum):
-                self._define_enum(decl)
+                elif isinstance(decl, ast.Enum):
+                    self._define_enum(decl)
+            except error.SymbolError as e:
+                # TODO: error message can use a more specific ast node
+                raise error.AnalyzerError(str(e), decl, e.symbol)
 
     def _declare_function(self, fn: ast.Def) -> None:
         # generic parameters
@@ -320,6 +325,12 @@ class AnalyzeExpr(Analyzer):
                 decl.body = self._expect(decl.body, decl.symbol.ret)
 
     def _expr(self, expr: ast.Expr, syms: symbols.SymbolTable) -> None:
+        try:
+            self._update(expr, syms)
+        except error.SymbolError as e:
+            raise error.AnalyzerError(str(e), expr, e.symbol)
+
+    def _update(self, expr: ast.Expr, syms: symbols.SymbolTable) -> None:
         if isinstance(expr, ast.Block):
             syms = symbols.Block(syms)
             for child in expr:
@@ -428,7 +439,7 @@ class AnalyzeExpr(Analyzer):
 
             expr.expr_type = builtin.UNKNOWN
             args = [c.expr_type for c in expr.arguments]
-            os = OverloadSet(expr, matches, args)
+            os = OverloadSet(matches, args)
             self.matches[expr] = os
 
             match = os.resolve(expr.expr_type)
@@ -453,7 +464,7 @@ class AnalyzeExpr(Analyzer):
             expr.expr_type = builtin.UNKNOWN
             args = [expr.object.expr_type] + \
                 [c.expr_type for c in expr.arguments]
-            os = OverloadSet(expr, matches, args)
+            os = OverloadSet(matches, args)
             self.matches[expr] = os
 
             match = os.resolve(expr.expr_type)
@@ -472,7 +483,7 @@ class AnalyzeExpr(Analyzer):
 
             expr.expr_type = builtin.UNKNOWN
             args = [c.expr_type for c in expr.arguments]
-            os = OverloadSet(expr, matches, args)
+            os = OverloadSet(matches, args)
             self.matches[expr] = os
 
             match = os.resolve(expr.expr_type)
@@ -484,13 +495,11 @@ class AnalyzeExpr(Analyzer):
         elif isinstance(expr, ast.Cast):
             self._expr(expr.expr, syms)
 
-            sym = syms.get('cast', symbols.FunctionGroup)
-            assert isinstance(sym, symbols.FunctionGroup)
+            matches = self.module.operators('cast')
 
-            matches = sym.overloads()
             expr.expr_type = get_type(syms, expr.type)
             args = [expr.expr.expr_type]
-            os = OverloadSet(expr, matches, args)
+            os = OverloadSet(matches, args)
             expr.match = os.resolve(expr.expr_type, required=True)
 
         elif isinstance(expr, ast.Member):
@@ -501,7 +510,7 @@ class AnalyzeExpr(Analyzer):
             if not isinstance(tp, types.StructType):
                 raise error.AnalyzerError(
                     'member access requires struct type',
-                    expr)
+                    expr.member)
 
             if expr.member.path is not None:
                 raise error.AnalyzerError(
@@ -546,7 +555,7 @@ class AnalyzeExpr(Analyzer):
             expr.expr_type = builtin.VOID
             args = [expr.variable.expr_type, expr.value.expr_type]
             ret = types.remove_ref(expr.variable.expr_type)
-            os = OverloadSet(expr, matches, args)
+            os = OverloadSet(matches, args)
 
             expr.match = os.resolve(ret, required=True)
             expr.expr_type = builtin.VOID

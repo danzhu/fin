@@ -1,6 +1,7 @@
 from typing import Tuple, Dict, Any, Set, List, TypeVar
 import typing
 from . import types
+from . import error
 
 
 TTbl = TypeVar('TTbl', bound='SymbolTable')
@@ -12,7 +13,9 @@ def check_type(sym: 'Symbol', tps: Tuple[type, ...]):
             return
 
     exp = ' or '.join(t.__name__ for t in tps)
-    raise LookupError(f"expecting {exp}, but got {type(sym).__name__} '{sym}'")
+    raise error.SymbolError(
+        f"expecting {exp}, but got {type(sym).__name__} '{sym}'",
+        sym)
 
 
 class Symbol:
@@ -28,8 +31,10 @@ class SymbolTable:
 
     def _add_symbol(self, name: str, sym: Symbol) -> None:
         if name in self.symbols:
-            raise LookupError(
-                f"symbol '{sym.name}' exists as {self.symbols[sym.name]}")
+            old = self.symbols[sym.name]
+            raise error.SymbolError(
+                f"symbol '{sym.name}' already exists",
+                old)
 
         self.symbols[name] = sym
 
@@ -53,7 +58,10 @@ class SymbolTable:
 
     def add_reference(self, mod: 'Module') -> None:
         if mod.name in self.references:
-            raise LookupError(f"reference '{mod.name}' already in scope")
+            old = self.references[mod.name]
+            raise error.SymbolError(
+                f"reference '{mod.name}' already in scope",
+                old)
 
         self.references[mod.name] = mod
 
@@ -61,7 +69,9 @@ class SymbolTable:
         sym = self._find(name)
 
         if sym is None:
-            raise LookupError(f"cannot find symbol '{name}'")
+            raise error.SymbolError(
+                f"cannot find symbol '{name}'",
+                None)
 
         check_type(sym, tps)
         return sym
@@ -70,14 +80,18 @@ class SymbolTable:
         sym = self._member(name)
 
         if sym is None:
-            raise LookupError(f"cannot find member '{name}'")
+            raise error.SymbolError(
+                f"cannot find member '{name}'",
+                None)
 
         check_type(sym, tps)
         return sym
 
     def ancestor(self, tp: typing.Type[TTbl]) -> TTbl:
         if self.parent is None:
-            raise LookupError(f'cannot find ancestor of type {tp.__name__}')
+            raise error.SymbolError(
+                f'cannot find ancestor of type {tp.__name__}',
+                None)
 
         if isinstance(self.parent, tp):
             return self.parent
@@ -85,9 +99,7 @@ class SymbolTable:
         return self.parent.ancestor(tp)
 
     def module(self) -> 'Module':
-        mod = self.ancestor(Module)
-        assert isinstance(mod, Module)
-        return mod
+        return self.ancestor(Module)
 
 
 class Constant(Symbol):
@@ -111,8 +123,11 @@ class Variable(Symbol):
         self.index = idx
         self.is_arg = is_arg
 
+        # TODO: this doesn't seem like a good place to check
         if isinstance(tp, types.Array) and tp.length is None:
-            raise TypeError('cannot create variable of unsized array type')
+            raise error.SymbolError(
+                'cannot create variable of unsized array type',
+                None)
 
     def __str__(self) -> str:
         return f'{self.name} {self.type}'
@@ -208,7 +223,9 @@ class Module(Scope):
             sym = self.symbols[fn.name]
 
             if not isinstance(sym, FunctionGroup):
-                raise LookupError(f"redefining '{sym}' as function")
+                raise error.SymbolError(
+                    f"redefining '{fn.name}' as function",
+                    sym)
 
             group = sym
 

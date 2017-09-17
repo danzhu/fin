@@ -114,7 +114,7 @@ def main() -> None:
     try:
         compiler.compile(args.src, args.out, args.name, args.stage)
     except error.CompilerError as e:
-        print(f'{type(e).__name__}: {e}', file=sys.stderr)
+        print(f'{type(e).__name__}: {e.detail()}', file=sys.stderr)
         exit(1)
 
 
