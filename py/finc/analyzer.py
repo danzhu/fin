@@ -721,6 +721,7 @@ class AnalyzeExpr(Analyzer):
         if tar == builtin.VOID:
             void = ast.Void(expr)
             void.expr_type = builtin.VOID
+            void.set_loc(expr.start_token, expr.end_token)
             return void
 
         # deref
@@ -728,6 +729,7 @@ class AnalyzeExpr(Analyzer):
             assert isinstance(expr.expr_type, types.Reference)
             deref = ast.Deref(expr)
             deref.expr_type = expr.expr_type.type
+            deref.set_loc(expr.start_token, expr.end_token)
             expr = deref
 
         return expr

@@ -142,6 +142,7 @@
 - compiler warnings
   - [ ] unused variables
   - [ ] unreachable code
+- [ ] implicit conversion sequence
 
 ## Runtime
 
