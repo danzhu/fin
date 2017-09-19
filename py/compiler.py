@@ -17,7 +17,7 @@ from asm import Assembler
 
 class Compiler:
     def __init__(self) -> None:
-        self.lexer = lexer.Lexer()
+        self.lexer = lexer.Lexer('fin')
         self.parser = parser.Parser()
         self.assembler = Assembler()
 
