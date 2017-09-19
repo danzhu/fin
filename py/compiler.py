@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from typing import Iterable, cast
+from typing import Iterable
 import argparse
 import io
 import os
@@ -12,14 +12,15 @@ from finc import generator
 from finc import lexer
 from finc import parser
 from finc import analyzer
-from asm import Assembler
+import asm
 
 
 class Compiler:
     def __init__(self) -> None:
         self.lexer = lexer.Lexer('fin')
         self.parser = parser.Parser()
-        self.assembler = Assembler()
+        self.assembler = asm.Assembler()
+        self.generator = generator.Generator()
 
         builtins = builtin.load_builtins()
         self.root = symbols.Module('', None, builtins)
@@ -74,16 +75,13 @@ class Compiler:
         if stage == 'ast':
             ast.print()
 
-        with io.StringIO() as asm:
-            assembly = cast(io.StringIO, asm)
+        gen = self.generator.generate(ast, mod)
 
-            generator.Generator(ast, mod, cast(io.TextIOBase, assembly))
+        if stage == 'asm':
+            for ins in gen:
+                print(ins)
 
-            if stage == 'asm':
-                print(assembly.getvalue())
-
-            assembly.seek(0)
-            self.assembler.assemble(assembly, out)
+        self.assembler.assemble(gen, out)
 
 
 def main() -> None:

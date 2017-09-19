@@ -1,10 +1,10 @@
-from typing import Dict, Set, List, Union, Any
-from io import TextIOBase
+from typing import Dict, Set, List, Union, Any, Sequence, Iterable, Iterator
 from . import builtin
 from . import symbols
 from . import types
 from . import pattern
 from . import ast
+from . import instr
 
 
 OP_TABLE = {
@@ -24,17 +24,18 @@ OP_TABLE = {
 }
 
 
-class Writer:
+class Writer(Iterable[instr.Instr]):
     def __init__(self, parent: 'Writer' = None) -> None:
-        self._instrs: List[str] = []
+        self._instrs: List[instr.Instr] = []
         self._indent: int = 0 if parent is None else parent._indent
 
-    def _write(self, val: str) -> None:
-        self._instrs.append('  ' * self._indent + val)
+    def __iter__(self) -> Iterator[instr.Instr]:
+        return iter(self._instrs)
 
-    def output(self, out: TextIOBase) -> None:
-        for instr in self._instrs:
-            out.write(instr + '\n')
+    def _write(self, tokens: Sequence[str]) -> None:
+        # TODO: line content
+        ins = instr.Instr(tokens, self._indent)
+        self._instrs.append(ins)
 
     def indent(self) -> None:
         self._indent += 1
@@ -43,16 +44,16 @@ class Writer:
         self._indent -= 1
 
     def instr(self, *args: str) -> None:
-        self._write(' '.join(args))
+        self._write(args)
 
     def comment(self, val: object) -> None:
-        self._write(f'# {val}')
+        self._write([f'# {val}'])
 
     def label(self, label: str) -> None:
-        self._write(f'{label}:')
+        self._write([f'{label}:'])
 
     def space(self) -> None:
-        self._write('')
+        self._write([])
 
     def extend(self, writer: 'Writer') -> None:
         self._instrs.extend(writer._instrs)
@@ -171,16 +172,23 @@ class TypeRef:
 
 
 class Generator:
-    def __init__(self,
+    def __init__(self) -> None:
+        self._root: ast.Node
+        self._module: symbols.Module
+
+        self._labels: Dict[str, int] = None
+        self._function_refs: Set[symbols.Function] = None
+        self._type_refs: Dict[str, SymbolRef] = None
+
+    def generate(self,
                  root: ast.Node,
-                 mod: symbols.Module,
-                 out: TextIOBase) -> None:
+                 mod: symbols.Module) -> Iterable[instr.Instr]:
         self._root = root
         self._module = mod
 
-        self._labels: Dict[str, int] = {}
-        self._function_refs: Set[symbols.Function] = set()
-        self._type_refs: Dict[str, SymbolRef] = {}
+        self._labels = {}
+        self._function_refs = set()
+        self._type_refs = {}
 
         body = Writer()
         for decl in root.children():
@@ -220,7 +228,7 @@ class Generator:
         writer.space()
         writer.extend(body)
 
-        writer.output(out)
+        return writer
 
     def label(self, name: str) -> str:
         count = self._labels.get(name, 0)

@@ -12,11 +12,11 @@ type 'Vec' 1 END_Vec
     size_i
 
     !off content
-    field Ptr
+    local Ptr
     !off size
-    field Int
+    local Int
     !off capacity
-    field Int
+    local Int
 
     type_ret
 END_Vec:

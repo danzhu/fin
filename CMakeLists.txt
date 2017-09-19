@@ -64,18 +64,18 @@ file(MAKE_DIRECTORY "${GEN}")
 # custom commands
 add_custom_command(
     OUTPUT "${GEN}/opcode.h"
-    DEPENDS "${PY}/instructions" "${PY}/instr.py" "${PY}/opcode.py"
+    DEPENDS "${PY}/instructions" "${PY}/instrs.py" "${PY}/opcode.py"
     COMMAND "${PY}/opcode.py" > "${GEN}/opcode.h")
 
 add_custom_command(
     OUTPUT "${GEN}/opcode.cc"
-    DEPENDS "${PY}/instructions" "${PY}/instr.py" "${PY}/opname.py"
+    DEPENDS "${PY}/instructions" "${PY}/instrs.py" "${PY}/opname.py"
     COMMAND "${PY}/opname.py" > "${GEN}/opcode.cc")
 
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/instructions.md"
-    DEPENDS "${PY}/instructions" "${PY}/instr.py"
-    COMMAND "${PY}/instr.py" > "${CMAKE_CURRENT_BINARY_DIR}/instructions.md")
+    DEPENDS "${PY}/instructions" "${PY}/instrs.py"
+    COMMAND "${PY}/instrs.py" > "${CMAKE_CURRENT_BINARY_DIR}/instructions.md")
 
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/test.fm"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import instr
+import instrs
 
 FORMAT = """#include "opcode.h"
 
@@ -19,7 +19,7 @@ std::ostream &Fin::operator<<(std::ostream &out, Opcode op)
 
 def main() -> None:
     opnames = [hex(i) for i in range(256)]
-    for ins in instr.load():
+    for ins in instrs.load():
         opnames[ins.opcode] = ins.opname
 
     names = ',\n'.join('   "{}"'.format(e) for e in opnames)

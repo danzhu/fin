@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
-from typing import List, Iterable, Dict, Any, DefaultDict
+from typing import List, Iterable, Dict, Any, DefaultDict, Iterator
 from collections import defaultdict
 import io
 import argparse
 import struct
-import instr
+import instrs
+from finc import builtin  # FIXME: circular import workaround
 from finc import error
+from finc import lexer
+from finc import tokens
+from finc import instr
 
 
 BRANCH_SIZE = 4
@@ -23,7 +27,7 @@ class RefTable:
         self.refs[value] = len(self.refs)
 
 
-class Token:
+class Chunk:
     def resolve(self,
                 loc: int,
                 syms: Dict[str, int],
@@ -34,7 +38,7 @@ class Token:
         raise NotImplementedError()
 
 
-class Bytes(Token):
+class Bytes(Chunk):
     def __init__(self, val: bytes) -> None:
         self.value = val
 
@@ -48,7 +52,7 @@ class Bytes(Token):
         out.write(self.value)
 
 
-class Label(Token):
+class Label(Chunk):
     def __init__(self, label: str) -> None:
         self.label = label
 
@@ -63,7 +67,7 @@ class Label(Token):
         pass
 
 
-class Branch(Token):
+class Branch(Chunk):
     def __init__(self, label: str) -> None:
         self.label = label
 
@@ -81,7 +85,7 @@ class Branch(Token):
         out.write(encode(value, BRANCH_SIZE))
 
 
-class Reference(Token):
+class Reference(Chunk):
     def __init__(self, tp: str, ref: str) -> None:
         self.type = tp
         self.ref = ref
@@ -101,9 +105,9 @@ class Reference(Token):
 
 class Assembler:
     def __init__(self) -> None:
-        self.instrs = {ins.opname: ins for ins in instr.load()}
+        self.instrs = {ins.opname: ins for ins in instrs.load()}
 
-        self.tokens: List[Token] = None
+        self.chunks: List[Chunk] = None
         self.references: DefaultDict[str, RefTable] = None
         self.functions: RefTable = None
         self.types: RefTable = None
@@ -113,38 +117,20 @@ class Assembler:
         self.ref_lib: str = None
         self.type: str = None
 
-    def assemble(self, src: Iterable[str], out: io.BytesIO) -> None:
-        self.tokens = []
+    def assemble(self,
+                 src: Iterable[instr.Instr],
+                 out: io.BytesIO) -> None:
+        self.chunks = []
         self.references = defaultdict(RefTable)
         self.functions = RefTable()
         self.types = RefTable()
         self.members = RefTable()
 
         # shebang
-        self.tokens.append(Bytes(b'#!/usr/bin/env fin\n'))
+        self.chunks.append(Bytes(b'#!/usr/bin/env fin\n'))
 
-        ln = 0
-        for line in src:
-            ln += 1
-
-            line = line.split('#')[0].strip()
-            if line == '':
-                continue
-
-            segs = line.split(' ')
-
-            # labels
-            while len(segs) > 0 and segs[0][-1] == ':':
-                self.tokens.append(Label(segs[0][:-1]))
-                segs = segs[1:]
-
-            if len(segs) == 0:
-                continue
-
-            try:
-                self.instr(segs[0], *segs[1:])
-            except (LookupError, ValueError) as e:
-                raise error.AssemblerError(str(e), line, ln)
+        for ins in src:
+            self.write(ins)
 
         syms: Dict[str, int] = {}
         location = 0
@@ -154,31 +140,54 @@ class Assembler:
         self.references['member'] = self.members
 
         # two-pass to resolve labels and references
-        for token in self.tokens:
-            size = token.resolve(location, syms, self.references)
+        for chunk in self.chunks:
+            size = chunk.resolve(location, syms, self.references)
             location += size
 
-        for token in self.tokens:
-            token.write(out, syms)
+        for chunk in self.chunks:
+            chunk.write(out, syms)
 
-    def instr(self, opname: str, *args: str) -> None:
+    def write(self, instruction: instr.Instr) -> None:
+        if len(instruction.tokens) == 0:
+            return
+
+        opname = instruction.tokens[0]
+        args = instruction.tokens[1:]
+
+        # comment
+        if opname[0] == '#':
+            return
+
         # pseudo-label resolution
         if opname[0] == '!':
             tp = opname[1:]
             self.references[tp].add(args[0])
             return
 
+        # label
+        if opname[-1] == ':':
+            if len(args) != 0:
+                raise error.AssemblerError(
+                    'labels need to be on their own lines',
+                    instruction)
+
+            self.chunks.append(Label(opname[:-1]))
+            return
+
         if opname not in self.instrs:
-            raise LookupError(f"no instruction '{opname}' defined")
+            raise error.AssemblerError(
+                f"no instruction '{opname}' defined",
+                instruction)
 
         ins = self.instrs[opname]
-        self.tokens.append(Bytes(pack('B', ins.opcode)))
+        self.chunks.append(Bytes(pack('B', ins.opcode)))
 
         if len(args) != len(ins.params):
-            raise ValueError(
+            raise error.AssemblerError(
                 'incorrect number of arguments for' +
                 f'\n  {ins}' +
-                f'\n  expected {len(ins.params)}, got {len(args)}')
+                f'\n  expected {len(ins.params)}, got {len(args)}',
+                instruction)
 
         if len(args) > 0:
             name = get_name(args[0])
@@ -208,42 +217,46 @@ class Assembler:
                 self.members.add(f'{self.type}:{name}')
 
         for param, arg in zip(ins.params, args):
-            token: Token
+            chunk: Chunk
             if param.type == 'int':
-                token = Bytes(encode(int(arg, 0)))
+                chunk = Bytes(encode(int(arg, 0)))
 
             elif param.type == 'str':
                 if arg[0] != "'" or arg[-1] != "'":
-                    raise ValueError('expected quotes around string')
+                    raise error.AssemblerError(
+                        'expected quotes around string',
+                        instruction)
 
-                arg = arg[1:-1]
-                token = Bytes(encode(len(arg)) + arg.encode())
+                val = get_name(arg)
+                chunk = Bytes(encode(len(val)) + val.encode())
 
             elif param.type == 'fn':
-                token = Reference('function', arg)
+                chunk = Reference('function', arg)
 
             elif param.type == 'tp':
-                token = Reference('type', arg)
+                chunk = Reference('type', arg)
 
             elif param.type == 'mem':
-                token = Reference('member', arg)
+                chunk = Reference('member', arg)
 
             elif param.type in ['sz', 'ctr', 'off']:
-                token = Bytes(encode(self.references[param.type][arg]))
+                chunk = Bytes(encode(self.references[param.type][arg]))
 
             elif param.type == 'i':
-                token = Bytes(pack('i', int(arg, 0)))
+                chunk = Bytes(pack('i', int(arg, 0)))
 
             elif param.type == 'f':
-                token = Bytes(pack('f', float(arg)))
+                chunk = Bytes(pack('f', float(arg)))
 
             elif param.type == 'tar':
                 if not arg[0].isalpha():
-                    raise ValueError('branch target not a label')
+                    raise error.AssemblerError(
+                        'branch target not a label',
+                        instruction)
 
-                token = Branch(arg)
+                chunk = Branch(arg)
 
-            self.tokens.append(token)
+            self.chunks.append(chunk)
 
 
 def pack(fmt: str, val: Any) -> bytes:
@@ -268,6 +281,7 @@ def encode(val: int, size: int = None) -> bytes:
 
     if size is not None:
         if len(enc) > size:
+            # TODO: use AssemblerError
             raise ValueError('value out of range')
 
         while len(enc) < size:
@@ -280,6 +294,25 @@ def get_name(val: str) -> str:
     return val[1:-1]
 
 
+def lex(src: Iterable[str]) -> Iterator[instr.Instr]:
+    lx = lexer.Lexer('asm')
+    lx.disable_indent = True
+
+    segs: List[tokens.Token] = []
+    for token in lx.read(src):
+        if token.type == 'EOF':
+            break
+
+        if token.type == 'EOL':
+            # TODO: line number & source
+            # TODO: indent?
+            yield instr.Instr([t.value for t in segs],
+                              indent=0)
+            segs = []
+        else:
+            segs.append(token)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description='Fin assembler.')
     parser.add_argument('src', type=argparse.FileType(), metavar='input',
@@ -290,7 +323,8 @@ def main() -> None:
     args = parser.parse_args()
 
     asm = Assembler()
-    asm.assemble(args.src, args.out)
+    tks = lex(args.src)
+    asm.assemble(tks, args.out)
 
 
 if __name__ == '__main__':

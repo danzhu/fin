@@ -1,6 +1,7 @@
 from . import ast
 from . import tokens
 from . import symbols
+from . import instr
 
 
 class CompilerError(Exception):
@@ -67,14 +68,5 @@ class SymbolError(Exception):
 
 
 class AssemblerError(Exception):
-    def __init__(self, msg: str, line: str, ln: int) -> None:
+    def __init__(self, msg: str, ins: 'instr.Instr') -> None:
         Exception.__init__(self, msg)
-
-        self.line = line
-        self.line_number = ln
-
-    def __str__(self) -> str:
-        val = super().__str__()
-        val += f'  at line {self.line_number}:'
-        val += f'\n\n    {self.line}'
-        return val

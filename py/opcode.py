@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import instr
+import instrs
 
 FORMAT = """#ifndef FIN_OPCODE_H
 #define FIN_OPCODE_H
@@ -23,7 +23,7 @@ namespace Fin
 
 
 def main() -> None:
-    opcodes = sorted((ins.opcode, ins.opname) for ins in instr.load())
+    opcodes = sorted((ins.opcode, ins.opname) for ins in instrs.load())
 
     print(FORMAT.format(opcodes=',\n'.join(
         '        {} = {}'.format(
