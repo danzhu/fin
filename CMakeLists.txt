@@ -102,6 +102,11 @@ add_custom_target(run
     COMMAND fin-bin "${CMAKE_CURRENT_BINARY_DIR}/test.fm"
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/test.fm")
 
+add_custom_target(valgrind
+    COMMAND valgrind --leak-check=full $<TARGET_FILE:fin-bin>
+        "${CMAKE_CURRENT_BINARY_DIR}/test.fm"
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/test.fm")
+
 # preprocessor definitions
 if(DEBUG)
     target_compile_definitions(fin PUBLIC FIN_DEBUG=${DEBUG})
