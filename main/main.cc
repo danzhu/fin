@@ -19,7 +19,15 @@ T input()
     return val;
 }
 
-Fin::Ptr alloc(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Int len)
+Fin::Ptr alloc(Fin::Allocator &alloc, Fin::TypeInfo type)
+{
+    return alloc.alloc(type.alignedSize(),
+                       Fin::Allocator::Access::Read |
+                               Fin::Allocator::Access::Write |
+                               Fin::Allocator::Access::Free);
+}
+
+Fin::Ptr allocArray(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Int len)
 {
     auto size = type.alignedSize() * len;
     return alloc.alloc(size,
@@ -28,14 +36,20 @@ Fin::Ptr alloc(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Int len)
                                Fin::Allocator::Access::Free);
 }
 
-Fin::Ptr _realloc(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Ptr ptr,
-                  Fin::Int len)
+Fin::Ptr reallocArray(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Ptr ptr,
+                      Fin::Int len)
 {
     auto size = type.size().align(type.alignment()) * len;
     return alloc.realloc(ptr, size);
 }
 
 void dealloc(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Ptr ptr)
+{
+    alloc.dealloc(ptr);
+}
+
+void deallocArray(Fin::Allocator &alloc, Fin::TypeInfo type, Fin::Ptr ptr,
+                  Fin::Int len)
 {
     alloc.dealloc(ptr);
 }
@@ -78,9 +92,11 @@ int main(int argc, const char *argv[])
     fin.addNative("input()Int", input<Fin::Int>);
     fin.addNative("input()Float", input<Fin::Float>);
     fin.addNative("input()Bool", input<Fin::Bool>);
-    fin.addNative("alloc(Int)&[0]", alloc);
-    fin.addNative("realloc(&[0],Int)&[0]", _realloc);
+    fin.addNative("alloc()&0", alloc);
+    fin.addNative("alloc(Int)&[0]", allocArray);
+    fin.addNative("realloc(&[0],Int)&[0]", reallocArray);
     fin.addNative("dealloc(&0)Void", dealloc);
+    fin.addNative("dealloc(&[0],Int)Void", deallocArray);
     fin.addNative("write(Int)", write);
     fin.addNative("read()Int", read);
     fin.addNative("backtrace()Void", backtrace);

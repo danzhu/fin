@@ -42,7 +42,8 @@ class Node:
             if isinstance(c, tp):
                 res.add(c)
 
-            res |= c.decedents(tp)
+            if c is not None:
+                res |= c.decedents(tp)
 
         return res
 

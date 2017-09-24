@@ -160,6 +160,7 @@ test_exec("generic_struct")
 test_exec("pattern_enum")
 test_exec("pattern_int")
 test_exec("pattern_struct")
+test_exec("sample_vec")
 
 # TODO
 # test_compile("recursive_struct" "recursive type definition")

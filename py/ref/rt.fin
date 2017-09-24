@@ -28,6 +28,9 @@ def realloc{T}(ref &[T], length Int) &[T]
 def dealloc{T}(ref &T)
     0
 
+def dealloc{T}(ref &[T], length Int)
+    0
+
 def write(char Int)
     0
 
