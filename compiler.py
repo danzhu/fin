@@ -12,14 +12,14 @@ from finc import generator
 from finc import lexer
 from finc import parser
 from finc import analyzer
-import asm
 
 
 class Compiler:
-    def __init__(self) -> None:
+    def __init__(self, debug: bool) -> None:
+        self._debug = debug
+
         self.lexer = lexer.Lexer('fin')
         self.parser = parser.Parser()
-        self.assembler = asm.Assembler()
         self.generator = generator.Generator()
 
         builtins = builtin.load_builtins()
@@ -75,13 +75,10 @@ class Compiler:
         if stage == 'ast':
             ast.print()
 
-        gen = self.generator.generate(ast, mod)
+        gen = self.generator.generate(ast, mod, self._debug)
 
-        if stage == 'asm':
-            for ins in gen:
-                print(ins)
-
-        self.assembler.assemble(gen, out)
+        for ins in gen:
+            out.write(str(ins) + '\n')
 
 
 def main() -> None:
@@ -89,7 +86,7 @@ def main() -> None:
     ag.add_argument('src', type=argparse.FileType(), metavar='input',
                     help='source file')
     ag.add_argument('-o', '--out', dest='out', metavar='<output>',
-                    type=argparse.FileType('wb'), default='a.fm',
+                    type=argparse.FileType('w'), default='a.ll',
                     help='write output to <output>')
     ag.add_argument('-n', '--name', dest='name', metavar='<name>',
                     default='main',
@@ -102,7 +99,7 @@ def main() -> None:
                     help='enable debug information')
     args = ag.parse_args()
 
-    compiler = Compiler()
+    compiler = Compiler(args.debug)
 
     if args.debug:
         # don't catch any exceptions
