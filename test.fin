@@ -1,10 +1,10 @@
-def main() Int
-    let i = 0
-    while i < 100 do
-        i = i + 1
-
-    i = 1
-    if i > 0 then
-        i + 2 - 3
+def fib(n Int) Int
+    if n == 0 then
+        0
+    else if n == 1 then
+        1
     else
-        -1
+        fib(n - 2) + fib(n - 1)
+
+def main() Int
+    fib(40)

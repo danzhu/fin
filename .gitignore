@@ -1,1 +1,3 @@
+# llvm files
 *.ll
+*.bc

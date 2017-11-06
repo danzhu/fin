@@ -45,6 +45,9 @@ class Arg:
         self.value = val
 
     def __str__(self) -> str:
+        if self.value is None:
+            return self.type
+
         return f'{self.type} {self.value}'
 
 
@@ -53,6 +56,7 @@ class Writer(Iterable[str]):
         self._instrs: List[str] = []
         self._temps: int = 0
         self._indent: int = 0 if parent is None else parent._indent
+        self._label: Arg = None
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._instrs)
@@ -71,14 +75,19 @@ class Writer(Iterable[str]):
     def dedent(self) -> None:
         self._indent -= 1
 
-    def exec(self, name: Union[str, List[str]], *args: object) -> None:
+    def exec(self, instrs: Union[object, List[object]], *args: object) -> None:
         def format_arg(arg: object) -> str:
+            if isinstance(arg, tuple):
+                return '(' + ', '.join(str(a) for a in arg) + ')'
+
             if isinstance(arg, list):
                 return '[' + ', '.join(str(a) for a in arg) + ']'
 
             return str(arg)
 
-        ins = name if isinstance(name, str) else ' '.join(name)
+        ins = ' '.join(format_arg(i) for i in instrs) \
+            if isinstance(instrs, list) \
+            else format_arg(instrs)
 
         if len(args) > 0:
             ags = ', '.join(format_arg(a) for a in args)
@@ -95,13 +104,20 @@ class Writer(Iterable[str]):
     def comment(self, val: object) -> None:
         self._write(f'; {val}')
 
-    def label(self, label: str) -> None:
+    def label(self, label: Arg) -> None:
+        lab = label.value[1:]
         self.space()
         # trim the leading '%'
-        self._instrs.append(f'{label.value[1:]}:')
+        self._instrs.append(f'{lab}:')
+
+        self._label = label
 
     def space(self) -> None:
         self._instrs.append('')
+
+    def block(self) -> Arg:
+        assert self._label is not None
+        return self._label
 
     def extend(self, writer: 'Writer') -> None:
         self._instrs.extend(writer._instrs)
@@ -243,31 +259,35 @@ class Function:
 
         name = fn_name(node.symbol)
         ret = type_name(node.symbol.ret)
-        params = ', '.join([ref_sym(p) for p in node.symbol.params])
+        params = tuple(Arg(type_name(p.type), param_name(p))
+                       for p in node.symbol.params)
 
         self.writer = Writer(writer)
 
         self.writer.comment(node)
-        self.writer.exec('define', f'{ret} @{name}({params}) {{')
+        self.writer.exec(['define', ret, name, params, '{'])
         self.writer.indent()
+
+        for p, param in zip(params, node.symbol.params):
+            self.writer.exec([var_name(param), '=', 'alloca'],
+                             type_name(param.type))
+            self.writer.exec('store', p, ref_sym(param))
 
         for var in node.symbol.locals:
             # HACK: shouldn't use exec here
-            self.writer.exec(f'{var_name(var)} = alloca', type_name(var.type))
+            self.writer.exec([var_name(var), '=', 'alloca'],
+                             type_name(var.type))
 
         res = self._gen(node.body)
-        if node.symbol.ret == builtin.VOID:
-            self.writer.exec('ret', 'void')
-        else:
-            self.writer.exec('ret', res)
+        self.writer.exec('ret', res)
 
         self.writer.dedent()
-        self.writer.exec(f'}}')
+        self.writer.exec('}')
         self.writer.space()
 
         writer.extend(self.writer)
 
-    def label(self, name: str) -> str:
+    def label(self, name: str) -> Arg:
         count = self._labels.get(name, 0)
         self._labels[name] = count + 1
         return Arg('label', f'%{name}_{count}')
@@ -282,23 +302,24 @@ class Function:
         if self._debug:
             self.writer.dedent()
 
-        if val is not None:
-            tp = type_name(node.expr_type)
-            return Arg(tp, val)
+        tp = type_name(node.expr_type)
+        return Arg(tp, val)
 
     # def _member(self, tp: types.Type, mem: str) -> str:
     #     tp = types.remove_ref(tp)
     #     tp_name = type_name(tp)
     #     return f'{tp_name}:{mem}'
 
-    def _call(self, match: types.Match, args: Iterable[str]) -> str:
+    def _call(self, match: types.Match, args: Iterable[Arg]) -> str:
         fn = match.source
         assert isinstance(fn, symbols.Function)
 
         # non-builtin function
-        # if fn.module().name != '':
-        #     self.writer.instr('call', match_name(match))
-        #     return
+        if fn.module().name != '':
+            return self.writer.call(['call',
+                                     type_name(match.ret),
+                                     match_name(match)],
+                                    tuple(args))
 
         # if fn.name == 'subscript':
         #     self.writer.instr('addr_off', type_name(match.generics[0]))
@@ -310,6 +331,7 @@ class Function:
         #     self.writer.instr(f'cast_{frm}_{tar}')
         #     return
 
+        # binary operator
         tp = match.params[0].type
         if tp == builtin.INT:
             assert fn.name in INT_OP_TABLE, f'unknown operator {fn.name}'
@@ -392,18 +414,18 @@ class Function:
                 self._gen(child)
                 self.writer.space()
 
-            val = self._gen(expr[-1])
-            if val is not None:
-                return val.value
+            return self._gen(expr[-1]).value
 
-        elif isinstance(expr, ast.Let):
+        if isinstance(expr, ast.Let):
             assert isinstance(expr.symbol, symbols.Variable)
 
             if expr.value is not None:
                 val = self._gen(expr.value)
                 self.writer.exec('store', val, ref_sym(expr.symbol))
 
-        elif isinstance(expr, ast.If):
+            return None
+
+        if isinstance(expr, ast.If):
             then = self.label('then')
             els = self.label('else')
             end = self.label('end_if')
@@ -414,11 +436,13 @@ class Function:
 
             self.writer.label(then)
             succ = self._gen(expr.success)
+            then = self.writer.block()
             self.writer.exec('br', end)
 
             if has_else:
                 self.writer.label(els)
                 fail = self._gen(expr.failure)
+                els = self.writer.block()
                 self.writer.exec('br', end)
 
             self.writer.label(end)
@@ -429,7 +453,9 @@ class Function:
                                         [succ.value, then.value],
                                         [fail.value, els.value])
 
-        elif isinstance(expr, ast.While):
+            return None
+
+        if isinstance(expr, ast.While):
             whl = self.label('while')
             do = self.label('do')
             els = self.label('otherwise')
@@ -450,14 +476,17 @@ class Function:
 
             self.writer.label(do)
             self._gen(expr.content)
+            do = self.writer.block()
             self.writer.exec('br', whl)
 
             if has_else:
                 self.writer.label(els)
                 self._gen(expr.failure)
+                els = self.writer.block()
                 self.writer.exec('br', end)
 
             self.writer.label(end)
+            return None
 
             # FIXME: break returning values
 
@@ -521,48 +550,47 @@ class Function:
         #     self._gen(expr.expr, stk)
         #     self.writer.instr('not')
 
-        # elif isinstance(expr, ast.Call):
-        #     sym = expr.match.source
+        if isinstance(expr, ast.Call):
+            sym = expr.match.source
 
-        #     if isinstance(sym, symbols.Function):
-        #         for child in expr.arguments:
-        #             stk = self._gen(child, stk)
+            if isinstance(sym, symbols.Function):
+                args = [self._gen(a) for a in expr.arguments]
 
-        #         self._call(expr.match)
+                return self._call(expr.match, args)
 
-        #     elif isinstance(sym, (symbols.Struct, symbols.Variant)):
-        #         tmp = self._temp()
+            # elif isinstance(sym, (symbols.Struct, symbols.Variant)):
+            #     tmp = self._temp()
 
-        #         tp = expr.match.ret
-        #         self._push_local(tmp, tp)
+            #     tp = expr.match.ret
+            #     self._push_local(tmp, tp)
 
-        #         assert isinstance(tp, (types.StructType,
-        #                                types.EnumerationType))
+            #     assert isinstance(tp, (types.StructType,
+            #                            types.EnumerationType))
 
-        #         if isinstance(sym, symbols.Variant):
-        #             self.writer.instr('addr_var', tmp)
-        #             # TODO: user-defined value type
-        #             self.writer.instr('const_i', str(sym.value))
-        #             self.writer.instr('store_mem',
-        #                               self._member(tp, '_value'),
-        #                               self._type(builtin.INT))
+            #     if isinstance(sym, symbols.Variant):
+            #         self.writer.instr('addr_var', tmp)
+            #         # TODO: user-defined value type
+            #         self.writer.instr('const_i', str(sym.value))
+            #         self.writer.instr('store_mem',
+            #                           self._member(tp, '_value'),
+            #                           self._type(builtin.INT))
 
-        #         # silence type checker
-        #         assert isinstance(sym, (symbols.Struct, symbols.Variant))
+            #     # silence type checker
+            #     assert isinstance(sym, (symbols.Struct, symbols.Variant))
 
-        #         assert len(expr.arguments) == len(sym.fields)
-        #         for child, field in zip(expr.arguments, sym.fields):
-        #             self.writer.instr('addr_var', tmp)
-        #             self._gen(child, stk)
-        #             self.writer.instr('store_mem',
-        #                               self._member(tp, field.name),
-        #                               self._type(child.expr_type))
+            #     assert len(expr.arguments) == len(sym.fields)
+            #     for child, field in zip(expr.arguments, sym.fields):
+            #         self.writer.instr('addr_var', tmp)
+            #         self._gen(child, stk)
+            #         self.writer.instr('store_mem',
+            #                           self._member(tp, field.name),
+            #                           self._type(child.expr_type))
 
-        #         self.writer.instr('load_var', tmp, self._type(tp))
-        #         self._pop_local(tmp)
+            #     self.writer.instr('load_var', tmp, self._type(tp))
+            #     self._pop_local(tmp)
 
-        #     else:
-        #         assert False, 'unknown match source type'
+            else:
+                assert False, 'unknown match source type'
 
         # elif isinstance(expr, ast.Method):
         #     stk = self._gen(expr.object, stk)
@@ -572,14 +600,13 @@ class Function:
 
         #     self._call(expr.match)
 
-        elif isinstance(expr, ast.Op):
+        if isinstance(expr, ast.Op):
             args = [self._gen(child) for child in expr.arguments]
-
             return self._call(expr.match, args)
 
-        elif isinstance(expr, ast.Cast):
+        if isinstance(expr, ast.Cast):
             res = self._gen(expr.expr)
-            return self._call(expr.match, res)
+            return self._call(expr.match, [res])
 
         # elif isinstance(expr, ast.Member):
         #     self._gen(expr.expr, stk)
@@ -590,7 +617,7 @@ class Function:
         #     mem = expr.member.name
         #     self.writer.instr('addr_mem', self._member(tp, mem))
 
-        elif isinstance(expr, ast.Var):
+        if isinstance(expr, ast.Var):
             if isinstance(expr.variable, symbols.Constant):
                 tp = expr.variable.type
                 if not isinstance(tp, types.StructType):
@@ -607,14 +634,15 @@ class Function:
             else:
                 assert False, 'unknown var type'
 
-        elif isinstance(expr, ast.Const):
+        if isinstance(expr, ast.Const):
             return expr.value
 
-        elif isinstance(expr, ast.Assn):
+        if isinstance(expr, ast.Assn):
             var = self._gen(expr.variable)
             val = self._gen(expr.value)
 
             self.writer.exec('store', val, var)
+            return None
 
         # elif isinstance(expr, ast.IncAssn):
         #     # left
@@ -668,22 +696,33 @@ class Function:
         #     self._exit(stk, cxt['before'])
         #     self.writer.instr('br', cxt['redo'])
 
-        elif isinstance(expr, ast.Noop):
+        if isinstance(expr, ast.Noop):
             # well, it's noop
             return None
 
-        elif isinstance(expr, ast.Deref):
+        if isinstance(expr, ast.Deref):
             val = self._gen(expr.expr)
             return self.writer.call('load', type_name(expr.expr_type), val)
 
         # elif isinstance(expr, ast.Void):
         #     self.writer.instr('pop', self._type(expr.expr.expr_type))
 
-        else:
-            assert False, f'unknown expr type {expr}'
+        assert False, f'unknown expr type {expr}'
 
 
 def type_name(tp: types.Type) -> str:
+    if tp == builtin.VOID:
+        return 'void'
+
+    if tp == builtin.INT:
+        return 'i32'
+
+    if tp == builtin.FLOAT:
+        return 'float'
+
+    if tp == builtin.BOOL:
+        return 'i1'
+
     if isinstance(tp, types.Array):
         return f'[{type_name(tp.type)}]'
 
@@ -693,52 +732,42 @@ def type_name(tp: types.Type) -> str:
     if isinstance(tp, types.Generic):
         return tp.fullname()
 
-    if isinstance(tp, (types.StructType, types.EnumerationType)):
-        if tp == builtin.INT:
-            return 'i32'
+    # if isinstance(tp, (types.StructType, types.EnumerationType)):
+    #     name = tp.symbol.fullname()
 
-        if tp == builtin.FLOAT:
-            return 'float'
+    #     if len(tp.generics) > 0:
+    #         name += '{' + \
+    #             ','.join(type_name(g) for g in tp.generics) + \
+    #             '}'
 
-        if tp == builtin.BOOL:
-            return 'i1'
-
-        # FIXME: user types
-        # name = tp.symbol.fullname()
-
-        # if len(tp.generics) > 0:
-        #     name += '{' + \
-        #         ','.join(type_name(g) for g in tp.generics) + \
-        #         '}'
-
-        # return name
+    #     return name
 
     assert False, tp
+
+
+def fn_name(fn: symbols.Function) -> str:
+    return f'@"{fn.fullname()}"'
 
 
 def match_name(match: types.Match) -> str:
     fn = match.source
     assert isinstance(fn, symbols.Function)
 
-    name = fn.fullname()
-    if len(fn.generics) > 0:
-        name += '`' + ','.join(type_name(g) for g in match.generics)
-
-    # TODO: constraints
-
-    return name
+    return fn_name(fn)
 
 
 def var_name(var: symbols.Variable) -> str:
-    tp = 'p' if var.is_arg else 'l'
-    return f'%{var.name}_{tp}{var.index}'
+    tp = 'a' if var.is_arg else f'l{var.index}'
+    return f'%{var.name}_{tp}'
+
+
+def param_name(param: symbols.Variable) -> str:
+    assert param.is_arg
+    return f'%{param.name}_p'
+
 
 def ref_sym(var: symbols.Variable) -> Arg:
     return Arg(type_name(var.var_type()), var_name(var))
-
-
-def fn_name(fn: symbols.Function) -> str:
-    return f'"{fn.basename()}"'
 
 
 def native_type_name(tp: types.Type) -> str:

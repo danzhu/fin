@@ -2,13 +2,16 @@ FINC = ./compiler.py
 
 .PHONY: all run clean
 
-all: test.ll
+all: test.bc
 
-run: test.ll
-	lli test.ll
+run: test.bc
+	lli test.bc
 
 clean:
-	${RM} *.ll
+	${RM} test.ll *.bc
+
+test.bc: test.ll main.ll
+	llvm-link $^ -o $@
 
 %.ll: %.fin
 	${FINC} $< -o $@ -d
