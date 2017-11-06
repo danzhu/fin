@@ -14,4 +14,4 @@ test.bc: test.ll main.ll
 	llvm-link $^ -o $@
 
 %.ll: %.fin
-	${FINC} $< -o $@ -d
+	${FINC} $< -o $@

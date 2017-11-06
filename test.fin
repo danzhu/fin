@@ -1,8 +1,6 @@
 def fib(n Int) Int
-    if n == 0 then
-        0
-    else if n == 1 then
-        1
+    if n == 0 or n == 1 then
+        n
     else
         fib(n - 2) + fib(n - 1)
 

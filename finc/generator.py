@@ -81,7 +81,7 @@ class Writer(Iterable[str]):
                 return '(' + ', '.join(str(a) for a in arg) + ')'
 
             if isinstance(arg, list):
-                return '[' + ', '.join(str(a) for a in arg) + ']'
+                return '[ ' + ', '.join(str(a) for a in arg) + ' ]'
 
             return str(arg)
 
@@ -95,19 +95,30 @@ class Writer(Iterable[str]):
         else:
             self._write(ins)
 
-    def call(self, name: Union[str, List[str]], *args: object) -> str:
+    def call(self, instrs: Union[str, List[str]], *args: object) -> str:
         tmp = self.temp()
-        ins = [name] if isinstance(name, str) else name
+        ins = [instrs] if isinstance(instrs, str) else instrs
         self.exec([tmp, '='] + ins, *args)
         return tmp
+
+    def begin(self, instrs: Union[str, List[str]]) -> str:
+        ins = [instrs] if isinstance(instrs, str) else instrs
+        self.exec(ins + ['{'])
+
+        self._label = None
+
+    def end(self) -> str:
+        self.exec('}')
 
     def comment(self, val: object) -> None:
         self._write(f'; {val}')
 
     def label(self, label: Arg) -> None:
-        lab = label.value[1:]
-        self.space()
+        if self._label is not None:
+            self.space()
+
         # trim the leading '%'
+        lab = label.value[1:]
         self._instrs.append(f'{lab}:')
 
         self._label = label
@@ -147,8 +158,6 @@ class Generator:
                 Function(decl, writer, debug)
             else:
                 assert False, 'unknown decl type'
-
-            writer.space()
 
         return writer
 
@@ -262,11 +271,13 @@ class Function:
         params = tuple(Arg(type_name(p.type), param_name(p))
                        for p in node.symbol.params)
 
-        self.writer = Writer(writer)
+        self.writer = writer
 
-        self.writer.comment(node)
-        self.writer.exec(['define', ret, name, params, '{'])
+        self.writer.begin(['define', ret, name, params])
         self.writer.indent()
+
+        entry = self.label('entry')
+        self.writer.label(entry)
 
         for p, param in zip(params, node.symbol.params):
             self.writer.exec([var_name(param), '=', 'alloca'],
@@ -282,10 +293,8 @@ class Function:
         self.writer.exec('ret', res)
 
         self.writer.dedent()
-        self.writer.exec('}')
+        self.writer.end()
         self.writer.space()
-
-        writer.extend(self.writer)
 
     def label(self, name: str) -> Arg:
         count = self._labels.get(name, 0)
@@ -476,13 +485,11 @@ class Function:
 
             self.writer.label(do)
             self._gen(expr.content)
-            do = self.writer.block()
             self.writer.exec('br', whl)
 
             if has_else:
                 self.writer.label(els)
                 self._gen(expr.failure)
-                els = self.writer.block()
                 self.writer.exec('br', end)
 
             self.writer.label(end)
@@ -520,35 +527,32 @@ class Function:
 
         #     self.writer.label(end)
 
-        # elif isinstance(expr, ast.BinTest):
-        #     jump = self.gen.label('SHORT_CIRCUIT')
-        #     end = self.gen.label('END_TEST')
+        if isinstance(expr, ast.BinTest):
+            nxt = self.label('next')
+            end = self.label('end_test')
 
-        #     self._gen(expr.left, stk)
+            beg = self.writer.block()
+            left = self._gen(expr.left)
 
-        #     if expr.operator == 'and':
-        #         self.writer.instr('br_false', jump)
-        #     elif expr.operator == 'or':
-        #         self.writer.instr('br_true', jump)
-        #     else:
-        #         assert False, 'unknown binary test type'
+            if expr.operator == 'and':
+                self.writer.exec('br', left, nxt, end)
+            elif expr.operator == 'or':
+                self.writer.exec('br', left, end, nxt)
+            else:
+                assert False, 'unknown binary test type'
 
-        #     self._gen(expr.right, stk)
-        #     self.writer.instr('br', end)
-        #     self.writer.label(jump)
+            self.writer.label(nxt)
+            right = self._gen(expr.right)
+            self.writer.exec('br', end)
 
-        #     if expr.operator == 'and':
-        #         self.writer.instr('const_false')
-        #     elif expr.operator == 'or':
-        #         self.writer.instr('const_true')
-        #     else:
-        #         assert False, 'unknown binary test type'
+            self.writer.label(end)
+            return self.writer.call(['phi', type_name(expr.expr_type)],
+                                    [left.value, beg.value],
+                                    [right.value, nxt.value])
 
-        #     self.writer.label(end)
-
-        # elif isinstance(expr, ast.NotTest):
-        #     self._gen(expr.expr, stk)
-        #     self.writer.instr('not')
+        if isinstance(expr, ast.NotTest):
+            val = self._gen(expr.expr)
+            return self.writer.call('xor', val, 'true')
 
         if isinstance(expr, ast.Call):
             sym = expr.match.source
@@ -723,14 +727,14 @@ def type_name(tp: types.Type) -> str:
     if tp == builtin.BOOL:
         return 'i1'
 
-    if isinstance(tp, types.Array):
-        return f'[{type_name(tp.type)}]'
+    # if isinstance(tp, types.Array):
+    #     return f'[{type_name(tp.type)}]'
 
     if isinstance(tp, types.Reference):
         return type_name(tp.type) + '*'
 
-    if isinstance(tp, types.Generic):
-        return tp.fullname()
+    # if isinstance(tp, types.Generic):
+    #     return tp.fullname()
 
     # if isinstance(tp, (types.StructType, types.EnumerationType)):
     #     name = tp.symbol.fullname()
@@ -768,7 +772,3 @@ def param_name(param: symbols.Variable) -> str:
 
 def ref_sym(var: symbols.Variable) -> Arg:
     return Arg(type_name(var.var_type()), var_name(var))
-
-
-def native_type_name(tp: types.Type) -> str:
-    return tp.fullname()[0].lower()
