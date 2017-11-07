@@ -75,7 +75,7 @@ class Writer(Iterable[str]):
     def dedent(self) -> None:
         self._indent -= 1
 
-    def exec(self, instrs: Union[object, List[object]], *args: object) -> None:
+    def exec(self, instrs: object, *args: object) -> None:
         def format_arg(arg: object) -> str:
             if isinstance(arg, tuple):
                 return '(' + ', '.join(str(a) for a in arg) + ')'
@@ -95,19 +95,20 @@ class Writer(Iterable[str]):
         else:
             self._write(ins)
 
-    def call(self, instrs: Union[str, List[str]], *args: object) -> str:
+    def call(self, instrs: object, *args: object) -> str:
         tmp = self.temp()
-        ins = [instrs] if isinstance(instrs, str) else instrs
+        ins = instrs if isinstance(instrs, list) else [instrs]
         self.exec([tmp, '='] + ins, *args)
         return tmp
 
-    def begin(self, instrs: Union[str, List[str]]) -> str:
-        ins = [instrs] if isinstance(instrs, str) else instrs
+    def begin(self, instrs: object) -> None:
+        ins = instrs if isinstance(instrs, list) else [instrs]
         self.exec(ins + ['{'])
 
+        self._temps = 0
         self._label = None
 
-    def end(self) -> str:
+    def end(self) -> None:
         self.exec('}')
 
     def comment(self, val: object) -> None:
@@ -648,21 +649,19 @@ class Function:
             self.writer.exec('store', val, var)
             return None
 
-        # elif isinstance(expr, ast.IncAssn):
-        #     # left
-        #     stk = self._gen(expr.variable, stk)
-        #     self.writer.instr('dup', self._type(expr.variable.expr_type))
-        #     # FIXME: this only works for buitin operators
-        #     self.writer.instr('load', self._type(expr.match.params[0].type))
+        if isinstance(expr, ast.IncAssn):
+            var = self._gen(expr.variable)
+            tp = expr.match.params[0].type
+            # FIXME: this only works for buitin operators,
+            # require conversion sequence for right arg
+            load = self.writer.call('load', type_name(tp), var)
 
-        #     # right
-        #     stk = self._gen(expr.value, stk)
+            val = self._gen(expr.value)
 
-        #     # call
-        #     self._call(expr.match)
+            ret = self._call(expr.match, [Arg(type_name(tp), load), val])
 
-        #     # assn
-        #     self.writer.instr('store', self._type(expr.match.ret))
+            self.writer.exec('store', Arg(type_name(expr.match.ret), ret), var)
+            return None
 
         # elif isinstance(expr, ast.Return):
         #     stk = self._gen(expr.value, stk)

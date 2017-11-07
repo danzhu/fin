@@ -5,4 +5,6 @@ def fib(n Int) Int
         fib(n - 2) + fib(n - 1)
 
 def main() Int
-    fib(40)
+    let i = 20
+    i += i
+    fib(i)
