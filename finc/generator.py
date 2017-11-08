@@ -663,18 +663,15 @@ class Function:
             self.writer.exec('store', Arg(type_name(expr.match.ret), ret), var)
             return None
 
-        # elif isinstance(expr, ast.Return):
-        #     stk = self._gen(expr.value, stk)
+        if isinstance(expr, ast.Return):
+            lab = self.label('ret')
 
-        #     cxt = self._context[expr.target]
+            val = self._gen(expr.value)
 
-        #     self._exit(stk, cxt['before'])
+            self.writer.exec('ret', val)
 
-        #     # TODO: cleanup variables for RAII
-        #     if expr.value.expr_type == builtin.VOID:
-        #         self.writer.instr('end')
-        #     else:
-        #         self.writer.instr('ret', self._type(expr.value.expr_type))
+            self.writer.label(lab)
+            return None
 
         # elif isinstance(expr, ast.Break):
         #     stk = self._gen(expr.value, stk)
@@ -707,8 +704,12 @@ class Function:
             val = self._gen(expr.expr)
             return self.writer.call('load', type_name(expr.expr_type), val)
 
-        # elif isinstance(expr, ast.Void):
-        #     self.writer.instr('pop', self._type(expr.expr.expr_type))
+        if isinstance(expr, ast.Void):
+            self._gen(expr.expr)
+
+            # we can just ignore the value
+            # TODO: can just remove this node from analyzer
+            return None
 
         assert False, f'unknown expr type {expr}'
 
@@ -716,6 +717,9 @@ class Function:
 def type_name(tp: types.Type) -> str:
     if tp == builtin.VOID:
         return 'void'
+
+    if tp == builtin.DIVERGE:
+        return None
 
     if tp == builtin.INT:
         return 'i32'

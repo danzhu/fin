@@ -1,10 +1,11 @@
 def fib(n Int) Int
     if n == 0 or n == 1 then
-        n
-    else
-        fib(n - 2) + fib(n - 1)
+        return n
+
+    fib(n - 2) + fib(n - 1)
 
 def main() Int
     let i = 20
     i += i
+    i - i
     fib(i)
